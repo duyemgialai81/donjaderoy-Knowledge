@@ -1,0 +1,14 @@
+# Chặn tất cả node_modules trong mọi folder con (client, server,...)
+**/node_modules/
+
+# Chặn các file môi trường bí mật
+**/.env
+**/.env.local
+
+# Chặn thư mục build của client
+client/dist/
+client/build/
+
+# Chặn các file rác của IDE (như folder .idea bạn đang có)
+.idea/
+.vscode/
