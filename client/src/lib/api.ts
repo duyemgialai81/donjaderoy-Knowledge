@@ -55,14 +55,9 @@ function unwrapResponse(res: any) {
 }
 
 // ==================== AUTH ====================
+
 export async function login(payload: any) {
   const res = await request('POST', '/api/auth/login', payload);
-  const user = res?.data || res;
-  return user ? normalizeUser(user) : user;
-}
-
-export async function register(userData: any) {
-  const res = await request('POST', '/api/auth/register', userData);
   const user = res?.data || res;
   return user ? normalizeUser(user) : user;
 }
@@ -78,6 +73,41 @@ export async function me(token?: string) {
   return user ? normalizeUser(user) : user;
 }
 
+// --- LUỒNG ĐĂNG KÝ (OTP) ---
+
+// 1. Yêu cầu gửi OTP đăng ký
+export async function requestRegisterOtp(userData: any) {
+  const res = await request('POST', '/api/auth/register/request-otp', userData);
+  return res?.data || res;
+}
+
+// 2. Xác thực OTP và hoàn tất đăng ký (Thay thế cho hàm register cũ)
+export async function verifyRegisterOtp(userData: any) {
+  const res = await request('POST', '/api/auth/register', userData);
+  const user = res?.data || res;
+  return user ? normalizeUser(user) : user;
+}
+
+// --- LUỒNG GOOGLE LOGIN ---
+export async function googleLogin(payload: any) {
+  const res = await request('POST', '/api/auth/google/login', payload);
+  const user = res?.data || res;
+  return user ? normalizeUser(user) : user;
+}
+
+// --- LUỒNG QUÊN MẬT KHẨU ---
+
+// 1. Yêu cầu OTP lấy lại mật khẩu
+export async function requestPasswordResetOtp(email: string) {
+  const res = await request('POST', '/api/auth/forgot-password/request-otp', { email });
+  return res?.data || res;
+}
+
+// 2. Xác nhận OTP và đổi mật khẩu mới
+export async function resetPassword(data: any) {
+  const res = await request('POST', '/api/auth/forgot-password/reset', data);
+  return res?.data || res;
+}
 // ==================== POSTS ====================
 export async function getPosts(page = 0, size = 20) {
   const res = await request('GET', `/api/posts?page=${page}&size=${size}`);
@@ -553,9 +583,13 @@ export default {
   
   // Auth
   login,
-  register,
   logout,
   me,
+  requestRegisterOtp,
+  verifyRegisterOtp,
+  googleLogin,
+  requestPasswordResetOtp,
+  resetPassword,
   
   // Posts
   getPosts,
