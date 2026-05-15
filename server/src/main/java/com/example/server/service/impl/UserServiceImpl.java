@@ -910,6 +910,8 @@ public class UserServiceImpl implements UserService {
         dto.setEmail(user.getEmail());
         dto.setAvatar(user.getAvatar());
         dto.setRole(user.getRole().name());
+        dto.setAuthProvider(user.getAuthProvider() != null ? user.getAuthProvider().name() : null);
+        dto.setEmailVerified(user.getEmailVerified());
         dto.setMajorId(user.getMajorId());
         dto.setClassName(user.getClassName());
         dto.setPoints(user.getPoints());

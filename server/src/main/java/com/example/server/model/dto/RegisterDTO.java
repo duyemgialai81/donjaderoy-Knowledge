@@ -10,8 +10,11 @@ import lombok.NoArgsConstructor;
 public class RegisterDTO {
     private String email;
     private String password;
+    private String otp;
     private String name;
     private String role; // student|lecturer
+    private String majorId;
+    private String className;
     private String deviceId;
     private String deviceName;
     private String userAgent;

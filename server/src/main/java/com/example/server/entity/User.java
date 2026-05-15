@@ -26,6 +26,11 @@ public class User {
     @JsonIgnore
     private String password;
     private String avatar;
+    @Enumerated(EnumType.STRING)
+    private AuthProvider authProvider;
+    @Column(unique = true)
+    private String googleId;
+    private Boolean emailVerified;
 
     @Enumerated(EnumType.STRING)
     private Role role;
@@ -40,9 +45,11 @@ public class User {
     private Integer postsCount;
     private Boolean isActive;
 
+    private LocalDateTime lastLoginAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private String bio;
 
     public enum Role { student, lecturer, admin }
+    public enum AuthProvider { local, google }
 }

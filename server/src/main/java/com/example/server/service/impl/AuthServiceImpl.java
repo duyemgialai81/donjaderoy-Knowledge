@@ -1,198 +1,481 @@
 package com.example.server.service.impl;
 
-import com.example.server.entity.Session;
-import com.example.server.entity.User;
-import com.example.server.model.dto.AuthDTO;
-import com.example.server.model.dto.RegisterDTO;
+import com.example.server.config.AppProperties;
+import com.example.server.entity.*;
+import com.example.server.model.dto.*;
 import com.example.server.model.response.ResponseObject;
-import com.example.server.repository.SessionRepository;
-import com.example.server.repository.UserRepository;
+import com.example.server.repository.*;
+import com.example.server.security.JwtTokenProvider;
 import com.example.server.service.AuthService;
-import com.example.server.security.JwtTokenProvider; // Import cần thiết
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import com.example.server.service.EmailService;
+import com.example.server.service.GoogleTokenVerifierService;
+import com.example.server.service.PermissionService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Service
+@RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private SessionRepository sessionRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private com.example.server.repository.DeviceRepository deviceRepository;
-
-    // THÊM: Inject JwtTokenProvider để tạo token JWT
-    @Autowired
-    private JwtTokenProvider jwtTokenProvider;
+    private final UserRepository userRepository;
+    private final SessionRepository sessionRepository;
+    private final DeviceRepository deviceRepository;
+    private final EmailVerificationTokenRepository emailVerificationTokenRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final BanRepository banRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtTokenProvider jwtTokenProvider;
+    private final EmailService emailService;
+    private final GoogleTokenVerifierService googleTokenVerifierService;
+    private final PermissionService permissionService;
+    private final AppProperties appProperties;
 
     @Override
+    @Transactional
     public ResponseObject login(AuthDTO authDTO) {
-        Optional<User> maybe = userRepository.findByEmail(authDTO.getEmail());
-        if (maybe.isEmpty()) return ResponseObject.error("User not found");
-
-        User user = maybe.get();
-        // Support two modes: bcrypt hashed in DB, or legacy plaintext seeded users.
-        boolean ok = false;
-        String stored = user.getPassword();
-        if (stored != null && stored.startsWith("$2")) {
-            // bcrypt
-            ok = passwordEncoder.matches(authDTO.getPassword(), stored);
-        } else {
-            // legacy plaintext
-            ok = stored.equals(authDTO.getPassword());
-            if (ok) {
-                // upgrade to hashed password
-                user.setPassword(passwordEncoder.encode(authDTO.getPassword()));
-                userRepository.save(user);
-            }
+        if (authDTO == null || authDTO.getEmail() == null || authDTO.getPassword() == null) {
+            return ResponseObject.error("Missing email or password");
         }
 
-        if (!ok) return ResponseObject.error("Invalid credentials");
-
-        // [FIX]: TẠO JWT Access Token thay vì UUID ngẫu nhiên
-        String token = jwtTokenProvider.generateAccessToken(UUID.fromString(user.getId()));
-
-        // Tạo session (Lưu ý: Nếu dùng JWT, việc lưu session vào DB không bắt buộc,
-        // nhưng có thể dùng để quản lý trạng thái/logout thủ công)
-        Session session = Session.builder()
-                .id(UUID.randomUUID().toString())
-                .userId(user.getId())
-                .deviceId(authDTO.getDeviceId())
-                .token(token) // Lưu JWT vào bảng sessions
-                .ipAddress(authDTO.getIpAddress())
-                .userAgent(authDTO.getUserAgent())
-                .loginAt(LocalDateTime.now())
-                .isActive(true)
-                .createdAt(LocalDateTime.now())
-                .build();
-
-        sessionRepository.save(session);
-        RegisterDTO registerDTO = new RegisterDTO();
-        if (registerDTO.getDeviceId() == null && (registerDTO.getDeviceName() != null || registerDTO.getUserAgent() != null)) {
-            var device = com.example.server.entity.Device.builder()
-                    .id(UUID.randomUUID().toString())
-                    .userId(user.getId())
-                    .deviceName(registerDTO.getDeviceName())
-                    .browser(registerDTO.getUserAgent())
-                    .createdAt(LocalDateTime.now())
-                    .lastSeen(LocalDateTime.now())
-                    .build();
-            var savedDev = deviceRepository.save(device);
-            session.setDeviceId(savedDev.getId());
-            sessionRepository.save(session);
-        } else if (registerDTO.getDeviceId() != null) {
-            deviceRepository.findById(registerDTO.getDeviceId()).ifPresent(d -> {
-                d.setLastSeen(LocalDateTime.now());
-                deviceRepository.save(d);
-            });
+        User user = userRepository.findByEmail(normalizeEmail(authDTO.getEmail())).orElse(null);
+        if (user == null) {
+            return ResponseObject.error("Account not found");
         }
 
-        // Save device if there is device info
-        if (authDTO.getDeviceId() == null && (authDTO.getDeviceName() != null || authDTO.getUserAgent() != null)) {
-            var device = com.example.server.entity.Device.builder()
-                    .id(UUID.randomUUID().toString())
-                    .userId(user.getId())
-                    .deviceName(authDTO.getDeviceName())
-                    .browser(authDTO.getUserAgent())
-                    .createdAt(LocalDateTime.now())
-                    .lastSeen(LocalDateTime.now())
-                    .build();
-            var savedDev = deviceRepository.save(device);
-            session.setDeviceId(savedDev.getId());
-            sessionRepository.save(session);
-        } else if (authDTO.getDeviceId() != null) {
-            // update last seen
-            deviceRepository.findById(authDTO.getDeviceId()).ifPresent(d -> {
-                d.setLastSeen(LocalDateTime.now());
-                deviceRepository.save(d);
-            });
+        String authBlockReason = getAuthenticationBlockReason(user);
+        if (authBlockReason != null) {
+            return ResponseObject.error(authBlockReason);
+        }
+        if (user.getPassword() == null || user.getPassword().isBlank()) {
+            return ResponseObject.error("This account uses Google login");
+        }
+        if (!matchesPassword(user, authDTO.getPassword())) {
+            return ResponseObject.error("Invalid credentials");
         }
 
-        // Return token and user info
-        return ResponseObject.success(new LoginResult(user.getId(), user.getName(), token, session.getDeviceId()), "Login successful");
+        if (user.getEmailVerified() == null) {
+            user.setEmailVerified(true);
+        }
+        if (user.getAuthProvider() == null) {
+            user.setAuthProvider(User.AuthProvider.local);
+        }
+        user.setLastLoginAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        return ResponseObject.success(buildAuthResult(user, extractDeviceContext(authDTO)), "Login successful");
     }
 
     @Override
+    @Transactional
     public ResponseObject register(RegisterDTO registerDTO) {
-        if (userRepository.findByEmail(registerDTO.getEmail()).isPresent()) {
+        if (registerDTO == null || registerDTO.getEmail() == null) {
+            return ResponseObject.error("Missing register data");
+        }
+        if (registerDTO.getOtp() == null || registerDTO.getOtp().isBlank()) {
+            return requestRegisterOtp(registerDTO);
+        }
+
+        String email = normalizeEmail(registerDTO.getEmail());
+        if (userRepository.findByEmail(email).isPresent()) {
             return ResponseObject.error("Email already exists");
         }
 
-        // Create new user
+        EmailVerificationToken token = emailVerificationTokenRepository
+                .findTopByEmailAndUsedFalseOrderByCreatedAtDesc(email)
+                .orElse(null);
+        if (token == null) {
+            return ResponseObject.error("Register OTP not found");
+        }
+        if (token.getExpiresAt().isBefore(LocalDateTime.now())) {
+            return ResponseObject.error("Register OTP expired");
+        }
+        if (!Objects.equals(token.getToken(), registerDTO.getOtp())) {
+            return ResponseObject.error("Register OTP is invalid");
+        }
+
+        User.Role role;
+        try {
+            role = normalizePublicRole(token.getPendingRole());
+        } catch (IllegalArgumentException ex) {
+            return ResponseObject.error(ex.getMessage());
+        }
+
         User user = User.builder()
                 .id(UUID.randomUUID().toString())
-                .name(registerDTO.getName())
-                .email(registerDTO.getEmail())
-                .password(passwordEncoder.encode(registerDTO.getPassword()))
-                .role(User.Role.valueOf(registerDTO.getRole()))
+                .name(token.getPendingName())
+                .email(email)
+                .password(token.getPasswordHash())
+                .role(role)
+                .majorId(token.getMajorId())
+                .className(token.getClassName())
                 .points(0)
                 .followers(0)
                 .following(0)
                 .postsCount(0)
                 .isActive(true)
+                .authProvider(User.AuthProvider.local)
+                .emailVerified(true)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
-
         userRepository.save(user);
 
-        // Auto-login: [FIX]: TẠO JWT Access Token thay vì UUID ngẫu nhiên
-        String token = jwtTokenProvider.generateAccessToken(UUID.fromString(user.getId()));
+        token.setUserId(user.getId());
+        token.setUsed(true);
+        token.setVerifiedAt(LocalDateTime.now());
+        emailVerificationTokenRepository.save(token);
 
+        return ResponseObject.success(buildAuthResult(user, extractDeviceContext(token)), "Register successful");
+    }
+
+    @Override
+    @Transactional
+    public ResponseObject requestRegisterOtp(RegisterDTO registerDTO) {
+        if (registerDTO == null) {
+            return ResponseObject.error("Missing register data");
+        }
+        String email = normalizeEmail(registerDTO.getEmail());
+        if (email == null || registerDTO.getPassword() == null || registerDTO.getName() == null) {
+            return ResponseObject.error("Missing register fields");
+        }
+        if (userRepository.findByEmail(email).isPresent()) {
+            return ResponseObject.error("Email already exists");
+        }
+
+        User.Role requestedRole;
+        try {
+            requestedRole = normalizePublicRole(registerDTO.getRole());
+        } catch (IllegalArgumentException ex) {
+            return ResponseObject.error(ex.getMessage());
+        }
+
+        String otp = generateOtp();
+        expireEmailTokens(email);
+
+        EmailVerificationToken token = EmailVerificationToken.builder()
+                .id(UUID.randomUUID().toString())
+                .email(email)
+                .token(otp)
+                .passwordHash(passwordEncoder.encode(registerDTO.getPassword()))
+                .pendingName(registerDTO.getName())
+                .pendingRole(requestedRole.name())
+                .majorId(registerDTO.getMajorId())
+                .className(registerDTO.getClassName())
+                .deviceId(registerDTO.getDeviceId())
+                .deviceName(registerDTO.getDeviceName())
+                .userAgent(registerDTO.getUserAgent())
+                .ipAddress(registerDTO.getIpAddress())
+                .expiresAt(LocalDateTime.now().plusMinutes(appProperties.getOtp().getRegisterExpirationMinutes()))
+                .used(false)
+                .createdAt(LocalDateTime.now())
+                .build();
+        emailVerificationTokenRepository.save(token);
+
+        emailService.sendOtpEmail(
+                email,
+                "OTP for registration",
+                "Your registration OTP",
+                otp,
+                appProperties.getOtp().getRegisterExpirationMinutes() + " minutes"
+        );
+        return ResponseObject.success(Map.of("email", email), "Register OTP sent");
+    }
+
+    @Override
+    @Transactional
+    public ResponseObject loginWithGoogle(GoogleLoginDTO googleLoginDTO) {
+        if (googleLoginDTO == null || googleLoginDTO.getIdToken() == null || googleLoginDTO.getIdToken().isBlank()) {
+            return ResponseObject.error("Missing Google ID token");
+        }
+
+        User.Role requestedRole;
+        try {
+            requestedRole = normalizePublicRole(googleLoginDTO.getRole());
+        } catch (IllegalArgumentException ex) {
+            return ResponseObject.error(ex.getMessage());
+        }
+
+        GoogleTokenVerifierService.GoogleUserProfile profile;
+        try {
+            profile = googleTokenVerifierService.verify(googleLoginDTO.getIdToken());
+        } catch (Exception ex) {
+            return ResponseObject.error("Invalid Google token: " + ex.getMessage());
+        }
+
+        User user = userRepository.findByGoogleId(profile.subject())
+                .or(() -> userRepository.findByEmail(normalizeEmail(profile.email())))
+                .orElseGet(() -> User.builder()
+                        .id(UUID.randomUUID().toString())
+                        .email(normalizeEmail(profile.email()))
+                        .name(profile.name() != null ? profile.name() : profile.email())
+                        .avatar(profile.picture())
+                        .role(requestedRole)
+                        .points(0)
+                        .followers(0)
+                        .following(0)
+                        .postsCount(0)
+                        .isActive(true)
+                        .createdAt(LocalDateTime.now())
+                        .updatedAt(LocalDateTime.now())
+                        .build());
+
+        if (user.getRole() == null) {
+            user.setRole(requestedRole);
+        }
+        user.setGoogleId(profile.subject());
+        user.setAuthProvider(User.AuthProvider.google);
+        user.setEmailVerified(true);
+        user.setIsActive(true);
+        user.setUpdatedAt(LocalDateTime.now());
+        user.setLastLoginAt(LocalDateTime.now());
+        if (user.getAvatar() == null) {
+            user.setAvatar(profile.picture());
+        }
+        userRepository.save(user);
+
+        String authBlockReason = getAuthenticationBlockReason(user);
+        if (authBlockReason != null) {
+            return ResponseObject.error(authBlockReason);
+        }
+        return ResponseObject.success(buildAuthResult(user, extractDeviceContext(googleLoginDTO)), "Google login successful");
+    }
+
+    @Override
+    @Transactional
+    public ResponseObject requestPasswordReset(ForgotPasswordRequestDTO requestDTO) {
+        if (requestDTO == null || requestDTO.getEmail() == null) {
+            return ResponseObject.error("Missing email");
+        }
+        String email = normalizeEmail(requestDTO.getEmail());
+        User user = userRepository.findByEmail(email).orElse(null);
+        if (user == null) {
+            return ResponseObject.success(Map.of("email", email), "If the email exists, reset OTP has been sent");
+        }
+        if (user.getPassword() == null || user.getPassword().isBlank()) {
+            return ResponseObject.error("This account uses Google login only");
+        }
+
+        String otp = generateOtp();
+        expireResetTokens(email);
+
+        PasswordResetToken token = PasswordResetToken.builder()
+                .id(UUID.randomUUID().toString())
+                .userId(user.getId())
+                .email(email)
+                .token(otp)
+                .expiresAt(LocalDateTime.now().plusMinutes(appProperties.getOtp().getResetExpirationMinutes()))
+                .used(false)
+                .createdAt(LocalDateTime.now())
+                .build();
+        passwordResetTokenRepository.save(token);
+
+        emailService.sendOtpEmail(
+                email,
+                "OTP for password reset",
+                "Your password reset OTP",
+                otp,
+                appProperties.getOtp().getResetExpirationMinutes() + " minutes"
+        );
+        return ResponseObject.success(Map.of("email", email), "Reset OTP sent");
+    }
+
+    @Override
+    @Transactional
+    public ResponseObject resetPassword(ResetPasswordDTO resetPasswordDTO) {
+        if (resetPasswordDTO == null || resetPasswordDTO.getEmail() == null
+                || resetPasswordDTO.getOtp() == null || resetPasswordDTO.getNewPassword() == null) {
+            return ResponseObject.error("Missing reset password data");
+        }
+
+        String email = normalizeEmail(resetPasswordDTO.getEmail());
+        User user = userRepository.findByEmail(email).orElse(null);
+        if (user == null) {
+            return ResponseObject.error("Account not found");
+        }
+
+        PasswordResetToken token = passwordResetTokenRepository.findTopByEmailAndUsedFalseOrderByCreatedAtDesc(email)
+                .orElse(null);
+        if (token == null) {
+            return ResponseObject.error("Reset OTP not found");
+        }
+        if (token.getExpiresAt().isBefore(LocalDateTime.now())) {
+            return ResponseObject.error("Reset OTP expired");
+        }
+        if (!Objects.equals(token.getToken(), resetPasswordDTO.getOtp())) {
+            return ResponseObject.error("Reset OTP is invalid");
+        }
+
+        user.setPassword(passwordEncoder.encode(resetPasswordDTO.getNewPassword()));
+        if (user.getAuthProvider() == null) {
+            user.setAuthProvider(User.AuthProvider.local);
+        }
+        user.setEmailVerified(true);
+        user.setUpdatedAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        token.setUsed(true);
+        token.setVerifiedAt(LocalDateTime.now());
+        passwordResetTokenRepository.save(token);
+
+        LocalDateTime now = LocalDateTime.now();
+        sessionRepository.findByUserId(user.getId()).forEach(session -> {
+            session.setIsActive(false);
+            session.setLogoutAt(now);
+        });
+        return ResponseObject.success(null, "Password reset successful");
+    }
+
+    @Override
+    @Transactional
+    public ResponseObject logout(String userId, String token) {
+        Session session = sessionRepository.findByToken(token).orElse(null);
+        if (session == null) {
+            return ResponseObject.error("Session not found");
+        }
+        if (!Objects.equals(session.getUserId(), userId)) {
+            return ResponseObject.error("Cannot revoke another user's session");
+        }
+        session.setLogoutAt(LocalDateTime.now());
+        session.setIsActive(false);
+        sessionRepository.save(session);
+        return ResponseObject.success(null, "Logout successful");
+    }
+
+    private boolean matchesPassword(User user, String rawPassword) {
+        String stored = user.getPassword();
+        if (stored != null && stored.startsWith("$2")) {
+            return passwordEncoder.matches(rawPassword, stored);
+        }
+        boolean matches = Objects.equals(stored, rawPassword);
+        if (matches) {
+            user.setPassword(passwordEncoder.encode(rawPassword));
+            userRepository.save(user);
+        }
+        return matches;
+    }
+
+    private String getAuthenticationBlockReason(User user) {
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            return "Account is inactive";
+        }
+        if (banRepository.hasActiveBan(user.getId(), LocalDateTime.now())) {
+            return "Account is banned";
+        }
+        return null;
+    }
+
+    private AuthResult buildAuthResult(User user, DeviceContext deviceContext) {
+        String token = jwtTokenProvider.generateAccessToken(UUID.fromString(user.getId()));
+        String deviceId = resolveDevice(user, deviceContext);
         Session session = Session.builder()
                 .id(UUID.randomUUID().toString())
                 .userId(user.getId())
-                .deviceId(null)
-                .token(token) // Lưu JWT vào bảng sessions
-                .ipAddress(null)
-                .userAgent(null)
+                .deviceId(deviceId)
+                .token(token)
+                .ipAddress(deviceContext.ipAddress())
+                .userAgent(deviceContext.userAgent())
                 .loginAt(LocalDateTime.now())
                 .isActive(true)
                 .createdAt(LocalDateTime.now())
                 .build();
         sessionRepository.save(session);
-        return ResponseObject.success(new LoginResult(user.getId(), user.getName(), token, session.getDeviceId()), "Register & logged in");
+
+        return new AuthResult(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getRole().name(),
+                user.getAuthProvider() != null ? user.getAuthProvider().name() : null,
+                Boolean.TRUE.equals(user.getEmailVerified()),
+                token,
+                deviceId,
+                new ArrayList<>(permissionService.getEffectivePermissions(user))
+        );
     }
 
-    @Override
-    public ResponseObject logout(String userId, String token) {
-        Optional<Session> maybe = sessionRepository.findByToken(token);
-        if (maybe.isEmpty()) return ResponseObject.error("Session not found");
-        Session session = maybe.get();
-        session.setLogoutAt(LocalDateTime.now());
-        session.setIsActive(false);
-        sessionRepository.save(session);
-        return ResponseObject.success(null, "Logout success");
-    }
-
-    // Simple DTO for login response
-    public static class LoginResult {
-        private String userId;
-        private String name;
-        private String token;
-        private String deviceId;
-
-        public LoginResult(String userId, String name, String token, String deviceId) {
-            this.userId = userId;
-            this.name = name;
-            this.token = token;
-            this.deviceId = deviceId;
+    private String resolveDevice(User user, DeviceContext context) {
+        if (context.deviceId() != null && !context.deviceId().isBlank()) {
+            deviceRepository.findById(context.deviceId()).ifPresent(device -> {
+                device.setLastSeen(LocalDateTime.now());
+                deviceRepository.save(device);
+            });
+            return context.deviceId();
         }
 
-        public String getUserId() { return userId; }
-        public String getName() { return name; }
-        public String getToken() { return token; }
-        public String getDeviceId() { return deviceId; }
+        if ((context.deviceName() == null || context.deviceName().isBlank())
+                && (context.userAgent() == null || context.userAgent().isBlank())) {
+            return null;
+        }
+
+        Device device = Device.builder()
+                .id(UUID.randomUUID().toString())
+                .userId(user.getId())
+                .deviceName(context.deviceName())
+                .browser(context.userAgent())
+                .createdAt(LocalDateTime.now())
+                .lastSeen(LocalDateTime.now())
+                .build();
+        return deviceRepository.save(device).getId();
+    }
+
+    private void expireEmailTokens(String email) {
+        List<EmailVerificationToken> tokens = emailVerificationTokenRepository.findByEmailAndUsedFalse(email);
+        tokens.forEach(token -> token.setUsed(true));
+        emailVerificationTokenRepository.saveAll(tokens);
+    }
+
+    private void expireResetTokens(String email) {
+        List<PasswordResetToken> tokens = passwordResetTokenRepository.findByEmailAndUsedFalse(email);
+        tokens.forEach(token -> token.setUsed(true));
+        passwordResetTokenRepository.saveAll(tokens);
+    }
+
+    private String generateOtp() {
+        return String.format("%06d", new Random().nextInt(1_000_000));
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase();
+    }
+
+    private User.Role normalizePublicRole(String role) {
+        if (role == null || role.isBlank()) {
+            return User.Role.student;
+        }
+        User.Role normalized = User.Role.valueOf(role.trim().toLowerCase());
+        if (normalized == User.Role.admin) {
+            throw new IllegalArgumentException("Self-register admin is not allowed");
+        }
+        return normalized;
+    }
+
+    private DeviceContext extractDeviceContext(AuthDTO dto) {
+        return new DeviceContext(dto.getDeviceId(), dto.getDeviceName(), dto.getUserAgent(), dto.getIpAddress());
+    }
+
+    private DeviceContext extractDeviceContext(GoogleLoginDTO dto) {
+        return new DeviceContext(dto.getDeviceId(), dto.getDeviceName(), dto.getUserAgent(), dto.getIpAddress());
+    }
+
+    private DeviceContext extractDeviceContext(EmailVerificationToken token) {
+        return new DeviceContext(token.getDeviceId(), token.getDeviceName(), token.getUserAgent(), token.getIpAddress());
+    }
+
+    private record DeviceContext(String deviceId, String deviceName, String userAgent, String ipAddress) {
+    }
+
+    public record AuthResult(String userId,
+                             String name,
+                             String email,
+                             String role,
+                             String authProvider,
+                             boolean emailVerified,
+                             String token,
+                             String deviceId,
+                             List<String> permissions) {
     }
 }

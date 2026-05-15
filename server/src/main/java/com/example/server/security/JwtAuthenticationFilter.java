@@ -21,58 +21,39 @@ import java.io.IOException;
 @RequiredArgsConstructor
 @Slf4j
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
-
     private final JwtTokenProvider jwtTokenProvider;
     private final UserDetailsService userDetailsService;
 
     @Override
-    protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain
-    ) throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
         try {
             String jwt = getJwtFromRequest(request);
-
             if (StringUtils.hasText(jwt) && jwtTokenProvider.validateToken(jwt)) {
                 String userId = jwtTokenProvider.getUserIdFromToken(jwt);
-
-                // [DEBUG LOG]
-                log.info("Processing JWT for userId: {}", userId);
-
                 UserDetails userDetails = userDetailsService.loadUserByUsername(userId);
 
-                // [DEBUG LOG]
-                log.info("Loaded UserDetails: username={}, authorities={}",
-                        userDetails.getUsername(),
+                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                        userDetails,
+                        null,
                         userDetails.getAuthorities()
                 );
-
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(
-                                userDetails,
-                                null,
-                                userDetails.getAuthorities()
-                        );
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
                 SecurityContextHolder.getContext().setAuthentication(authentication);
 
-                log.info("✅ Authentication set successfully for: {}", userId);
-            } else {
-                log.warn("⚠️ No valid JWT token found in request to: {}", request.getRequestURI());
+                if (userDetails instanceof AppUserPrincipal principal) {
+                    request.setAttribute("CURRENT_USER", principal.getUser());
+                    request.setAttribute("CURRENT_PERMISSIONS", principal.getPermissions());
+                }
             }
         } catch (Exception ex) {
-            log.error("❌ Could not set user authentication: {}", ex.getMessage(), ex);
+            log.error("Could not set user authentication: {}", ex.getMessage(), ex);
         }
 
         filterChain.doFilter(request, response);
     }
 
-    /**
-     * Trích xuất JWT token từ header Authorization.
-     * Format: "Bearer <token>"
-     */
     private String getJwtFromRequest(HttpServletRequest request) {
         String bearerToken = request.getHeader("Authorization");
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {

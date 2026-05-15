@@ -17,8 +17,10 @@ public class PasswordResetToken {
     private String id;
 
     private String userId;
+    private String email;
     private String token;
     private LocalDateTime expiresAt;
     private Boolean used;
     private LocalDateTime createdAt;
+    private LocalDateTime verifiedAt;
 }

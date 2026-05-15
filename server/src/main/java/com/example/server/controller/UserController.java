@@ -28,7 +28,11 @@ public class UserController {
     @PutMapping("/{userId}")
     public ResponseObject updateProfile(
             @PathVariable String userId,
-            @RequestBody UserDTO dto) {
+            @RequestBody UserDTO dto,
+            Principal principal) {
+        if (principal == null || !principal.getName().equals(userId)) {
+            return ResponseObject.error("Forbidden");
+        }
         return userService.updateProfile(userId, dto);
     }
 
@@ -52,14 +56,22 @@ public class UserController {
     @PostMapping("/{followerId}/follow/{followeeId}")
     public ResponseObject followUser(
             @PathVariable String followerId,
-            @PathVariable String followeeId) {
+            @PathVariable String followeeId,
+            Principal principal) {
+        if (principal == null || !principal.getName().equals(followerId)) {
+            return ResponseObject.error("Forbidden");
+        }
         return userService.followUser(followerId, followeeId);
     }
 
     @DeleteMapping("/{followerId}/unfollow/{followeeId}")
     public ResponseObject unfollowUser(
             @PathVariable String followerId,
-            @PathVariable String followeeId) {
+            @PathVariable String followeeId,
+            Principal principal) {
+        if (principal == null || !principal.getName().equals(followerId)) {
+            return ResponseObject.error("Forbidden");
+        }
         return userService.unfollowUser(followerId, followeeId);
     }
 
