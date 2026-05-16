@@ -404,7 +404,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
 
     const client = new Client({
       // ✅ SỬA 1: Bỏ ?token= khỏi URL để tránh lỗi Tomcat "Invalid character found in method name"
-      webSocketFactory: () => new SockJS(import.meta.env.VITE_WS_URL || 'https://donjaderoy-knowledge-iy-5ba.fly.dev/ws'),
+      webSocketFactory: () => new SockJS(import.meta.env.VITE_WS_URL || 'https://donjaderoy81-knowledge.hf.space/ws'),
       connectHeaders: { Authorization: `Bearer ${token}` },
       reconnectDelay: 5000,
       heartbeatIncoming: 10000,
