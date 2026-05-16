@@ -40,7 +40,6 @@ import {
   CheckCircle,
   XCircle,
   Search,
-  Filter,
   Download,
   BarChart3
 } from "lucide-react";
@@ -383,60 +382,60 @@ export function AdminDashboard() {
 
                 <div className="overflow-x-auto">
                   <Table className="min-w-[800px]">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Người dùng</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Vai trò</TableHead>
-                      <TableHead>Ngành</TableHead>
-                      <TableHead>Điểm</TableHead>
-                      <TableHead>Bài viết</TableHead>
-                      <TableHead>Hành động</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredUsers.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={user.avatar}
-                              alt={user.name}
-                              className="h-10 w-10 rounded-full object-cover"
-                            />
-                            <div>
-                              <p className="text-sm">{user.name}</p>
-                              {user.class && (
-                                <p className="text-xs text-gray-500">{user.class}</p>
-                              )}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm">{user.email}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={user.role === "lecturer" ? "secondary" : "outline"}
-                          >
-                            {user.role === "lecturer" ? "Giảng viên" : "Sinh viên"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm">{user.major}</TableCell>
-                        <TableCell className="text-sm">{user.points.toLocaleString()}</TableCell>
-                        <TableCell className="text-sm">{user.postsCount}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline">
-                              <Eye className="h-3 w-3" />
-                            </Button>
-                            <Button size="sm" variant="outline">
-                              <Ban className="h-3 w-3 text-red-600" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Người dùng</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Vai trò</TableHead>
+                        <TableHead>Ngành</TableHead>
+                        <TableHead>Điểm</TableHead>
+                        <TableHead>Bài viết</TableHead>
+                        <TableHead>Hành động</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredUsers.map((user) => (
+                        <TableRow key={user.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <img
+                                src={user.avatar}
+                                alt={user.name}
+                                className="h-10 w-10 rounded-full object-cover"
+                              />
+                              <div>
+                                <p className="text-sm">{user.name}</p>
+                                {user.class && (
+                                  <p className="text-xs text-gray-500">{user.class}</p>
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm">{user.email}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={user.role === "lecturer" ? "secondary" : "outline"}
+                            >
+                              {user.role === "lecturer" ? "Giảng viên" : "Sinh viên"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm">{user.major}</TableCell>
+                          <TableCell className="text-sm">{user.points.toLocaleString()}</TableCell>
+                          <TableCell className="text-sm">{user.postsCount}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="outline">
+                                <Eye className="h-3 w-3" />
+                              </Button>
+                              <Button size="sm" variant="outline">
+                                <Ban className="h-3 w-3 text-red-600" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               </TabsContent>
 
@@ -466,59 +465,59 @@ export function AdminDashboard() {
 
                 <div className="overflow-x-auto">
                   <Table className="min-w-[800px]">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Tiêu đề</TableHead>
-                      <TableHead>Tác giả</TableHead>
-                      <TableHead>Ngành</TableHead>
-                      <TableHead>Lượt xem</TableHead>
-                      <TableHead>Thích</TableHead>
-                      <TableHead>Trạng thái</TableHead>
-                      <TableHead>Hành động</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredPosts.map((post) => {
-                      const author = users.find((u) => u.id === post.authorId);
-                      return (
-                        <TableRow key={post.id}>
-                          <TableCell>
-                            <div>
-                              <p className="text-sm line-clamp-1">{post.title}</p>
-                              <p className="text-xs text-gray-500">
-                                {formatDistanceToNow(new Date(post.createdAt), {
-                                  addSuffix: true,
-                                  locale: vi,
-                                })}
-                              </p>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-sm">{author?.name}</TableCell>
-                          <TableCell className="text-sm">{post.major}</TableCell>
-                          <TableCell className="text-sm">{post.views.toLocaleString()}</TableCell>
-                          <TableCell className="text-sm">{post.likes}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={post.status === "published" ? "default" : "secondary"}
-                            >
-                              {post.status === "published" ? "Đã đăng" : "Nháp"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Button size="sm" variant="outline">
-                                <Eye className="h-3 w-3" />
-                              </Button>
-                              <Button size="sm" variant="outline">
-                                <XCircle className="h-3 w-3 text-red-600" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Tiêu đề</TableHead>
+                        <TableHead>Tác giả</TableHead>
+                        <TableHead>Ngành</TableHead>
+                        <TableHead>Lượt xem</TableHead>
+                        <TableHead>Thích</TableHead>
+                        <TableHead>Trạng thái</TableHead>
+                        <TableHead>Hành động</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredPosts.map((post) => {
+                        const author = users.find((u) => u.id === post.authorId);
+                        return (
+                          <TableRow key={post.id}>
+                            <TableCell>
+                              <div>
+                                <p className="text-sm line-clamp-1">{post.title}</p>
+                                <p className="text-xs text-gray-500">
+                                  {formatDistanceToNow(new Date(post.createdAt), {
+                                    addSuffix: true,
+                                    locale: vi,
+                                  })}
+                                </p>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-sm">{author?.name}</TableCell>
+                            <TableCell className="text-sm">{post.major}</TableCell>
+                            <TableCell className="text-sm">{post.views.toLocaleString()}</TableCell>
+                            <TableCell className="text-sm">{post.likes}</TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={post.status === "published" ? "default" : "secondary"}
+                              >
+                                {post.status === "published" ? "Đã đăng" : "Nháp"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                <Button size="sm" variant="outline">
+                                  <Eye className="h-3 w-3" />
+                                </Button>
+                                <Button size="sm" variant="outline">
+                                  <XCircle className="h-3 w-3 text-red-600" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
                 </div>
               </TabsContent>
 
