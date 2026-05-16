@@ -250,3 +250,18 @@
     padding-top: 0;
   }
 }
+/* Trong global.css */
+.messenger-sidebar::-webkit-scrollbar {
+  width: 4px;
+}
+.messenger-sidebar::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+.messenger-sidebar::-webkit-scrollbar-thumb {
+  background: #fdba74;
+  border-radius: 10px;
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}

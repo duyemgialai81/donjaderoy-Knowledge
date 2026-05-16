@@ -437,6 +437,7 @@ export function AdminDashboard() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               </TabsContent>
 
               {/* Posts Tab */}
@@ -518,6 +519,7 @@ export function AdminDashboard() {
                     })}
                   </TableBody>
                 </Table>
+                </div>
               </TabsContent>
 
               {/* Reports Tab */}
