@@ -1294,49 +1294,53 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
       .sort((a, b) => parseDateSafely(a.createdAt).getTime() - parseDateSafely(b.createdAt).getTime());
 
     return (
-      <div key={comment.id} className={isReply ? "ml-12" : ""}>
-        <div className="flex gap-3 p-4 hover:bg-gray-50 rounded-lg">
+      <div key={comment.id} className={isReply ? "ml-10 border-l-2 border-slate-100 pl-4 mt-3" : "mt-4"}>
+        <div className="flex gap-3 p-3 hover:bg-slate-50 rounded-xl transition-colors group">
           <img
             src={commentAuthor.avatar && typeof commentAuthor.avatar === 'string' && commentAuthor.avatar.trim()
               ? commentAuthor.avatar
               : `https://api.dicebear.com/7.x/avataaars/svg?seed=${commentAuthor.id}`}
             alt={commentAuthor.name}
-            className="h-10 w-10 rounded-full object-cover"
+            className="h-9 w-9 rounded-full object-cover shrink-0"
             onError={(e) => {
               (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${commentAuthor.id}`;
             }}
           />
-          <div className="flex-1">
-            <div className={`bg-gray-100 rounded-lg p-3 ${replyTo === comment.id ? 'ring-2 ring-orange-200 bg-orange-50/50' : ''}`}>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm font-semibold">{commentAuthor.name}</span>
+          <div className="flex-1 min-w-0">
+            <div className={`bg-slate-100/70 rounded-2xl rounded-tl-none p-3.5 inline-block min-w-[200px] max-w-[100%] ${replyTo === comment.id ? 'ring-2 ring-orange-200 bg-orange-50/50' : ''}`}>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-sm font-bold text-slate-800">{commentAuthor.name}</span>
                 {commentAuthor.role === 'lecturer' && (
-                  <Badge variant="secondary" className="text-xs">Giảng viên</Badge>
+                  <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100 border-none px-1.5 py-0 text-[10px]">Giảng viên</Badge>
                 )}
-                <span className="text-xs text-gray-500">• {commentTime}</span>
               </div>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">{comment.content}</p>
+              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap break-words">{comment.content}</p>
             </div>
-            <div className="flex items-center gap-4 mt-2 text-xs text-gray-600">
-              <button className="hover:text-blue-600 flex items-center gap-1" onClick={() => handleLikeComment(comment.id)}>
-                <ThumbsUp className="h-3 w-3" />
+            <div className="flex items-center gap-4 mt-1.5 ml-2 text-xs font-semibold text-slate-500">
+              <span className="text-slate-400 font-medium">{commentTime}</span>
+              <button className="hover:text-blue-600 flex items-center gap-1 transition-colors" onClick={() => handleLikeComment(comment.id)}>
+                <ThumbsUp className="h-3.5 w-3.5" />
                 <span>{comment.likes || 0}</span>
               </button>
-              <button className={`transition-colors ${replyTo === comment.id ? 'text-orange-600 font-bold' : 'hover:text-orange-600'}`} onClick={() => setReplyTo(replyTo === comment.id ? null : comment.id)}>
+              <button className={`transition-colors ${replyTo === comment.id ? 'text-[#F26B38] font-bold' : 'hover:text-[#F26B38]'}`} onClick={() => setReplyTo(replyTo === comment.id ? null : comment.id)}>
                 Trả lời
               </button>
-              <button className="hover:text-red-600 flex items-center gap-1" onClick={() => handleReportComment(comment.id)}>
-                <Flag className="h-3 w-3" /> Báo cáo
+              <button className="hover:text-red-600 flex items-center gap-1 transition-colors" onClick={() => handleReportComment(comment.id)}>
+                <Flag className="h-3.5 w-3.5" /> Báo cáo
               </button>
               {currentUser?.id === comment.authorId && (
-                <button className="hover:text-red-600 flex items-center gap-1" onClick={() => handleDeleteComment(comment.id)}>
-                  <Trash2 className="h-3 w-3" /> Xóa
+                <button className="hover:text-red-600 flex items-center gap-1 transition-colors opacity-0 group-hover:opacity-100 ml-auto" onClick={() => handleDeleteComment(comment.id)}>
+                  <Trash2 className="h-3.5 w-3.5" /> Xóa
                 </button>
               )}
             </div>
           </div>
         </div>
-        {childReplies.map(reply => renderComment(reply, true))}
+        {childReplies.length > 0 && (
+          <div className="mt-1">
+            {childReplies.map(reply => renderComment(reply, true))}
+          </div>
+        )}
       </div>
     );
   };
@@ -1354,102 +1358,120 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
   // ==========================================
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent aria-describedby={undefined} className="max-w-4xl w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto p-0">
-        <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between z-10">
-          <h2 className="text-xl font-bold">Chi tiết bài viết</h2>
-          <Button variant="ghost" size="icon" onClick={onClose}>
+      <DialogContent aria-describedby={undefined} className="max-w-4xl w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto p-0 rounded-2xl border-none shadow-2xl">
+        {/* ── Header ── */}
+        <div className="sticky top-0 bg-white/90 backdrop-blur-md border-b border-slate-100 px-6 py-4 flex items-center justify-between z-20">
+          <div className="flex items-center gap-2 text-slate-800">
+            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-[#F26B38] to-[#D9541E] flex items-center justify-center shadow-sm">
+              <FileText className="h-4 w-4 text-white" />
+            </div>
+            <h2 className="text-lg font-bold">Chi tiết bài viết</h2>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose} className="h-9 w-9 rounded-xl hover:bg-slate-100 text-slate-500">
             <X className="h-5 w-5" />
           </Button>
         </div>
 
-        <div className="p-6">
+        <div className="px-6 py-6 pb-20">
+          {/* ── Author Info ── */}
           {author ? (
-            <div className="flex items-start justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <img
-                  src={author.avatar && typeof author.avatar === 'string' && author.avatar.trim()
-                    ? author.avatar
-                    : `https://api.dicebear.com/7.x/avataaars/svg?seed=${author.id}`}
-                  alt={author.name}
-                  className="h-16 w-16 rounded-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${author.id}`;
-                  }}
-                />
+            <div className="flex items-start justify-between mb-8">
+              <div className="flex items-center gap-3.5">
+                <div className="relative">
+                  <img
+                    src={author.avatar && typeof author.avatar === 'string' && author.avatar.trim()
+                      ? author.avatar
+                      : `https://api.dicebear.com/7.x/avataaars/svg?seed=${author.id}`}
+                    alt={author.name}
+                    className="h-14 w-14 rounded-full object-cover shadow-sm ring-2 ring-white"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${author.id}`;
+                    }}
+                  />
+                  {author.badges && author.badges.length > 0 && author.badges[author.badges.length - 1] && (
+                    <span className="absolute -bottom-1 -right-1 text-base bg-white rounded-full p-px shadow-sm" title={author.badges[author.badges.length - 1].name}>
+                      {author.badges[author.badges.length - 1].icon}
+                    </span>
+                  )}
+                </div>
                 <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-semibold">{author.name}</h3>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <h3 className="font-bold text-slate-800">{author.name}</h3>
                     {author.role === 'lecturer' && (
-                      <Badge variant="secondary">Giảng viên</Badge>
-                    )}
-                    {author.badges && author.badges.length > 0 && author.badges[author.badges.length - 1] && (
-                      <span className="text-xl" title={author.badges[author.badges.length - 1].name}>
-                        {author.badges[author.badges.length - 1].icon}
-                      </span>
+                      <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100 border-none px-1.5 py-0 text-[10px]">Giảng viên</Badge>
                     )}
                   </div>
-                  <div className="text-sm text-gray-600">
-                    {author.major} {author.class && `• ${author.class}`}
+                  <div className="text-sm font-medium text-slate-500">
+                    {author.major} {author.class && `• Lớp ${author.class}`}
                   </div>
-                  <div className="text-xs text-gray-500">{timeAgo}</div>
+                  <div className="text-xs text-slate-400 mt-0.5">{timeAgo}</div>
                 </div>
               </div>
               <Button 
-                variant="outline"
                 onClick={handleFollow}
                 disabled={isFollowingLoading || currentUser?.id === post.authorId}
+                className={`h-9 px-4 rounded-xl text-sm font-semibold transition-all ${
+                  isFollowing 
+                    ? "bg-slate-100 text-slate-700 hover:bg-slate-200" 
+                    : "btn-gradient-orange"
+                }`}
               >
-                {isFollowing ? 'Bỏ theo dõi' : 'Theo dõi'}
+                {isFollowing ? 'Đang theo dõi' : 'Theo dõi'}
               </Button>
             </div>
           ) : (
-            <div className="mb-6 text-center text-gray-500">Đang tải thông tin tác giả...</div>
+            <div className="mb-6 p-4 rounded-xl bg-slate-50 border border-slate-100 flex gap-3">
+              <div className="skeleton h-14 w-14 rounded-full shrink-0" />
+              <div className="space-y-2 flex-1">
+                <div className="skeleton h-4 w-32" />
+                <div className="skeleton h-3 w-48" />
+              </div>
+            </div>
           )}
 
-          <h1 className="text-2xl font-bold mb-4">{post.title}</h1>
+          {/* ── Post Title & Metadata ── */}
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-tight mb-4">{post.title}</h1>
 
-          <div className="flex flex-wrap gap-2 mb-6">
-            <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
-              {post.topic}
+          <div className="flex flex-wrap gap-2 mb-8">
+            <Badge className="bg-[#FEF0E8] text-[#D9541E] hover:bg-[#FEF0E8] border-none px-2.5 py-0.5 text-xs font-semibold">
+              {post.topic || 'Chủ đề chung'}
             </Badge>
-            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+            <Badge className="bg-blue-50 text-blue-600 hover:bg-blue-50 border-none px-2.5 py-0.5 text-xs font-semibold">
               {post.major as any || 'N/A'}
             </Badge>
             {tags.map((tag) => (
-              <Badge key={tag} variant="secondary">
+              <Badge key={tag} className="bg-slate-100 text-slate-500 hover:bg-slate-200 border-none px-2 py-0.5 text-[10px] font-medium">
                 #{tag}
               </Badge>
             ))}
           </div>
 
-          <div className="prose max-w-none mb-6">
-            <p className="whitespace-pre-wrap text-gray-700">{post.content}</p>
+          {/* ── Post Content ── */}
+          <div className="prose prose-slate max-w-none mb-10 prose-p:leading-relaxed prose-p:text-slate-700 prose-a:text-[#F26B38]">
+            <p className="whitespace-pre-wrap">{post.content}</p>
           </div>
 
+          {/* ── Attachments ── */}
           {post.attachments && post.attachments.length > 0 && (
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Tệp đính kèm
+            <div className="mb-8 p-5 rounded-2xl bg-slate-50 border border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2 uppercase tracking-wide">
+                <FileText className="h-4 w-4 text-slate-500" />
+                Tệp đính kèm ({post.attachments.length})
               </h3>
-              <div className="space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {post.attachments.map((file) => (
-                  <div
-                    key={file.id}
-                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded bg-orange-100">
-                        <FileText className="h-5 w-5 text-orange-600" />
+                  <div key={file.id} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-xl hover:border-[#F26B38] transition-colors group">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#FEF0E8] text-[#F26B38] group-hover:scale-105 transition-transform">
+                        <FileText className="h-5 w-5" />
                       </div>
-                      <div>
-                        <p className="text-sm font-medium">{file.name}</p>
-                        <p className="text-xs text-gray-500">{file.size}</p>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-700 truncate">{file.name}</p>
+                        <p className="text-[10px] text-slate-400 font-medium">{file.size}</p>
                       </div>
                     </div>
-                    <Button size="sm" variant="outline">
-                      <Download className="h-4 w-4 mr-1" />
-                      Tải xuống
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 group-hover:text-[#F26B38] rounded-lg shrink-0">
+                      <Download className="h-4 w-4" />
                     </Button>
                   </div>
                 ))}
@@ -1457,79 +1479,81 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
             </div>
           )}
 
+          {/* ── Video ── */}
           {post.videoUrl && (
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                <Video className="h-5 w-5" />
-                Video hướng dẫn
+            <div className="mb-8">
+              <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2 uppercase tracking-wide">
+                <Video className="h-4 w-4 text-blue-500" />
+                Video đính kèm
               </h3>
-              <div className="aspect-video bg-gray-200 rounded-lg flex items-center justify-center">
-                <Video className="h-12 w-12 text-gray-400" />
+              <div className="aspect-video bg-slate-900 rounded-2xl overflow-hidden shadow-lg border border-slate-200 flex items-center justify-center relative group cursor-pointer">
+                <Video className="h-16 w-16 text-white/50 group-hover:text-white group-hover:scale-110 transition-all" />
               </div>
             </div>
           )}
 
-          <div className="flex items-center justify-between py-4 border-y">
-            <div className="flex items-center gap-6 text-sm text-gray-600">
-              <div className="flex items-center gap-1">
-                <Eye className="h-4 w-4" />
-                <span>{(post.views || 0).toLocaleString()} lượt xem</span>
+          {/* ── Stats & Actions Bar ── */}
+          <div className="flex items-center justify-between py-4 border-y border-slate-100 mb-8">
+            <div className="flex items-center gap-5 text-sm font-medium text-slate-500">
+              <div className="flex items-center gap-1.5">
+                <Eye className="h-4 w-4 text-slate-400" />
+                <span>{(post.views || 0).toLocaleString()} <span className="hidden sm:inline">lượt xem</span></span>
               </div>
-              <div className="flex items-center gap-1">
-                <MessageCircle className="h-4 w-4" />
-                <span>{postComments.length} bình luận</span>
+              <div className="flex items-center gap-1.5">
+                <MessageCircle className="h-4 w-4 text-slate-400" />
+                <span>{postComments.length} <span className="hidden sm:inline">bình luận</span></span>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <Button
                 variant={isLiked ? "default" : "outline"}
-                size="sm"
                 onClick={handleLikeToggle}
                 disabled={!currentUser?.id || isLiking}
-                className={isLiked ? "bg-red-500 hover:bg-red-600 text-white" : "hover:bg-gray-100"}
+                className={`h-9 px-4 rounded-xl text-sm font-semibold transition-all ${
+                  isLiked 
+                    ? "bg-rose-50 border-rose-100 text-rose-600 hover:bg-rose-100" 
+                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                }`}
               >
-                <Heart className={`h-4 w-4 mr-1 ${isLiked ? 'fill-current text-white' : 'text-gray-500'}`} />
+                <Heart className={`h-4 w-4 mr-1.5 ${isLiked ? 'fill-current text-rose-500' : ''}`} />
                 {currentLikesCount} 
               </Button>
-              <Button variant="outline" size="sm">
-                <Share2 className="h-4 w-4 mr-1" />
-                Chia sẻ
+              <Button variant="outline" className="h-9 px-3 rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50">
+                <Share2 className="h-4 w-4 sm:mr-1.5" />
+                <span className="hidden sm:inline">Chia sẻ</span>
               </Button>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50">
                 <Bookmark className="h-4 w-4" />
               </Button>
             </div>
           </div>
 
-          <div className="mt-6">
-            <h3 className="text-lg font-semibold mb-4">Bình luận ({postComments.length})</h3>
+          {/* ── Comments Section ── */}
+          <div className="mt-8">
+            <h3 className="text-lg font-bold text-slate-800 mb-5">Bình luận ({postComments.length})</h3>
 
-            <div className="mb-6">
+            {/* Comment Input Box */}
+            <div className="mb-8 p-4 rounded-2xl border border-slate-200 bg-slate-50 focus-within:border-[#F26B38] focus-within:ring-2 focus-within:ring-[#F26B38]/20 transition-all">
               {replyTo && (
-                <div className="flex items-center justify-between mb-2 p-2 bg-orange-50 rounded">
-                  <span className="text-sm text-gray-600">Đang trả lời bình luận...</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setReplyTo(null)}
-                  >
-                    <X className="h-4 w-4" />
+                <div className="flex items-center justify-between mb-3 px-3 py-1.5 bg-[#FEF0E8] border border-orange-100 rounded-lg">
+                  <span className="text-xs font-semibold text-[#D9541E]">Đang trả lời bình luận...</span>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-orange-200 text-[#D9541E]" onClick={() => setReplyTo(null)}>
+                    <X className="h-3 w-3" />
                   </Button>
                 </div>
               )}
-              
               <div className="flex gap-3">
                 <img
                   src={currentUser?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser?.id}`}
                   alt="Current user"
-                  className="h-10 w-10 rounded-full object-cover"
+                  className="h-10 w-10 rounded-full object-cover shrink-0"
                 />
                 <div className="flex-1">
                   <Textarea
-                    placeholder="Viết bình luận..."
+                    placeholder="Viết bình luận của bạn..."
                     value={newComment}
                     onChange={(e) => setNewComment(e.target.value)}
-                    className="min-h-[80px]"
+                    className="min-h-[80px] border-none bg-transparent resize-none p-0 focus-visible:ring-0 text-sm"
                     disabled={!currentUser}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
@@ -1539,20 +1563,13 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
                     }}
                   />
                   <div className="flex justify-end gap-2 mt-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setNewComment("");
-                        setReplyTo(null);
-                      }}
-                    >
+                    <Button variant="ghost" size="sm" onClick={() => { setNewComment(""); setReplyTo(null); }} className="h-8 px-3 rounded-lg text-xs font-semibold text-slate-500 hover:bg-slate-200">
                       Hủy
                     </Button>
                     <Button
                       size="sm"
                       onClick={handleAddComment}
-                      className="bg-orange-600 hover:bg-orange-700"
+                      className="h-8 px-4 rounded-lg text-xs font-semibold btn-gradient-orange"
                       disabled={!currentUser || !newComment.trim()}
                     >
                       Gửi bình luận
@@ -1561,15 +1578,19 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
                 </div>
               </div>
             </div>
-            
-            <div className="space-y-2">
+
+            {/* Comments List */}
+            <div className="space-y-4">
               {rootComments.map(comment => renderComment(comment))}
             </div>
+
             {postComments.length === 0 && (
-              <div className="text-center py-12 text-gray-500">
-                <MessageCircle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                <p>Chưa có bình luận nào</p>
-                <p className="text-sm">Hãy là người đầu tiên bình luận!</p>
+              <div className="text-center py-12">
+                <div className="h-16 w-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <MessageCircle className="h-8 w-8 text-slate-300" />
+                </div>
+                <p className="font-semibold text-slate-700 mb-1">Chưa có bình luận nào</p>
+                <p className="text-sm text-slate-500">Hãy là người đầu tiên chia sẻ cảm nghĩ của bạn!</p>
               </div>
             )}
           </div>

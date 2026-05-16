@@ -12,13 +12,13 @@ import { UserSidebar } from "./components/UserSidebar";
 import { Leaderboard } from "./components/Leaderboard";
 import { SuggestedPosts } from "./components/SuggestedPosts";
 import { CreatePostModal } from "./components/CreatePostModal";
-import { SettingsPage } from "./components/SettingsPage"; 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
-import  MessagesPage  from "./components/MessagesPage";
+import { SettingsPage } from "./components/SettingsPage";
+import { Tabs, TabsList, TabsTrigger } from "./components/ui/tabs";
+import MessagesPage from "./components/MessagesPage";
 import { Button } from "./components/ui/button";
 import type { Post } from "./lib/mockData";
 import api from "./lib/api";
-import { BookOpen, TrendingUp, Users as UsersIcon, Clock, Shield, MessageCircle } from "lucide-react";
+import { BookOpen, TrendingUp, Users as UsersIcon, Clock, Shield, MessageCircle, Home, User, Settings, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 function MainApp() {
@@ -335,9 +335,17 @@ function MainApp() {
     );
   }
 
+  // Left sidebar navigation items
+  const navItems = [
+    { id: "feed",     label: "Trang chủ",     icon: Home,          onClick: () => { setCurrentView("feed"); navigate("/"); } },
+    { id: "profile",  label: "Hồ sơ của tôi", icon: User,          onClick: () => handleViewProfile() },
+    { id: "messages", label: "Tin nhắn",       icon: MessageCircle, onClick: () => { setCurrentView("messages"); navigate("/tin-nhan"); } },
+    { id: "settings", label: "Cài đặt",        icon: Settings,      onClick: () => { setCurrentView("settings"); navigate("/cai-dat"); } },
+  ];
+
   // 5. Default Main Feed View
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen" style={{ background: "#F7F9FC" }}>
       <Header {...headerProps} />
 
       <FilterPanel
@@ -348,59 +356,116 @@ function MainApp() {
       />
 
       <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Sidebar - Hidden on mobile, visible on desktop */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+
+          {/* ── Left Sidebar ── */}
           <div className="hidden lg:block lg:col-span-3">
-            <div className="sticky top-20">
+            <div className="sticky top-20 space-y-4">
+              {/* Nav card */}
+              <div className="card-premium p-3">
+                <nav className="space-y-0.5">
+                  {navItems.map(({ id, label, icon: Icon, onClick }) => (
+                    <button
+                      key={id}
+                      onClick={onClick}
+                      className={`nav-item ${currentView === id ? "active" : ""}`}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      {label}
+                    </button>
+                  ))}
+                  {isAdmin && (
+                    <button
+                      onClick={() => { setCurrentView("admin"); navigate("/quan-tri"); }}
+                      className={`nav-item ${currentView === "admin" ? "active" : ""}`}
+                    >
+                      <Shield className="h-4 w-4 shrink-0 text-purple-500" />
+                      <span className="text-purple-600">Quản trị hệ thống</span>
+                    </button>
+                  )}
+                </nav>
+              </div>
+
+              {/* Create post CTA */}
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="w-full flex items-center gap-2.5 p-3.5 rounded-xl bg-gradient-to-r from-[#F26B38] to-[#D9541E] text-white text-sm font-semibold shadow-[0_4px_14px_rgba(242,107,56,0.35)] hover:shadow-[0_6px_20px_rgba(242,107,56,0.45)] transition-shadow"
+              >
+                <Plus className="h-4 w-4" />
+                Tạo bài viết mới
+              </button>
+
+              {/* User profile widget */}
               <UserSidebar user={currentUser} onViewProfile={() => handleViewProfile()} />
-              {isAdmin && (
-                <Button className="w-full mt-4 bg-purple-600 hover:bg-purple-700" onClick={() => setCurrentView("admin")}>
-                  <Shield className="h-4 w-4 mr-2" />
-                  Quản trị hệ thống
-                </Button>
-              )}
             </div>
           </div>
 
-          {/* Main Feed */}
+          {/* ── Main Feed ── */}
           <div className="col-span-1 lg:col-span-6">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-              <TabsList className="grid w-full grid-cols-4 bg-white">
-                <TabsTrigger value="all" className="gap-2 px-2 text-xs sm:text-sm"><BookOpen className="h-4 w-4 hidden xs:block" /> Tất cả</TabsTrigger>
-                <TabsTrigger value="following" className="gap-2 px-2 text-xs sm:text-sm"><UsersIcon className="h-4 w-4 hidden xs:block" /> Theo dõi</TabsTrigger>
-                <TabsTrigger value="saved" className="gap-2 px-2 text-xs sm:text-sm"><TrendingUp className="h-4 w-4 hidden xs:block" /> Đã lưu</TabsTrigger>
-                <TabsTrigger value="my-posts" className="gap-2 px-2 text-xs sm:text-sm"><Clock className="h-4 w-4 hidden xs:block" /> Của tôi</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            {/* Tab bar */}
+            <div className="card-premium mb-4 overflow-hidden">
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="flex w-full bg-transparent border-b border-slate-100 h-auto p-0 rounded-none gap-0">
+                  {[
+                    { value: "all",       label: "Tất cả",    icon: BookOpen  },
+                    { value: "following", label: "Theo dõi",  icon: UsersIcon },
+                    { value: "saved",     label: "Đã lưu",    icon: TrendingUp },
+                    { value: "my-posts",  label: "Của tôi",   icon: Clock     },
+                  ].map(({ value, label, icon: Icon }) => (
+                    <TabsTrigger
+                      key={value}
+                      value={value}
+                      className="flex-1 h-11 gap-1.5 text-xs font-medium rounded-none border-b-2 border-transparent
+                        data-[state=active]:border-[#F26B38] data-[state=active]:text-[#F26B38]
+                        data-[state=active]:bg-transparent text-slate-500 hover:text-slate-700"
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+            </div>
 
             {searchQuery && (
-              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm">Tìm thấy <span className="text-blue-600">{filteredPosts.length}</span> kết quả cho "{searchQuery}"</p>
+              <div className="mb-4 px-4 py-3 bg-blue-50 border border-blue-100 rounded-xl flex items-center gap-2">
+                <span className="text-sm text-blue-600">
+                  Tìm thấy <strong>{filteredPosts.length}</strong> kết quả cho "{searchQuery}"
+                </span>
               </div>
             )}
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               {filteredPosts.length > 0 ? (
                 filteredPosts.map((post) => (
-                  <PostCard
-                    key={post.id}
-                    post={post}
-                    onClick={() => setSelectedPost(post)}
-                    onLike={() => handleLikePost(post.id)}
-                    onUserUpdate={refreshUserData}
-                  />
+                  <div key={post.id} className="post-card-hover">
+                    <PostCard
+                      post={post}
+                      onClick={() => setSelectedPost(post)}
+                      onLike={() => handleLikePost(post.id)}
+                      onUserUpdate={refreshUserData}
+                    />
+                  </div>
                 ))
               ) : (
-                <div className="text-center py-12 bg-white rounded-lg border">
-                  <BookOpen className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                  <h3 className="mb-2">Không tìm thấy bài viết</h3>
-                  <p className="text-gray-600 mb-4">Thử điều chỉnh bộ lọc hoặc tìm kiếm với từ khóa khác</p>
+                <div className="card-premium text-center py-16">
+                  <div className="h-20 w-20 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                    <BookOpen className="h-10 w-10 text-slate-300" />
+                  </div>
+                  <h3 className="text-slate-600 font-semibold mb-2">Không tìm thấy bài viết</h3>
+                  <p className="text-sm text-slate-400 mb-5">Thử điều chỉnh bộ lọc hoặc tìm kiếm với từ khóa khác</p>
+                  <button
+                    onClick={() => setIsCreateModalOpen(true)}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold btn-gradient-orange"
+                  >
+                    <Plus className="h-4 w-4" /> Tạo bài viết đầu tiên
+                  </button>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Right Sidebar - Hidden on small tablets and mobile */}
+          {/* ── Right Sidebar ── */}
           <div className="hidden xl:block lg:col-span-3">
             <div className="sticky top-20 space-y-4">
               <Leaderboard />

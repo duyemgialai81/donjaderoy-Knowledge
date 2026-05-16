@@ -1,7 +1,7 @@
 import { Heart, MessageCircle, Eye, Share2, FileText, Video, Bookmark, Flag } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
-import { Card } from "./ui/card";
+
 import type { Post, User } from "../lib/mockData";
 import api from "../lib/api";
 import { useAuth } from "../lib/authContext";
@@ -11,6 +11,7 @@ import { vi } from "date-fns/locale";
 import { toast } from "sonner";
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
+import { env } from "process";
 
 interface PostCardProps {
   post: Post;
@@ -218,7 +219,10 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
   const tags = Array.isArray(post.tags) ? post.tags : (post.tags ? String(post.tags).split(',').map(t => t.trim()).filter(Boolean) : []);
 
   return (
-    <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer" onClick={onClick}>
+    <div
+      className="card-premium p-5 cursor-pointer"
+      onClick={onClick}
+    >
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
           <img src={author.avatar} alt={author.name} className="h-12 w-12 rounded-full object-cover" />
@@ -328,6 +332,6 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
           </Button>
         </div>
       </div>
-    </Card>
+    </div>
   );
 }
