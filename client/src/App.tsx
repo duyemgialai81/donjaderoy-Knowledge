@@ -295,7 +295,6 @@ function MainApp() {
     return (
       <div className="h-screen flex flex-col overflow-hidden bg-white">
         <Header {...headerProps} />
-        {/* Render Component Tin nhắn vừa thiết kế */}
         <div className="flex-1 min-h-0 overflow-hidden bg-white">
           <MessagesPage currentUser={currentUser} />
         </div>
@@ -350,8 +349,8 @@ function MainApp() {
 
       <div className="container mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Sidebar */}
-          <div className="lg:col-span-3">
+          {/* Left Sidebar - Hidden on mobile, visible on desktop */}
+          <div className="hidden lg:block lg:col-span-3">
             <div className="sticky top-20">
               <UserSidebar user={currentUser} onViewProfile={() => handleViewProfile()} />
               {isAdmin && (
@@ -364,13 +363,13 @@ function MainApp() {
           </div>
 
           {/* Main Feed */}
-          <div className="lg:col-span-6">
+          <div className="col-span-1 lg:col-span-6">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
               <TabsList className="grid w-full grid-cols-4 bg-white">
-                <TabsTrigger value="all" className="gap-2"><BookOpen className="h-4 w-4" /> Tất cả</TabsTrigger>
-                <TabsTrigger value="following" className="gap-2"><UsersIcon className="h-4 w-4" /> Theo dõi</TabsTrigger>
-                <TabsTrigger value="saved" className="gap-2"><TrendingUp className="h-4 w-4" /> Đã lưu</TabsTrigger>
-                <TabsTrigger value="my-posts" className="gap-2"><Clock className="h-4 w-4" /> Của tôi</TabsTrigger>
+                <TabsTrigger value="all" className="gap-2 px-2 text-xs sm:text-sm"><BookOpen className="h-4 w-4 hidden xs:block" /> Tất cả</TabsTrigger>
+                <TabsTrigger value="following" className="gap-2 px-2 text-xs sm:text-sm"><UsersIcon className="h-4 w-4 hidden xs:block" /> Theo dõi</TabsTrigger>
+                <TabsTrigger value="saved" className="gap-2 px-2 text-xs sm:text-sm"><TrendingUp className="h-4 w-4 hidden xs:block" /> Đã lưu</TabsTrigger>
+                <TabsTrigger value="my-posts" className="gap-2 px-2 text-xs sm:text-sm"><Clock className="h-4 w-4 hidden xs:block" /> Của tôi</TabsTrigger>
               </TabsList>
             </Tabs>
 
@@ -401,8 +400,8 @@ function MainApp() {
             </div>
           </div>
 
-          {/* Right Sidebar */}
-          <div className="lg:col-span-3">
+          {/* Right Sidebar - Hidden on small tablets and mobile */}
+          <div className="hidden xl:block lg:col-span-3">
             <div className="sticky top-20 space-y-4">
               <Leaderboard />
               <SuggestedPosts />

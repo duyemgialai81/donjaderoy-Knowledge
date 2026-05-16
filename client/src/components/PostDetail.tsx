@@ -1354,7 +1354,7 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
   // ==========================================
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent aria-describedby={undefined} className="max-w-4xl max-h-[90vh] overflow-y-auto p-0">
+      <DialogContent aria-describedby={undefined} className="max-w-4xl w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto p-0">
         <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between z-10">
           <h2 className="text-xl font-bold">Chi tiết bài viết</h2>
           <Button variant="ghost" size="icon" onClick={onClose}>

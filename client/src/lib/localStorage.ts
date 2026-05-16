@@ -86,12 +86,10 @@ export const localStorage_service = {
     const filters = localStorage.getItem(STORAGE_KEYS.FILTERS);
     return filters ? JSON.parse(filters) : null;
   },
-
   // Theme
   saveTheme: (theme: string) => {
     localStorage.setItem(STORAGE_KEYS.THEME, theme);
   },
-  
   getTheme: () => {
     return localStorage.getItem(STORAGE_KEYS.THEME) || "light";
   },

@@ -143,19 +143,21 @@ export function AdminDashboard() {
       <div className="container mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl mb-2">Quản trị hệ thống</h1>
-              <p className="text-gray-600">Tổng quan và quản lý nền tảng FPT Polytechnic</p>
+              <h1 className="text-2xl sm:text-3xl mb-2">Quản trị hệ thống</h1>
+              <p className="text-gray-600 text-sm sm:text-base">Tổng quan và quản lý nền tảng FPT Polytechnic</p>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline">
+              <Button variant="outline" className="flex-1 sm:flex-none">
                 <Download className="h-4 w-4 mr-2" />
-                Xuất báo cáo
+                <span className="hidden xs:inline">Xuất báo cáo</span>
+                <span className="xs:hidden">Xuất</span>
               </Button>
-              <Button className="bg-orange-600 hover:bg-orange-700">
+              <Button className="bg-orange-600 hover:bg-orange-700 flex-1 sm:flex-none">
                 <BarChart3 className="h-4 w-4 mr-2" />
-                Phân tích chi tiết
+                <span className="hidden xs:inline">Phân tích chi tiết</span>
+                <span className="xs:hidden">Phân tích</span>
               </Button>
             </div>
           </div>
@@ -357,8 +359,8 @@ export function AdminDashboard() {
 
               {/* Users Tab */}
               <TabsContent value="users" className="mt-6">
-                <div className="mb-4 flex items-center gap-2">
-                  <div className="relative flex-1">
+                <div className="mb-4 flex flex-col sm:flex-row items-center gap-2">
+                  <div className="relative flex-1 w-full">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
                       placeholder="Tìm kiếm người dùng..."
@@ -368,7 +370,7 @@ export function AdminDashboard() {
                     />
                   </div>
                   <Select defaultValue="all">
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-full sm:w-[180px]">
                       <SelectValue placeholder="Lọc theo" />
                     </SelectTrigger>
                     <SelectContent>
@@ -379,7 +381,8 @@ export function AdminDashboard() {
                   </Select>
                 </div>
 
-                <Table>
+                <div className="overflow-x-auto">
+                  <Table className="min-w-[800px]">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Người dùng</TableHead>
@@ -438,8 +441,8 @@ export function AdminDashboard() {
 
               {/* Posts Tab */}
               <TabsContent value="posts" className="mt-6">
-                <div className="mb-4 flex items-center gap-2">
-                  <div className="relative flex-1">
+                <div className="mb-4 flex flex-col sm:flex-row items-center gap-2">
+                  <div className="relative flex-1 w-full">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
                       placeholder="Tìm kiếm bài viết..."
@@ -449,7 +452,7 @@ export function AdminDashboard() {
                     />
                   </div>
                   <Select defaultValue="all">
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-full sm:w-[180px]">
                       <SelectValue placeholder="Trạng thái" />
                     </SelectTrigger>
                     <SelectContent>
@@ -460,7 +463,8 @@ export function AdminDashboard() {
                   </Select>
                 </div>
 
-                <Table>
+                <div className="overflow-x-auto">
+                  <Table className="min-w-[800px]">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Tiêu đề</TableHead>

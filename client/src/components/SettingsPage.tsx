@@ -227,9 +227,9 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="mx-auto min-h-screen max-w-7xl px-4 py-8 sm:px-6">
-      <div className="rounded-[32px] border border-orange-100 bg-[linear-gradient(180deg,#fff7ed_0%,#ffffff_28%,#fffaf5_100%)] p-6 shadow-[0_24px_70px_rgba(249,115,22,0.08)]">
-        <div className="grid gap-8 xl:grid-cols-[280px_minmax(0,1fr)]">
+    <div className="mx-auto min-h-screen max-w-7xl px-0 sm:px-4 py-4 sm:py-8">
+      <div className="sm:rounded-[32px] border-orange-100 bg-[linear-gradient(180deg,#fff7ed_0%,#ffffff_28%,#fffaf5_100%)] p-4 sm:p-6 shadow-[0_24px_70px_rgba(249,115,22,0.08)]">
+        <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
           <aside className="space-y-4">
             <div className="rounded-[28px] border border-orange-100 bg-white p-5 shadow-sm">
               <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-orange-700">
