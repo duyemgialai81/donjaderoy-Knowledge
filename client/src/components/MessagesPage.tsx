@@ -564,7 +564,7 @@
 
 //     const token = localStorage_service.getAuthToken();
 //     const client = new Client({
-//       webSocketFactory: () => new SockJS("http://localhost:8080/ws"),
+//       webSocketFactory: () => new SockJS(import.meta.env.VITE_WS_URL || 'https://donjaderoy81-knowledge.hf.space/ws'),
 //       connectHeaders: { Authorization: `Bearer ${token}` },
 //       debug: () => {},
 //       reconnectDelay: 5000,
@@ -2306,7 +2306,7 @@
 //     if (!currentUserId) return;
 //     const token = localStorage_service.getAuthToken();
 //     const client = new Client({
-//       webSocketFactory: () => new SockJS(`http://localhost:8080/ws?token=${token}`),
+//       webSocketFactory: () => new SockJS(`${import.meta.env.VITE_WS_URL || 'https://donjaderoy81-knowledge.hf.space/ws'}?token=${token}`),
 //       connectHeaders: { Authorization: `Bearer ${token}` },
 //       debug: () => {},
 //       reconnectDelay: 5000,
@@ -4001,7 +4001,7 @@
 //     if (!currentUserId) return;
 //     const token = localStorage_service.getAuthToken();
 //     const client = new Client({
-//       webSocketFactory: () => new SockJS(`http://localhost:8080/ws?token=${token}`),
+//       webSocketFactory: () => new SockJS(`${import.meta.env.VITE_WS_URL || 'https://donjaderoy81-knowledge.hf.space/ws'}?token=${token}`),
 //       connectHeaders: { Authorization: `Bearer ${token}` },
 //       debug: () => {},
 //       reconnectDelay: 5000,
@@ -5698,7 +5698,7 @@
 //     if (!currentUserId) return;
 //     const token = localStorage_service.getAuthToken();
 //     const client = new Client({
-//       webSocketFactory: () => new SockJS(`http://localhost:8080/ws?token=${token}`),
+//       webSocketFactory: () => new SockJS(`${import.meta.env.VITE_WS_URL || 'https://donjaderoy81-knowledge.hf.space/ws'}?token=${token}`),
 //       connectHeaders: { Authorization: `Bearer ${token}` },
 //       debug: () => {},
 //       reconnectDelay: 5000,
@@ -6986,7 +6986,7 @@
 //     if (!currentUserId) return;
 //     const token = localStorage_service.getAuthToken();
 //     const client = new Client({
-//       webSocketFactory: () => new SockJS(`http://localhost:8080/ws?token=${token}`),
+//       webSocketFactory: () => new SockJS(`${import.meta.env.VITE_WS_URL || 'https://donjaderoy81-knowledge.hf.space/ws'}?token=${token}`),
 //       connectHeaders: { Authorization: `Bearer ${token}` },
 //       debug: () => {},
 //       reconnectDelay: 5000,
@@ -8104,7 +8104,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
 
     const client = new Client({
       // ✅ SỬA 1: Bỏ ?token= khỏi URL để tránh lỗi Tomcat "Invalid character found in method name"
-      webSocketFactory: () => new SockJS("http://localhost:8080/ws"),
+      webSocketFactory: () => new SockJS(import.meta.env.VITE_WS_URL || 'https://donjaderoy81-knowledge.hf.space/ws'),
       connectHeaders: { Authorization: `Bearer ${token}` },
       reconnectDelay: 5000,
       heartbeatIncoming: 10000, // ✅ SỬA 2: Giữ kết nối sống, tránh bị Proxy/Server đóng idle

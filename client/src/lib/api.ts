@@ -1,4 +1,4 @@
-const API_BASE = 'https://donjaderoy81-knowledge.hf.space';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://donjaderoy81-knowledge.hf.space';
 import { localStorage_service } from './localStorage';
 async function safeJson(res: Response) {
   try {

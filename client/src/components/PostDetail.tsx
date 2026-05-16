@@ -1076,7 +1076,7 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
 
     const token = localStorage.getItem('ksp_auth_token') || "";
     const client = new Client({
-      webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
+      webSocketFactory: () => new SockJS(import.meta.env.VITE_WS_URL || 'https://donjaderoy81-knowledge.hf.space/ws'),
       connectHeaders: { Authorization: `Bearer ${token}` },
       debug: () => {}, 
       onConnect: () => {
