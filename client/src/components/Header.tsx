@@ -1,4 +1,4 @@
-import { Search, Plus, LogOut, User, Settings, Shield, Home, MessageCircle, Bell } from "lucide-react";
+import { Search, Plus, LogOut, User, Settings, Shield, Home, MessageCircle, Bell, Trophy } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import {
@@ -141,8 +141,9 @@ export function Header({
                 <p className="text-sm font-semibold text-slate-800 line-clamp-1">
                   {currentUser?.name || "Người dùng"}
                 </p>
-                <p className="text-xs text-[#F26B38] font-medium mt-0.5">
-                  🏆 {(currentUser?.points || 0).toLocaleString()} điểm tích lũy
+                <p className="text-xs text-[#F26B38] font-medium mt-0.5 flex items-center gap-1">
+                  <Trophy className="h-3 w-3" />
+                  {(currentUser?.points || 0).toLocaleString()} điểm tích lũy
                 </p>
               </div>
 

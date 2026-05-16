@@ -34,14 +34,14 @@ export function SuggestedPosts({ currentPost }: SuggestedPostsProps) {
   }, []);
 
   return (
-    <div className="space-y-4">
-      {/* ── Suggested Posts ── */}
-      <div className="card-premium p-5">
+    <div className="space-y-5">
+      {/* ── Suggested Posts – nâng cấp ── */}
+      <div className="card-premium p-5 hover:shadow-lg transition-all duration-300">
         <div className="flex items-center gap-2 mb-4">
-          <Lightbulb className="h-4 w-4 text-[#F26B38]" />
-          <h3 className="font-semibold text-slate-800 text-sm">Gợi ý cho bạn</h3>
+          <Lightbulb className="h-5 w-5 text-[#F26B38]" />
+          <h3 className="font-semibold text-slate-800 text-base">Gợi ý cho bạn</h3>
         </div>
-        <div className="space-y-1">
+        <div className="space-y-2">
           {suggested.map((post) => {
             const author = users.find(u => u.id === post.authorId);
             const majorName = post.major || '';
@@ -50,22 +50,25 @@ export function SuggestedPosts({ currentPost }: SuggestedPostsProps) {
             return (
               <div
                 key={post.id}
-                className="group cursor-pointer hover:bg-slate-50 p-2.5 rounded-xl transition-colors border border-transparent hover:border-slate-100"
+                className="group cursor-pointer hover:bg-gradient-to-r hover:from-orange-50 hover:to-transparent p-3 rounded-xl transition-all duration-200 border border-transparent hover:border-orange-100 hover:shadow-sm"
               >
-                <h4 className="text-sm font-medium text-slate-700 line-clamp-2 mb-1.5 group-hover:text-[#F26B38] transition-colors">
+                <h4 className="text-sm font-semibold text-slate-700 line-clamp-2 mb-2 group-hover:text-[#F26B38] transition-colors">
                   {post.title}
                 </h4>
-                <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-medium">
-                  <span className="text-slate-600">{author?.name}</span>
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">
+                  <span className="text-slate-600">{author?.name || "Ẩn danh"}</span>
                   <span>•</span>
-                  <span className="truncate max-w-[80px]">{subjectName || majorName}</span>
+                  <span className="truncate max-w-[80px]">{subjectName || majorName || "Chưa phân loại"}</span>
                   <span>•</span>
-                  <span>{post.views || 0} views</span>
+                  <span>{post.views || 0} lượt xem</span>
                 </div>
                 {post.tags && post.tags.length > 0 && (
                   <div className="flex gap-1.5 mt-2">
                     {post.tags.slice(0, 2).map(tag => (
-                      <Badge key={tag} className="text-[10px] font-medium bg-slate-100 text-slate-500 hover:bg-slate-200 border-none px-1.5 py-0">
+                      <Badge 
+                        key={tag} 
+                        className="text-[10px] font-medium bg-orange-50 text-orange-600 hover:bg-orange-100 border-none px-2 py-0.5 rounded-full transition-colors"
+                      >
                         #{tag}
                       </Badge>
                     ))}
@@ -74,23 +77,26 @@ export function SuggestedPosts({ currentPost }: SuggestedPostsProps) {
               </div>
             );
           })}
+          {suggested.length === 0 && (
+            <div className="text-center py-6 text-slate-400 text-sm">Chưa có gợi ý</div>
+          )}
         </div>
       </div>
 
-      {/* ── Trending Posts ── */}
-      <div className="card-premium p-5">
+      {/* ── Trending Posts – nâng cấp ── */}
+      <div className="card-premium p-5 hover:shadow-lg transition-all duration-300">
         <div className="flex items-center gap-2 mb-4">
-          <TrendingUp className="h-4 w-4 text-emerald-500" />
-          <h3 className="font-semibold text-slate-800 text-sm">Xu hướng</h3>
+          <TrendingUp className="h-5 w-5 text-emerald-500" />
+          <h3 className="font-semibold text-slate-800 text-base">Xu hướng</h3>
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           {trending.map((post, index) => {
             return (
               <div
                 key={post.id}
-                className="group cursor-pointer hover:bg-slate-50 p-2.5 rounded-xl transition-colors flex gap-3 border border-transparent hover:border-slate-100"
+                className="group cursor-pointer hover:bg-gradient-to-r hover:from-emerald-50 hover:to-transparent p-2.5 rounded-xl transition-all duration-200 flex gap-3 border border-transparent hover:border-emerald-100"
               >
-                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 text-sm font-bold flex-shrink-0">
+                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 text-sm font-bold flex-shrink-0 group-hover:scale-110 transition-transform">
                   {index + 1}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -104,16 +110,19 @@ export function SuggestedPosts({ currentPost }: SuggestedPostsProps) {
               </div>
             );
           })}
+          {trending.length === 0 && (
+            <div className="text-center py-6 text-slate-400 text-sm">Chưa có bài xu hướng</div>
+          )}
         </div>
       </div>
 
-      {/* ── Active Users ── */}
-      <div className="card-premium p-5">
+      {/* ── Active Users – nâng cấp ── */}
+      <div className="card-premium p-5 hover:shadow-lg transition-all duration-300">
         <div className="flex items-center gap-2 mb-4">
-          <Users className="h-4 w-4 text-blue-500" />
-          <h3 className="font-semibold text-slate-800 text-sm">Người dùng tích cực</h3>
+          <Users className="h-5 w-5 text-blue-500" />
+          <h3 className="font-semibold text-slate-800 text-base">Người dùng tích cực</h3>
         </div>
-        <div className="space-y-1">
+        <div className="space-y-2">
           {users.slice(0, 5).map((user) => {
             const userBadges = user.badges || [];
             const latestBadge = userBadges.length > 0 ? userBadges[userBadges.length - 1] : null;
@@ -121,30 +130,33 @@ export function SuggestedPosts({ currentPost }: SuggestedPostsProps) {
             return (
               <div
                 key={user.id}
-                className="flex items-center gap-3 cursor-pointer hover:bg-slate-50 p-2.5 rounded-xl transition-colors border border-transparent hover:border-slate-100"
+                className="flex items-center gap-3 cursor-pointer hover:bg-gradient-to-r hover:from-blue-50 hover:to-transparent p-2.5 rounded-xl transition-all duration-200 border border-transparent hover:border-blue-100"
               >
                 <img
                   src={user.avatar}
                   alt={user.name}
-                  className="h-9 w-9 rounded-full object-cover shadow-sm"
+                  className="h-10 w-10 rounded-full object-cover shadow-sm ring-2 ring-white group-hover:ring-blue-200 transition-all"
                   onError={(e) => {
                     e.currentTarget.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`;
                   }}
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <p className="text-sm font-medium text-slate-700 truncate">{user.name}</p>
+                    <p className="text-sm font-semibold text-slate-700 truncate">{user.name}</p>
                     {latestBadge && (
-                      <span className="text-sm" title={latestBadge.name}>
+                      <span className="text-base" title={latestBadge.name}>
                         {latestBadge.icon}
                       </span>
                     )}
                   </div>
-                  <p className="text-[10px] font-medium text-slate-400">{user.postsCount || 0} bài viết</p>
+                  <p className="text-[11px] font-medium text-slate-400">{user.postsCount || 0} bài viết</p>
                 </div>
               </div>
             );
           })}
+          {users.length === 0 && (
+            <div className="text-center py-6 text-slate-400 text-sm">Chưa có người dùng</div>
+          )}
         </div>
       </div>
     </div>

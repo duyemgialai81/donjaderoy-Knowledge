@@ -5,9 +5,8 @@ import { cn } from "./utils";
 function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      data-slot="card"
       className={cn(
-        "bg-card text-card-foreground flex flex-col gap-6 rounded-xl border",
+        "bg-white text-slate-800 flex flex-col gap-6 rounded-2xl border border-slate-100 shadow-sm transition-all duration-200 hover:shadow-md",
         className,
       )}
       {...props}

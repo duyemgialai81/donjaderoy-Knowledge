@@ -64,9 +64,9 @@ function loadCallPreferences() {
 }
 
 function formatRole(role?: string) {
-  if (role === "lecturer") return "Giang vien";
-  if (role === "admin") return "Quan tri vien";
-  return "Sinh vien";
+  if (role === "lecturer") return "Giảng viên";
+  if (role === "admin") return "Quản trị viên";
+  return "Sinh viên";
 }
 
 function getAvatarUrl(user?: any) {
@@ -98,9 +98,9 @@ export function SettingsPage() {
 
   const overviewStats = useMemo(
     () => [
-      { label: "Diem hien tai", value: user?.points || 0 },
-      { label: "Nguoi theo doi", value: user?.followers || 0 },
-      { label: "Bai viet", value: user?.postsCount || 0 },
+      { label: "Điểm hiện tại", value: user?.points || 0 },
+      { label: "Người theo dõi", value: user?.followers || 0 },
+      { label: "Bài viết", value: user?.postsCount || 0 },
     ],
     [user],
   );
@@ -117,7 +117,7 @@ export function SettingsPage() {
         });
       }
     } catch (error) {
-      toast.error("Khong the tai cai dat quyen rieng tu.");
+      toast.error("Không thể tải cài đặt quyền riêng tư.");
     }
   };
 
@@ -128,7 +128,7 @@ export function SettingsPage() {
       const res = await api.getBlockedUsers(0, 50, token);
       setBlockedUsers(Array.isArray(res) ? res : []);
     } catch (error) {
-      toast.error("Khong the tai danh sach chan.");
+      toast.error("Không thể tải danh sách chặn.");
     } finally {
       setIsLoadingBlocked(false);
     }
@@ -146,7 +146,7 @@ export function SettingsPage() {
       setSessions(Array.isArray(sessionList) ? sessionList : []);
       setDevices(Array.isArray(deviceList) ? deviceList : []);
     } catch (error) {
-      toast.error("Khong the tai thong tin thiet bi va phien dang nhap.");
+      toast.error("Không thể tải thông tin thiết bị và phiên đăng nhập.");
     } finally {
       setIsLoadingSecurity(false);
     }
@@ -170,9 +170,9 @@ export function SettingsPage() {
     try {
       await api.updatePrivacySettings(privacySettings, token);
       localStorage.setItem(CALL_PREFERENCE_KEY, JSON.stringify(callPreferences));
-      toast.success("Da cap nhat cai dat quyen rieng tu.");
+      toast.success("Đã cập nhật cài đặt quyền riêng tư.");
     } catch (error) {
-      toast.error("Khong the luu thay doi quyen rieng tu.");
+      toast.error("Không thể lưu thay đổi quyền riêng tư.");
     } finally {
       setIsSavingPrivacy(false);
     }
@@ -182,9 +182,9 @@ export function SettingsPage() {
     setIsSavingCalls(true);
     try {
       localStorage.setItem(CALL_PREFERENCE_KEY, JSON.stringify(callPreferences));
-      toast.success("Da luu tuy chon goi va nhan tin.");
+      toast.success("Đã lưu tùy chọn gọi và nhắn tin.");
     } catch (error) {
-      toast.error("Khong the luu tuy chon giao dien.");
+      toast.error("Không thể lưu tùy chọn giao diện.");
     } finally {
       setTimeout(() => setIsSavingCalls(false), 350);
     }
@@ -196,9 +196,9 @@ export function SettingsPage() {
     try {
       await api.unblockUser(blockedId, token);
       setBlockedUsers((previous) => previous.filter((blockedUser) => blockedUser.id !== blockedId));
-      toast.success(`Da bo chan ${name}.`);
+      toast.success(`Đã bỏ chặn ${name}.`);
     } catch (error) {
-      toast.error("Khong the bo chan nguoi dung nay luc nay.");
+      toast.error("Không thể bỏ chặn người dùng lúc này.");
     }
   };
 
@@ -208,9 +208,9 @@ export function SettingsPage() {
     try {
       await api.revokeSession(sessionToken, token);
       setSessions((previous) => previous.filter((session) => session.token !== sessionToken && session.id !== sessionToken));
-      toast.success("Da thu hoi phien dang nhap.");
+      toast.success("Đã thu hồi phiên đăng nhập.");
     } catch (error) {
-      toast.error("Khong the thu hoi phien dang nhap.");
+      toast.error("Không thể thu hồi phiên đăng nhập.");
     }
   };
 
@@ -220,505 +220,435 @@ export function SettingsPage() {
     try {
       await api.deleteDevice(deviceId, token);
       setDevices((previous) => previous.filter((device) => device.id !== deviceId));
-      toast.success("Da go thiet bi khoi tai khoan.");
+      toast.success("Đã gỡ thiết bị khỏi tài khoản.");
     } catch (error) {
-      toast.error("Khong the xoa thiet bi nay.");
+      toast.error("Không thể xóa thiết bị này.");
     }
   };
 
   return (
-    <div className="mx-auto min-h-screen max-w-7xl px-0 sm:px-4 py-4 sm:py-8">
-      <div className="sm:rounded-[32px] border-orange-100 bg-[linear-gradient(180deg,#fff7ed_0%,#ffffff_28%,#fffaf5_100%)] p-4 sm:p-6 shadow-[0_24px_70px_rgba(249,115,22,0.08)]">
-        <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
-          <aside className="space-y-4">
-            <div className="rounded-[28px] border border-orange-100 bg-white p-5 shadow-sm">
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-orange-700">
-                <SettingsIcon className="h-3.5 w-3.5" />
-                Control Center
+    <div className="mx-auto min-h-screen max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className="rounded-2xl bg-white/80 backdrop-blur-sm shadow-xl border border-slate-100 overflow-hidden">
+        <div className="grid gap-0 lg:grid-cols-[300px_minmax(0,1fr)]">
+          {/* Sidebar */}
+          <aside className="border-r border-slate-100 bg-gradient-to-b from-slate-50/50 to-white p-5">
+            <div className="mb-6 flex items-center gap-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#F26B38] to-[#D9541E] shadow-md">
+                <SettingsIcon className="h-5 w-5 text-white" />
               </div>
+              <div>
+                <h2 className="font-bold text-slate-800">Cài đặt</h2>
+                <p className="text-xs text-slate-400">Tùy chỉnh tài khoản</p>
+              </div>
+            </div>
+
+            <div className="mb-6 rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-100">
               <div className="flex items-center gap-3">
-                <img src={userAvatar} alt={user?.name || "User"} className="h-14 w-14 rounded-[18px] border border-orange-100 object-cover" />
+                <img
+                  src={userAvatar}
+                  alt={user?.name || "User"}
+                  className="h-12 w-12 rounded-xl object-cover ring-2 ring-white shadow-sm"
+                />
                 <div className="min-w-0">
-                  <div className="truncate text-base font-semibold text-slate-950">{user?.name || "Tai khoan hien tai"}</div>
-                  <div className="mt-1 text-sm text-slate-500">{user?.email || "Chua co email"}</div>
+                  <div className="truncate text-sm font-semibold text-slate-800">{user?.name || "Tài khoản hiện tại"}</div>
+                  <div className="mt-0.5 text-xs text-slate-500 truncate">{user?.email || "Chưa có email"}</div>
                 </div>
               </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Badge className="rounded-full bg-orange-500 px-3 py-1 text-white hover:bg-orange-500">
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Badge className="rounded-full bg-orange-500 text-white hover:bg-orange-600 text-[10px] px-2 py-0.5">
                   {formatRole(user?.role)}
                 </Badge>
-                <Badge variant="secondary" className="rounded-full px-3 py-1">
-                  {callPreferences.showActiveStatus ? "Dang hien trang thai online" : "Da an trang thai online"}
+                <Badge variant="secondary" className="rounded-full text-[10px] px-2 py-0.5">
+                  {callPreferences.showActiveStatus ? "🟢 Online" : "🔴 Ẩn trạng thái"}
                 </Badge>
               </div>
             </div>
 
-            <div className="space-y-2 rounded-[28px] border border-orange-100 bg-white p-3 shadow-sm">
+            <div className="space-y-1">
               {[
-                { id: "overview", label: "Tong quan", icon: User },
-                { id: "privacy", label: "Quyen rieng tu", icon: Shield },
-                { id: "calls", label: "Goi va nhan tin", icon: Phone },
-                { id: "security", label: "Bao mat", icon: Lock },
+                { id: "overview", label: "Tổng quan", icon: User },
+                { id: "privacy", label: "Quyền riêng tư", icon: Shield },
+                { id: "calls", label: "Cuộc gọi & Tin nhắn", icon: Phone },
+                { id: "security", label: "Bảo mật", icon: Lock },
               ].map((item) => (
                 <Button
                   key={item.id}
-                  variant={activeTab === item.id ? "default" : "ghost"}
-                  className={`h-12 w-full justify-start rounded-2xl ${
+                  variant="ghost"
+                  className={`w-full justify-start rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
                     activeTab === item.id
-                      ? "bg-orange-500 text-white hover:bg-orange-600"
-                      : "text-slate-700 hover:bg-orange-50"
+                      ? "bg-orange-50 text-orange-700 shadow-sm ring-1 ring-orange-200"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                   }`}
                   onClick={() => setActiveTab(item.id as SettingsTab)}
                 >
-                  <item.icon className="mr-3 h-4 w-4" />
+                  <item.icon className={`mr-3 h-4 w-4 ${activeTab === item.id ? "text-orange-600" : "text-slate-400"}`} />
                   {item.label}
                 </Button>
               ))}
             </div>
           </aside>
 
-          <main className="min-w-0">
-            {activeTab === "overview" ? (
+          {/* Main content */}
+          <main className="p-6 md:p-8">
+            {activeTab === "overview" && (
               <div className="space-y-6">
-                <Card className="overflow-hidden rounded-[30px] border-orange-100 shadow-sm">
-                  <CardContent className="p-0">
-                    <div className="bg-[linear-gradient(135deg,#f97316_0%,#fb923c_45%,#fdba74_100%)] px-6 py-8 text-white">
-                      <div className="max-w-3xl">
-                        <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em]">
-                          <ShieldCheck className="h-3.5 w-3.5" />
-                          Settings overview
-                        </div>
-                        <h1 className="text-3xl font-semibold">Quan ly tai khoan, quyen rieng tu va giao dien chat</h1>
-                        <p className="mt-3 max-w-2xl text-sm leading-7 text-orange-50">
-                          Day la khu settings moi de ban theo doi trang thai tai khoan, chinh quyen nhan tin va cai dat audio/video call.
-                        </p>
-                      </div>
-                    </div>
+                <div className="rounded-2xl bg-gradient-to-r from-orange-500 to-orange-600 p-6 text-white shadow-lg">
+                  <div className="flex items-center gap-2 text-orange-100 text-xs font-semibold uppercase tracking-wider mb-2">
+                    <ShieldCheck className="h-4 w-4" />
+                    Tổng quan tài khoản
+                  </div>
+                  <h1 className="text-2xl font-bold">Chào mừng trở lại, {user?.name?.split(' ')[0] || 'bạn'} 👋</h1>
+                  <p className="mt-2 text-orange-100 max-w-xl text-sm">
+                    Quản lý thông tin cá nhân, cài đặt quyền riêng tư và tùy chỉnh trải nghiệm cuộc gọi.
+                  </p>
+                </div>
 
-                    <div className="grid gap-4 px-6 py-6 sm:grid-cols-3">
-                      {overviewStats.map((item) => (
-                        <div key={item.label} className="rounded-[24px] border border-orange-100 bg-orange-50/60 p-4">
-                          <div className="text-sm text-slate-500">{item.label}</div>
-                          <div className="mt-2 text-2xl font-semibold text-slate-950">{item.value}</div>
-                        </div>
-                      ))}
+                <div className="grid gap-5 sm:grid-cols-3">
+                  {overviewStats.map((item) => (
+                    <div key={item.label} className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
+                      <div className="text-sm font-medium text-slate-500">{item.label}</div>
+                      <div className="mt-2 text-3xl font-bold text-slate-800">{item.value.toLocaleString()}</div>
                     </div>
-                  </CardContent>
-                </Card>
+                  ))}
+                </div>
 
                 <div className="grid gap-6 lg:grid-cols-2">
-                  <Card className="rounded-[28px] border-orange-100 shadow-sm">
-                    <CardHeader>
-                      <CardTitle>Thong tin tai khoan</CardTitle>
-                      <CardDescription>Thong tin chinh dang duoc su dung trong he thong.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-slate-500">Ho va ten</label>
-                          <Input value={user?.name || ""} readOnly className="h-11 rounded-2xl border-orange-100 bg-orange-50/60" />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-slate-500">Vai tro</label>
-                          <Input value={formatRole(user?.role)} readOnly className="h-11 rounded-2xl border-orange-100 bg-orange-50/60" />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-slate-500">Email</label>
-                          <Input value={user?.email || ""} readOnly className="h-11 rounded-2xl border-orange-100 bg-orange-50/60" />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-slate-500">Nganh hoc</label>
-                          <Input value={user?.major || ""} readOnly className="h-11 rounded-2xl border-orange-100 bg-orange-50/60" />
-                        </div>
+                  <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+                    <h3 className="font-semibold text-slate-800">Thông tin tài khoản</h3>
+                    <p className="text-xs text-slate-400 mt-0.5 mb-4">Thông tin chính được sử dụng trong hệ thống.</p>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs font-medium text-slate-500">Họ và tên</label>
+                        <Input value={user?.name || ""} readOnly className="mt-1 h-10 rounded-lg bg-slate-50 border-slate-200 text-sm" />
                       </div>
-                    </CardContent>
-                  </Card>
+                      <div>
+                        <label className="text-xs font-medium text-slate-500">Vai trò</label>
+                        <Input value={formatRole(user?.role)} readOnly className="mt-1 h-10 rounded-lg bg-slate-50 border-slate-200 text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-slate-500">Email</label>
+                        <Input value={user?.email || ""} readOnly className="mt-1 h-10 rounded-lg bg-slate-50 border-slate-200 text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-slate-500">Ngành học</label>
+                        <Input value={user?.major || ""} readOnly className="mt-1 h-10 rounded-lg bg-slate-50 border-slate-200 text-sm" />
+                      </div>
+                    </div>
+                  </div>
 
-                  <Card className="rounded-[28px] border-orange-100 shadow-sm">
-                    <CardHeader>
-                      <CardTitle>Tong quan giao tiep</CardTitle>
-                      <CardDescription>Trang thai hien tai cho khu nhan tin va goi.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="rounded-[24px] border border-orange-100 bg-orange-50/70 p-4">
-                        <div className="flex items-center gap-3">
-                          <Phone className="h-5 w-5 text-orange-600" />
-                          <div>
-                            <div className="font-semibold text-slate-900">Audio call</div>
-                            <div className="text-sm text-slate-500">
-                              {callPreferences.allowAudioCalls ? "Dang cho phep" : "Dang tam tat"}
-                            </div>
-                          </div>
+                  <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+                    <h3 className="font-semibold text-slate-800">Trạng thái liên lạc</h3>
+                    <p className="text-xs text-slate-400 mt-0.5 mb-4">Cài đặt nhanh cho khu vực nhắn tin & gọi.</p>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-orange-500" />
+                          <span className="text-sm font-medium">Cuộc gọi thoại</span>
                         </div>
+                        <Badge variant={callPreferences.allowAudioCalls ? "default" : "secondary"} className="text-[10px]">
+                          {callPreferences.allowAudioCalls ? "Đang bật" : "Đã tắt"}
+                        </Badge>
                       </div>
-                      <div className="rounded-[24px] border border-orange-100 bg-orange-50/70 p-4">
-                        <div className="flex items-center gap-3">
-                          <Video className="h-5 w-5 text-orange-600" />
-                          <div>
-                            <div className="font-semibold text-slate-900">Video call</div>
-                            <div className="text-sm text-slate-500">
-                              {callPreferences.allowVideoCalls ? "Dang cho phep" : "Dang tam tat"}
-                            </div>
-                          </div>
+                      <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
+                        <div className="flex items-center gap-2">
+                          <Video className="h-4 w-4 text-orange-500" />
+                          <span className="text-sm font-medium">Cuộc gọi video</span>
                         </div>
+                        <Badge variant={callPreferences.allowVideoCalls ? "default" : "secondary"} className="text-[10px]">
+                          {callPreferences.allowVideoCalls ? "Đang bật" : "Đã tắt"}
+                        </Badge>
                       </div>
-                      <div className="rounded-[24px] border border-orange-100 bg-orange-50/60 p-4">
-                        <div className="flex items-center gap-3">
-                          <Bell className="h-5 w-5 text-orange-600" />
-                          <div>
-                            <div className="font-semibold text-slate-900">Thong bao desktop</div>
-                            <div className="text-sm text-slate-500">
-                              {callPreferences.desktopNotifications ? "Dang bat" : "Dang tat"}
-                            </div>
-                          </div>
+                      <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
+                        <div className="flex items-center gap-2">
+                          <Bell className="h-4 w-4 text-orange-500" />
+                          <span className="text-sm font-medium">Thông báo desktop</span>
                         </div>
+                        <Badge variant={callPreferences.desktopNotifications ? "default" : "secondary"} className="text-[10px]">
+                          {callPreferences.desktopNotifications ? "Đang bật" : "Đã tắt"}
+                        </Badge>
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </div>
                 </div>
               </div>
-            ) : null}
+            )}
 
-            {activeTab === "privacy" ? (
+            {activeTab === "privacy" && (
               <div className="space-y-6">
-                <Card className="rounded-[30px] border-orange-100 shadow-sm">
-                  <CardHeader>
-                    <CardTitle>Quyen rieng tu va nhan tin</CardTitle>
-                    <CardDescription>Quan ly ai co the nhan tin, thay trang thai va dua tin vao hop thu cho.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <button
-                        type="button"
-                        onClick={() => setPrivacySettings((previous) => ({ ...previous, allowMessagesFrom: "everyone" }))}
-                        className={`rounded-[24px] border p-5 text-left transition ${
-                          privacySettings.allowMessagesFrom === "everyone"
-                            ? "border-orange-200 bg-orange-50 shadow-sm"
-                            : "border-orange-100 bg-white hover:bg-orange-50"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <Mail className="h-5 w-5 text-orange-600" />
-                          <div>
-                            <div className="font-semibold text-slate-900">Moi nguoi</div>
-                            <div className="mt-1 text-sm leading-6 text-slate-500">
-                              Cho phep tat ca nguoi dung duoc bat dau hoi thoai voi ban.
-                            </div>
-                          </div>
-                        </div>
-                      </button>
+                <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+                  <h2 className="text-xl font-semibold text-slate-800">Quyền riêng tư & Nhắn tin</h2>
+                  <p className="text-sm text-slate-500 mt-1">Quản lý ai có thể nhắn tin, xem trạng thái và gửi yêu cầu kết bạn.</p>
 
-                      <button
-                        type="button"
-                        onClick={() => setPrivacySettings((previous) => ({ ...previous, allowMessagesFrom: "mutual_followers" }))}
-                        className={`rounded-[24px] border p-5 text-left transition ${
-                          privacySettings.allowMessagesFrom === "mutual_followers"
-                            ? "border-orange-200 bg-orange-50 shadow-sm"
-                            : "border-orange-100 bg-white hover:bg-orange-50"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <BadgeCheck className="h-5 w-5 text-orange-600" />
-                          <div>
-                            <div className="font-semibold text-slate-900">Chi ban be follow cheo</div>
-                            <div className="mt-1 text-sm leading-6 text-slate-500">
-                              Han che hoi thoai moi chi voi nhung nguoi da ket noi hai chieu.
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    </div>
-
-                    <div className="grid gap-4 lg:grid-cols-2">
-                      <div className="rounded-[24px] border border-orange-100 bg-orange-50/60 p-5">
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <div className="font-semibold text-slate-900">Tin nhan cho</div>
-                            <div className="mt-1 text-sm leading-6 text-slate-500">
-                              Nguoi la se vao hop thu cho thay vi thong bao truc tiep.
-                            </div>
-                          </div>
-                          <Switch
-                            checked={privacySettings.requireApproval}
-                            onCheckedChange={(checked) =>
-                              setPrivacySettings((previous) => ({ ...previous, requireApproval: checked }))
-                            }
-                          />
-                        </div>
-                      </div>
-
-                      <div className="rounded-[24px] border border-orange-100 bg-orange-50/60 p-5">
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <div className="font-semibold text-slate-900">Hien trang thai hoat dong</div>
-                            <div className="mt-1 text-sm leading-6 text-slate-500">
-                              Cho phep nguoi khac biet ban dang online trong khu nhan tin.
-                            </div>
-                          </div>
-                          <Switch
-                            checked={callPreferences.showActiveStatus}
-                            onCheckedChange={(checked) =>
-                              setCallPreferences((previous) => ({ ...previous, showActiveStatus: checked }))
-                            }
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <Button
-                      className="h-11 rounded-2xl bg-orange-500 px-5 text-white hover:bg-orange-600"
-                      onClick={handleSavePrivacy}
-                      disabled={isSavingPrivacy}
+                  <div className="mt-6 grid gap-4 md:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => setPrivacySettings((prev) => ({ ...prev, allowMessagesFrom: "everyone" }))}
+                      className={`rounded-xl border p-4 text-left transition-all ${
+                        privacySettings.allowMessagesFrom === "everyone"
+                          ? "border-orange-200 bg-orange-50 shadow-sm ring-1 ring-orange-200"
+                          : "border-slate-100 bg-white hover:bg-slate-50"
+                      }`}
                     >
-                      {isSavingPrivacy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                      Luu thay doi
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-            ) : null}
-
-            {activeTab === "calls" ? (
-              <div className="space-y-6">
-                <Card className="rounded-[30px] border-orange-100 shadow-sm">
-                  <CardHeader>
-                    <CardTitle>Cai dat goi va tra nghiem nhan tin</CardTitle>
-                    <CardDescription>Bat tat quyen goi, thong bao va kieu hien thi composer trong chat.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-5">
-                    <div className="grid gap-4 lg:grid-cols-2">
-                      {[
-                        {
-                          key: "allowAudioCalls",
-                          label: "Cho phep goi thoai",
-                          description: "Hien button audio call trong khung chat va profile hoi thoai.",
-                          icon: Phone,
-                        },
-                        {
-                          key: "allowVideoCalls",
-                          label: "Cho phep video call",
-                          description: "Hien button video call va call overlay cho stream camera.",
-                          icon: Camera,
-                        },
-                        {
-                          key: "desktopNotifications",
-                          label: "Thong bao desktop",
-                          description: "Nhan thong bao cho tin nhan moi va loi moi tham gia cuoc goi.",
-                          icon: Bell,
-                        },
-                        {
-                          key: "autoPlayMedia",
-                          label: "Tu dong phat media",
-                          description: "Tu dong chuan bi media preview khi ban mo call overlay.",
-                          icon: Video,
-                        },
-                      ].map((item) => (
-                        <div key={item.key} className="rounded-[24px] border border-orange-100 bg-white p-5 shadow-sm">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="pr-4">
-                              <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-100 text-orange-600">
-                                <item.icon className="h-5 w-5" />
-                              </div>
-                              <div className="font-semibold text-slate-900">{item.label}</div>
-                              <div className="mt-1 text-sm leading-6 text-slate-500">{item.description}</div>
-                            </div>
-                            <Switch
-                              checked={callPreferences[item.key as keyof CallPreferences] as boolean}
-                              onCheckedChange={(checked) =>
-                                setCallPreferences((previous) => ({ ...previous, [item.key]: checked }))
-                              }
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="rounded-[24px] border border-orange-100 bg-orange-50/60 p-5">
-                      <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3">
+                        <Mail className="h-5 w-5 text-orange-500 mt-0.5" />
                         <div>
-                          <div className="font-semibold text-slate-900">Compact composer</div>
-                          <div className="mt-1 text-sm leading-6 text-slate-500">
-                            Thu gon action composer de giao dien chat gon hon khi ban lam viec tren laptop nho.
-                          </div>
+                          <div className="font-semibold text-slate-800">Mọi người</div>
+                          <p className="text-sm text-slate-500">Cho phép tất cả người dùng bắt đầu hội thoại với bạn.</p>
                         </div>
-                        <Switch
-                          checked={callPreferences.compactComposer}
-                          onCheckedChange={(checked) =>
-                            setCallPreferences((previous) => ({ ...previous, compactComposer: checked }))
-                          }
-                        />
                       </div>
-                    </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPrivacySettings((prev) => ({ ...prev, allowMessagesFrom: "mutual_followers" }))}
+                      className={`rounded-xl border p-4 text-left transition-all ${
+                        privacySettings.allowMessagesFrom === "mutual_followers"
+                          ? "border-orange-200 bg-orange-50 shadow-sm ring-1 ring-orange-200"
+                          : "border-slate-100 bg-white hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <BadgeCheck className="h-5 w-5 text-orange-500 mt-0.5" />
+                        <div>
+                          <div className="font-semibold text-slate-800">Chỉ bạn bè theo dõi chéo</div>
+                          <p className="text-sm text-slate-500">Hạn chế tin nhắn mới chỉ với những người đã kết nối hai chiều.</p>
+                        </div>
+                      </div>
+                    </button>
+                  </div>
 
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-500">Profile note cho khu nhan tin</label>
-                      <Textarea
-                        value={callPreferences.profileNote}
-                        onChange={(event) =>
-                          setCallPreferences((previous) => ({ ...previous, profileNote: event.target.value }))
+                  <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="font-medium text-slate-800">Tin nhắn chờ</div>
+                      <p className="text-sm text-slate-500">Người lạ sẽ vào hộp thư chờ thay vì thông báo trực tiếp.</p>
+                    </div>
+                    <Switch
+                      checked={privacySettings.requireApproval}
+                      onCheckedChange={(checked) =>
+                        setPrivacySettings((prev) => ({ ...prev, requireApproval: checked }))
+                      }
+                    />
+                  </div>
+
+                  <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="font-medium text-slate-800">Hiển thị trạng thái hoạt động</div>
+                      <p className="text-sm text-slate-500">Cho phép người khác biết bạn đang online trong khu vực nhắn tin.</p>
+                    </div>
+                    <Switch
+                      checked={callPreferences.showActiveStatus}
+                      onCheckedChange={(checked) =>
+                        setCallPreferences((prev) => ({ ...prev, showActiveStatus: checked }))
+                      }
+                    />
+                  </div>
+
+                  <Button
+                    className="mt-6 h-10 rounded-lg bg-orange-500 hover:bg-orange-600 text-white px-5"
+                    onClick={handleSavePrivacy}
+                    disabled={isSavingPrivacy}
+                  >
+                    {isSavingPrivacy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    Lưu thay đổi
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "calls" && (
+              <div className="space-y-6">
+                <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+                  <h2 className="text-xl font-semibold text-slate-800">Cuộc gọi & Trải nghiệm nhắn tin</h2>
+                  <p className="text-sm text-slate-500 mt-1">Bật/tắt quyền gọi, thông báo và kiểu hiển thị composer.</p>
+
+                  <div className="mt-6 grid gap-4 md:grid-cols-2">
+                    {[
+                      {
+                        key: "allowAudioCalls",
+                        label: "Cho phép cuộc gọi thoại",
+                        description: "Hiển thị nút audio call trong khung chat và profile hội thoại.",
+                        icon: Phone,
+                      },
+                      {
+                        key: "allowVideoCalls",
+                        label: "Cho phép video call",
+                        description: "Hiển thị nút video call và overlay cho stream camera.",
+                        icon: Camera,
+                      },
+                      {
+                        key: "desktopNotifications",
+                        label: "Thông báo desktop",
+                        description: "Nhận thông báo cho tin nhắn mới và lời mời tham gia cuộc gọi.",
+                        icon: Bell,
+                      },
+                      {
+                        key: "autoPlayMedia",
+                        label: "Tự động phát media",
+                        description: "Tự động chuẩn bị media preview khi bạn mở call overlay.",
+                        icon: Video,
+                      },
+                    ].map((item) => (
+                      <div key={item.key} className="rounded-xl border border-slate-100 p-4 hover:shadow-sm transition-shadow">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3">
+                            <div className="mt-0.5 rounded-lg bg-orange-50 p-2 text-orange-500">
+                              <item.icon className="h-4 w-4" />
+                            </div>
+                            <div>
+                              <div className="font-medium text-slate-800">{item.label}</div>
+                              <p className="text-sm text-slate-500">{item.description}</p>
+                            </div>
+                          </div>
+                          <Switch
+                            checked={callPreferences[item.key as keyof CallPreferences] as boolean}
+                            onCheckedChange={(checked) =>
+                              setCallPreferences((prev) => ({ ...prev, [item.key]: checked }))
+                            }
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 rounded-xl border border-slate-100 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-medium text-slate-800">Compact composer</div>
+                        <p className="text-sm text-slate-500">Thu gọn action composer để giao diện chat gọn hơn khi làm việc trên laptop nhỏ.</p>
+                      </div>
+                      <Switch
+                        checked={callPreferences.compactComposer}
+                        onCheckedChange={(checked) =>
+                          setCallPreferences((prev) => ({ ...prev, compactComposer: checked }))
                         }
-                        className="min-h-[120px] rounded-[24px] border-orange-100 bg-white"
-                        placeholder="Them mot dong ghi chu ngan de hien thi trong profile thong tin hoi thoai..."
                       />
                     </div>
+                  </div>
 
-                    <Button
-                      className="h-11 rounded-2xl bg-orange-500 px-5 text-white hover:bg-orange-600"
-                      onClick={handleSaveCallPreferences}
-                      disabled={isSavingCalls}
-                    >
-                      {isSavingCalls ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                      Luu tuy chon
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-            ) : null}
+                  <div className="mt-4">
+                    <label className="text-sm font-medium text-slate-700">Profile note cho khu vực nhắn tin</label>
+                    <Textarea
+                      value={callPreferences.profileNote}
+                      onChange={(e) => setCallPreferences((prev) => ({ ...prev, profileNote: e.target.value }))}
+                      className="mt-2 min-h-[100px] rounded-xl border-slate-200 focus:border-orange-300 focus:ring-orange-200"
+                      placeholder="Thêm một dòng ghi chú ngắn để hiển thị trong profile thông tin hội thoại..."
+                    />
+                  </div>
 
-            {activeTab === "security" ? (
-              <div className="space-y-6">
-                <div className="grid gap-6 lg:grid-cols-2">
-                  <Card className="rounded-[28px] border-orange-100 shadow-sm">
-                    <CardHeader>
-                      <CardTitle>Phien dang nhap</CardTitle>
-                      <CardDescription>Quan ly cac session hien co tren nhieu trinh duyet hoac may tinh.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {isLoadingSecurity ? (
-                        <div className="flex items-center gap-3 rounded-2xl border border-orange-100 bg-orange-50/60 px-4 py-4 text-sm text-slate-500">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Dang tai danh sach phien dang nhap...
-                        </div>
-                      ) : sessions.length === 0 ? (
-                        <div className="rounded-[24px] border border-dashed border-orange-100 bg-orange-50/60 px-4 py-8 text-center text-sm text-slate-500">
-                          Chua co du lieu session de hien thi.
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {sessions.map((session: any, index) => {
-                            const sessionId = session.token || session.id || `session-${index}`;
-                            const deviceName = session.deviceName || session.userAgent || "Session khong ro";
-
-                            return (
-                              <div key={sessionId} className="rounded-[24px] border border-orange-100 bg-white p-4">
-                                <div className="flex items-start justify-between gap-4">
-                                  <div className="flex items-start gap-3">
-                                    <Laptop className="mt-1 h-5 w-5 text-slate-500" />
-                                    <div>
-                                      <div className="font-semibold text-slate-900">{deviceName}</div>
-                                      <div className="mt-1 text-sm text-slate-500">
-                                        {session.createdAt || session.lastActive || "Khong ro thoi gian"}
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <Button variant="outline" size="sm" className="rounded-full border-orange-100 hover:bg-orange-50" onClick={() => handleRevokeSession(sessionId)}>
-                                    Thu hoi
-                                  </Button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  <Card className="rounded-[28px] border-orange-100 shadow-sm">
-                    <CardHeader>
-                      <CardTitle>Thiet bi da dang ky</CardTitle>
-                      <CardDescription>Theo doi va go bo nhung thiet bi dang duoc luu trong he thong.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {isLoadingSecurity ? (
-                        <div className="flex items-center gap-3 rounded-2xl border border-orange-100 bg-orange-50/60 px-4 py-4 text-sm text-slate-500">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Dang tai danh sach thiet bi...
-                        </div>
-                      ) : devices.length === 0 ? (
-                        <div className="rounded-[24px] border border-dashed border-orange-100 bg-orange-50/60 px-4 py-8 text-center text-sm text-slate-500">
-                          Chua co du lieu thiet bi.
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {devices.map((device: any, index) => {
-                            const deviceId = device.id || `device-${index}`;
-                            const deviceName = device.deviceName || device.name || "Thiet bi khong ro";
-
-                            return (
-                              <div key={deviceId} className="rounded-[24px] border border-orange-100 bg-white p-4">
-                                <div className="flex items-start justify-between gap-4">
-                                  <div className="flex items-start gap-3">
-                                    <Smartphone className="mt-1 h-5 w-5 text-slate-500" />
-                                    <div>
-                                      <div className="font-semibold text-slate-900">{deviceName}</div>
-                                      <div className="mt-1 text-sm text-slate-500">
-                                        {device.userAgent || device.platform || "Khong ro thong tin thiet bi"}
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <Button variant="outline" size="sm" className="rounded-full border-orange-100 hover:bg-orange-50" onClick={() => handleDeleteDevice(deviceId)}>
-                                    Xoa
-                                  </Button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                  <Button
+                    className="mt-6 h-10 rounded-lg bg-orange-500 hover:bg-orange-600 text-white px-5"
+                    onClick={handleSaveCallPreferences}
+                    disabled={isSavingCalls}
+                  >
+                    {isSavingCalls ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    Lưu tùy chọn
+                  </Button>
                 </div>
+              </div>
+            )}
 
-                <Card className="rounded-[28px] border-orange-100 shadow-sm">
-                  <CardHeader>
-                    <CardTitle>Danh sach chan</CardTitle>
-                    <CardDescription>Nhung nguoi dung nay se khong the nhan tin hoac tuong tac truc tiep voi ban.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {isLoadingBlocked ? (
-                      <div className="flex items-center gap-3 rounded-2xl border border-orange-100 bg-orange-50/60 px-4 py-4 text-sm text-slate-500">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Dang tai danh sach chan...
+            {activeTab === "security" && (
+              <div className="space-y-6">
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+                    <h3 className="font-semibold text-slate-800">Phiên đăng nhập</h3>
+                    <p className="text-xs text-slate-400 mt-0.5 mb-4">Quản lý các session hiện có trên nhiều trình duyệt hoặc máy tính.</p>
+                    {isLoadingSecurity ? (
+                      <div className="flex items-center gap-2 text-sm text-slate-500">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Đang tải...
                       </div>
-                    ) : blockedUsers.length === 0 ? (
-                      <div className="rounded-[24px] border border-dashed border-orange-100 bg-orange-50/60 px-4 py-10 text-center">
-                        <Ban className="mx-auto mb-3 h-10 w-10 text-slate-300" />
-                        <div className="text-sm font-medium text-slate-700">Ban chua chan nguoi dung nao.</div>
-                      </div>
+                    ) : sessions.length === 0 ? (
+                      <div className="rounded-lg bg-slate-50 py-8 text-center text-sm text-slate-500">Chưa có dữ liệu phiên.</div>
                     ) : (
                       <div className="space-y-3">
-                        {blockedUsers.map((blockedUser) => (
-                          <div key={blockedUser.id} className="rounded-[24px] border border-orange-100 bg-white p-4">
-                            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                              <div className="flex items-center gap-3">
-                                <img
-                                  src={getAvatarUrl(blockedUser)}
-                                  alt={blockedUser.name}
-                                  className="h-12 w-12 rounded-[16px] border border-orange-100 object-cover"
-                                />
+                        {sessions.map((session, idx) => {
+                          const sessionId = session.token || session.id || `session-${idx}`;
+                          const deviceName = session.deviceName || session.userAgent || "Thiết bị không rõ";
+                          return (
+                            <div key={sessionId} className="flex items-center justify-between rounded-lg border border-slate-100 p-3">
+                              <div className="flex items-center gap-2">
+                                <Laptop className="h-4 w-4 text-slate-400" />
                                 <div>
-                                  <div className="font-semibold text-slate-900">{blockedUser.name}</div>
-                                  <div className="mt-1 text-sm text-slate-500">{blockedUser.email}</div>
+                                  <div className="text-sm font-medium">{deviceName}</div>
+                                  <div className="text-xs text-slate-400">{session.createdAt || session.lastActive || "Không rõ thời gian"}</div>
                                 </div>
                               </div>
-
-                              <Button
-                                variant="outline"
-                                className="rounded-full border-orange-100 hover:bg-orange-50"
-                                onClick={() => handleUnblock(blockedUser.id, blockedUser.name)}
-                              >
-                                <Unlock className="mr-2 h-4 w-4" />
-                                Bo chan
+                              <Button variant="outline" size="sm" className="h-8 rounded-full text-xs" onClick={() => handleRevokeSession(sessionId)}>
+                                Thu hồi
                               </Button>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+                    <h3 className="font-semibold text-slate-800">Thiết bị đã đăng ký</h3>
+                    <p className="text-xs text-slate-400 mt-0.5 mb-4">Theo dõi và gỡ bỏ những thiết bị đang được lưu trong hệ thống.</p>
+                    {isLoadingSecurity ? (
+                      <div className="flex items-center gap-2 text-sm text-slate-500">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Đang tải...
+                      </div>
+                    ) : devices.length === 0 ? (
+                      <div className="rounded-lg bg-slate-50 py-8 text-center text-sm text-slate-500">Chưa có dữ liệu thiết bị.</div>
+                    ) : (
+                      <div className="space-y-3">
+                        {devices.map((device, idx) => {
+                          const deviceId = device.id || `device-${idx}`;
+                          const deviceName = device.deviceName || device.name || "Thiết bị không rõ";
+                          return (
+                            <div key={deviceId} className="flex items-center justify-between rounded-lg border border-slate-100 p-3">
+                              <div className="flex items-center gap-2">
+                                <Smartphone className="h-4 w-4 text-slate-400" />
+                                <div>
+                                  <div className="text-sm font-medium">{deviceName}</div>
+                                  <div className="text-xs text-slate-400">{device.userAgent || device.platform || "Không rõ thông tin"}</div>
+                                </div>
+                              </div>
+                              <Button variant="outline" size="sm" className="h-8 rounded-full text-xs" onClick={() => handleDeleteDevice(deviceId)}>
+                                Xóa
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+                  <h3 className="font-semibold text-slate-800">Danh sách chặn</h3>
+                  <p className="text-xs text-slate-400 mt-0.5 mb-4">Những người dùng này sẽ không thể nhắn tin hoặc tương tác trực tiếp với bạn.</p>
+                  {isLoadingBlocked ? (
+                    <div className="flex items-center gap-2 text-sm text-slate-500">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Đang tải...
+                    </div>
+                  ) : blockedUsers.length === 0 ? (
+                    <div className="rounded-lg bg-slate-50 py-10 text-center">
+                      <Ban className="mx-auto h-10 w-10 text-slate-300" />
+                      <p className="mt-2 text-sm text-slate-500">Bạn chưa chặn người dùng nào.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {blockedUsers.map((blockedUser) => (
+                        <div key={blockedUser.id} className="flex items-center justify-between rounded-lg border border-slate-100 p-3">
+                          <div className="flex items-center gap-3">
+                            <img src={getAvatarUrl(blockedUser)} alt={blockedUser.name} className="h-10 w-10 rounded-full object-cover" />
+                            <div>
+                              <div className="text-sm font-medium">{blockedUser.name}</div>
+                              <div className="text-xs text-slate-400">{blockedUser.email}</div>
+                            </div>
+                          </div>
+                          <Button variant="outline" size="sm" className="h-8 rounded-full text-xs" onClick={() => handleUnblock(blockedUser.id, blockedUser.name)}>
+                            <Unlock className="mr-1 h-3 w-3" /> Bỏ chặn
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            ) : null}
+            )}
           </main>
         </div>
       </div>

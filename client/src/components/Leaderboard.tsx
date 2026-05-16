@@ -1,4 +1,4 @@
-import { Trophy, TrendingUp } from "lucide-react";
+import { Trophy, TrendingUp, FileText, MessageCircle, Heart } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import api from "../lib/api";
 import { useEffect, useState } from "react";
@@ -132,8 +132,10 @@ export function Leaderboard() {
       </Tabs>
 
       <div className="mt-4 pt-3 border-t border-slate-100">
-        <p className="text-[10px] text-slate-400 text-center leading-relaxed">
-          📝 Đăng bài: +10 điểm &nbsp;•&nbsp; 💬 Bình luận: +2 điểm &nbsp;•&nbsp; ❤️ Lượt thích: +1 điểm
+        <p className="text-[10px] text-slate-400 text-center leading-relaxed flex items-center justify-center gap-2">
+          <FileText className="h-3 w-3" /> Đăng bài: +10 điểm &nbsp;•&nbsp;
+          <MessageCircle className="h-3 w-3" /> Bình luận: +2 điểm &nbsp;•&nbsp;
+          <Heart className="h-3 w-3" /> Lượt thích: +1 điểm
         </p>
       </div>
     </div>

@@ -66,121 +66,123 @@ export function UserSidebar({ user, onViewProfile }: UserSidebarProps) {
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
 
-      {/* ── User Profile Card ── */}
-      <div className="card-premium p-5">
+      {/* ── User Profile Card – nâng cấp ── */}
+      <div className="card-premium p-5 hover:shadow-lg transition-all duration-300">
         <div className="text-center">
-          {/* Avatar */}
-          <div className="relative inline-block mb-3">
+          {/* Avatar với hiệu ứng ring */}
+          <div className="relative inline-block mb-4">
             <img
               src={user?.avatar && typeof user.avatar === "string" && user.avatar.trim()
                 ? user.avatar
                 : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`}
               alt={user.name}
-              className="h-20 w-20 rounded-full mx-auto object-cover shadow-md"
-              style={{ boxShadow: "0 0 0 3px white, 0 0 0 5px rgba(242,107,56,0.25)" }}
+              className="h-24 w-24 rounded-full mx-auto object-cover shadow-md transition-transform duration-200 hover:scale-105"
+              style={{ boxShadow: "0 0 0 3px white, 0 0 0 5px rgba(242,107,56,0.3)" }}
               onError={(e) => {
                 (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`;
               }}
             />
             {currentBadge && (
-              <span className="absolute -bottom-1 -right-1 text-xl bg-white rounded-full shadow-md p-0.5 border border-orange-100">
+              <span className="absolute -bottom-1 -right-1 text-xl bg-white rounded-full shadow-md p-0.5 border-2 border-orange-100">
                 {currentBadge.icon}
               </span>
             )}
           </div>
 
-          <h3 className="font-bold text-slate-800 text-base mb-0.5">{user.name}</h3>
-          <p className="text-xs text-slate-500 mb-2">{user.major}</p>
+          <h3 className="font-bold text-slate-800 text-lg mb-1">{user.name}</h3>
+          <p className="text-xs text-slate-500 mb-3">{user.major}</p>
 
           {user.class && (
-            <Badge variant="outline" className="text-xs mb-3 border-slate-200 text-slate-600">
+            <Badge variant="outline" className="text-xs mb-4 border-slate-200 text-slate-600 bg-slate-50">
               {user.class}
             </Badge>
           )}
 
-          {/* View Profile Button */}
+          {/* Xem hồ sơ button */}
           {onViewProfile && (
             <Button
               size="sm"
-              className="w-full mb-4 h-8 text-xs rounded-lg btn-gradient-orange font-semibold"
+              className="w-full mb-5 h-9 text-sm rounded-xl btn-gradient-orange font-semibold shadow-md hover:shadow-orange-hover transition-all"
               onClick={onViewProfile}
             >
-              <UserIcon className="h-3.5 w-3.5 mr-1.5" />
+              <UserIcon className="h-3.5 w-3.5 mr-2" />
               Xem hồ sơ
             </Button>
           )}
 
-          {/* Stats row */}
-          <div className="grid grid-cols-3 text-center pt-3 border-t border-slate-100 gap-2">
-            <div>
-              <div className="flex items-center justify-center gap-1 mb-0.5">
-                <Trophy className="h-3.5 w-3.5 text-[#F26B38]" />
-                <span className="font-bold text-sm text-[#F26B38]">{(user.points || 0).toLocaleString()}</span>
+          {/* Stats row – điểm, bài viết, theo dõi */}
+          <div className="grid grid-cols-3 text-center pt-4 border-t border-slate-100 gap-3">
+            <div className="bg-slate-50 rounded-xl py-2 transition-colors hover:bg-orange-50">
+              <div className="flex items-center justify-center gap-1 mb-1">
+                <Trophy className="h-4 w-4 text-[#F26B38]" />
+                <span className="font-bold text-base text-[#F26B38]">{(user.points || 0).toLocaleString()}</span>
               </div>
-              <p className="text-[10px] text-slate-500">Điểm</p>
+              <p className="text-[11px] text-slate-500 font-medium">Điểm</p>
             </div>
-            <div>
-              <p className="font-bold text-sm text-slate-700 mb-0.5">{user.postsCount || 0}</p>
-              <p className="text-[10px] text-slate-500">Bài viết</p>
+            <div className="bg-slate-50 rounded-xl py-2 transition-colors hover:bg-orange-50">
+              <p className="font-bold text-base text-slate-700 mb-1">{user.postsCount || 0}</p>
+              <p className="text-[11px] text-slate-500 font-medium">Bài viết</p>
             </div>
-            <div>
-              <p className="font-bold text-sm text-slate-700 mb-0.5">{user.followers || 0}</p>
-              <p className="text-[10px] text-slate-500">Theo dõi</p>
+            <div className="bg-slate-50 rounded-xl py-2 transition-colors hover:bg-orange-50">
+              <p className="font-bold text-base text-slate-700 mb-1">{user.followers || 0}</p>
+              <p className="text-[11px] text-slate-500 font-medium">Theo dõi</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── Badge Progress ── */}
-      <div className="card-premium p-5">
-        <div className="flex items-center gap-2 mb-3">
-          <Award className="h-4 w-4 text-[#F26B38]" />
-          <h3 className="font-semibold text-slate-800 text-sm">Danh hiệu</h3>
+      {/* ── Badge Progress – nâng cấp ── */}
+      <div className="card-premium p-5 hover:shadow-lg transition-all duration-300">
+        <div className="flex items-center gap-2 mb-4">
+          <Award className="h-5 w-5 text-[#F26B38]" />
+          <h3 className="font-semibold text-slate-800 text-base">Danh hiệu</h3>
         </div>
 
         {/* Current badge */}
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-[#FEF0E8] to-[#FFF7F3] border border-orange-100 mb-3">
-          <span className="text-2xl">{currentBadge?.icon ?? "🏅"}</span>
+        <div className="flex items-center gap-4 p-3 rounded-xl bg-gradient-to-r from-[#FEF0E8] to-[#FFF7F3] border border-orange-100 mb-4">
+          <span className="text-3xl">{currentBadge?.icon ?? "🏅"}</span>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-slate-800 truncate">{currentBadge?.name ?? "Chưa có danh hiệu"}</p>
             <p className="text-xs text-slate-500 truncate">{currentBadge?.description ?? "Hoàn thành nhiệm vụ để nhận danh hiệu"}</p>
           </div>
         </div>
 
-        {/* Progress to next */}
+        {/* Progress to next badge */}
         {nextBadge && (
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-500">Tiến đến <span className="font-medium text-slate-700">{nextBadge.name}</span></span>
               <span className="font-semibold text-[#F26B38]">{user.points || 0}/{nextBadge.requiredPoints}</span>
             </div>
             <div className="progress-fpt">
-              <Progress value={progressToNext} className="h-2" />
+              <Progress value={progressToNext} className="h-2 rounded-full" />
             </div>
-            <p className="text-[10px] text-slate-400">Còn {nextBadge.requiredPoints - (user.points || 0)} điểm nữa</p>
+            <p className="text-[11px] text-slate-400">Còn {nextBadge.requiredPoints - (user.points || 0)} điểm nữa</p>
           </div>
         )}
 
         {/* All badges grid */}
         {sortedBadges.length > 0 && (
-          <div className="pt-3 mt-3 border-t border-slate-100">
-            <p className="text-xs text-slate-500 mb-2">
+          <div className="pt-4 mt-3 border-t border-slate-100">
+            <p className="text-xs text-slate-500 mb-3">
               Huy hiệu đạt được ({achievedBadges.length}/{sortedBadges.length})
             </p>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {sortedBadges.map((badge) => {
                 const achieved = achievedBadges.some((b) => b.id === badge.id);
                 return (
                   <div
                     key={badge.id}
-                    className={`flex items-center justify-center h-10 w-10 rounded-full border-2 transition-all ${
-                      achieved ? `${badge.color} border-transparent shadow-sm` : "bg-slate-100 border-slate-200 grayscale opacity-40"
+                    className={`flex items-center justify-center h-11 w-11 rounded-full border-2 transition-all duration-200 hover:scale-110 cursor-help ${
+                      achieved 
+                        ? `${badge.color || "bg-gradient-to-br from-orange-400 to-orange-600"} border-transparent shadow-md` 
+                        : "bg-slate-100 border-slate-200 grayscale opacity-50"
                     }`}
                     title={`${badge.name} – ${badge.requiredPoints} điểm`}
                   >
-                    <span className="text-lg">{badge.icon}</span>
+                    <span className="text-xl">{badge.icon}</span>
                   </div>
                 );
               })}
@@ -189,44 +191,44 @@ export function UserSidebar({ user, onViewProfile }: UserSidebarProps) {
         )}
       </div>
 
-      {/* ── Weekly Stats – 4 mini cards ── */}
-      <div className="card-premium p-5">
-        <div className="flex items-center gap-2 mb-3">
-          <TrendingUp className="h-4 w-4 text-[#F26B38]" />
-          <h3 className="font-semibold text-slate-800 text-sm">Thống kê tuần này</h3>
+      {/* ── Weekly Stats – 4 mini cards (đã đẹp sẵn, chỉ thêm hover) ── */}
+      <div className="card-premium p-5 hover:shadow-lg transition-all duration-300">
+        <div className="flex items-center gap-2 mb-4">
+          <TrendingUp className="h-5 w-5 text-[#F26B38]" />
+          <h3 className="font-semibold text-slate-800 text-base">Thống kê tuần này</h3>
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-3">
           {weekStats.map(({ label, value, icon: Icon, colorClass, iconColor }) => (
-            <div key={label} className={`${colorClass} rounded-xl p-3 flex flex-col gap-1`}>
+            <div key={label} className={`${colorClass} rounded-xl p-3 flex flex-col gap-1.5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5`}>
               <div className="flex items-center justify-between">
-                <Icon className={`h-4 w-4 ${iconColor}`} />
-                <span className="font-bold text-sm text-slate-700">{value}</span>
+                <Icon className={`h-5 w-5 ${iconColor}`} />
+                <span className="font-bold text-base text-slate-700">{value}</span>
               </div>
-              <p className="text-[10px] text-slate-500 font-medium">{label}</p>
+              <p className="text-[11px] text-slate-500 font-medium">{label}</p>
             </div>
           ))}
         </div>
       </div>
 
-      {/* ── Weekly Goals ── */}
-      <div className="card-premium p-5">
-        <div className="flex items-center gap-2 mb-3">
-          <Target className="h-4 w-4 text-[#F26B38]" />
-          <h3 className="font-semibold text-slate-800 text-sm">Mục tiêu tuần này</h3>
+      {/* ── Weekly Goals – nâng cấp ── */}
+      <div className="card-premium p-5 hover:shadow-lg transition-all duration-300">
+        <div className="flex items-center gap-2 mb-4">
+          <Target className="h-5 w-5 text-[#F26B38]" />
+          <h3 className="font-semibold text-slate-800 text-base">Mục tiêu tuần này</h3>
         </div>
-        <div className="space-y-3">
+        <div className="space-y-4">
           {weeklyGoals.map(({ label, current, target }) => {
             const pct = Math.round((current / target) * 100);
             return (
               <div key={label}>
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-slate-600">{label}</span>
+                <div className="flex items-center justify-between text-xs mb-1.5">
+                  <span className="text-slate-600 font-medium">{label}</span>
                   <span className={`font-semibold ${pct >= 100 ? "text-emerald-600" : "text-[#F26B38]"}`}>
                     {current}/{target}
                   </span>
                 </div>
                 <div className="progress-fpt">
-                  <Progress value={pct} className="h-1.5" />
+                  <Progress value={pct} className="h-2 rounded-full" />
                 </div>
               </div>
             );

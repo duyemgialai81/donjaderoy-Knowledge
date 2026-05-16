@@ -1,4 +1,4 @@
-@custom-variant dark (&:is(.dark *));
+
 
 :root {
   --font-size: 16px;
@@ -60,11 +60,13 @@
   --messenger-blue-dark: #D9541E;
   --messenger-shadow: 0 24px 70px rgba(15, 23, 42, 0.12);
 
-  /* ===== Shadows ===== */
-  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
-  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.04);
-  --shadow-lg: 0 10px 30px rgba(15, 23, 42, 0.10), 0 4px 8px rgba(15, 23, 42, 0.04);
-  --shadow-orange: 0 4px 14px rgba(242, 107, 56, 0.30);
+  /* ===== Shadows nâng cấp ===== */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.04), 0 8px 16px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.06), 0 16px 32px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.08), 0 24px 48px rgba(0, 0, 0, 0.04);
+  --shadow-orange: 0 8px 20px rgba(242, 107, 56, 0.25);
+  --shadow-orange-hover: 0 12px 28px rgba(242, 107, 56, 0.35);
 }
 
 .dark {
@@ -142,7 +144,7 @@
   * {
     @apply border-border outline-ring/50;
     scrollbar-width: thin;
-    scrollbar-color: rgba(148, 163, 184, 0.75) transparent;
+    scrollbar-color: rgba(148, 163, 184, 0.6) transparent;
   }
 
   html {
@@ -150,30 +152,32 @@
     font-family: "Be Vietnam Pro", "Inter", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
   }
 
   body {
     @apply bg-background text-foreground;
     margin: 0;
     padding: 0;
-    min-height: 0;
+    min-height: 100vh;
     background: #F7F9FC;
   }
 
   #root {
-    min-height:0;
+    min-height: 100vh;
     margin: 0;
     padding: 0;
   }
 
   ::selection {
-    background: rgba(242, 107, 56, 0.16);
+    background: rgba(242, 107, 56, 0.2);
     color: #0f172a;
   }
 
+  /* Custom scrollbar – đẹp hơn */
   *::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
   }
 
   *::-webkit-scrollbar-track {
@@ -181,10 +185,13 @@
   }
 
   *::-webkit-scrollbar-thumb {
-    background: rgba(148, 163, 184, 0.62);
-    border: 3px solid transparent;
+    background: rgba(148, 163, 184, 0.5);
     border-radius: 999px;
-    background-clip: padding-box;
+    transition: background 0.2s;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(148, 163, 184, 0.8);
   }
 
   img {
@@ -200,79 +207,74 @@
 
   button {
     transition:
-      transform 180ms ease,
-      box-shadow 180ms ease,
-      background-color 180ms ease,
-      border-color 180ms ease,
-      color 180ms ease;
+      transform 150ms cubic-bezier(0.2, 0, 0, 1),
+      box-shadow 200ms ease,
+      background-color 200ms ease,
+      border-color 200ms ease,
+      color 200ms ease;
   }
 
   button:active {
-    transform: scale(0.985);
+    transform: scale(0.98);
   }
 
   input::placeholder,
   textarea::placeholder {
     color: #94a3b8;
+    font-weight: 400;
   }
 }
 
+/* ===== Avatar fix ===== */
 .avatar-fix {
   aspect-ratio: 1 / 1;
   object-fit: cover;
   flex-shrink: 0;
 }
 
+/* ===== Messenger ===== */
 .messenger-page {
   height: 100%;
   min-height: 0;
 }
-
 .messenger-shell {
   box-shadow: var(--messenger-shadow);
 }
-
 .messenger-sidebar,
 .messenger-thread,
 .messenger-info-panel {
-  backdrop-filter: blur(14px);
+  backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.88);
 }
-
 .messenger-preview {
   display: block;
   white-space: normal;
   word-break: break-word;
   overflow: visible;
 }
-
 .messenger-bubble-incoming {
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(249, 115, 22, 0.12);
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
 }
-
 .messenger-bubble-outgoing {
   background: linear-gradient(135deg, var(--messenger-blue), var(--messenger-blue-dark));
-  box-shadow: 0 18px 36px rgba(249, 115, 22, 0.28);
+  box-shadow: 0 12px 28px rgba(242, 107, 56, 0.3);
 }
-
 .messenger-floating-card {
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(249, 115, 22, 0.1);
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(249, 115, 22, 0.12);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
 }
-
 .messenger-blue-ring:focus-within {
-  border-color: rgba(249, 115, 22, 0.28);
-  box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.10);
+  border-color: var(--fpt-orange);
+  box-shadow: 0 0 0 4px rgba(242, 107, 56, 0.15);
 }
-
 @media (max-width: 1024px) {
   .messenger-page {
     padding-top: 0;
   }
 }
-/* Trong global.css */
 .messenger-sidebar::-webkit-scrollbar {
   width: 4px;
 }
@@ -288,172 +290,184 @@
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* ===== Skeleton Loading ===== */
+/* ===== Skeleton Loading – nâng cấp ===== */
 @keyframes skeleton-shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
-
 .skeleton {
-  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background: linear-gradient(90deg, #eef2f6 25%, #e2e8f0 50%, #eef2f6 75%);
   background-size: 200% 100%;
-  animation: skeleton-shimmer 1.5s infinite;
-  border-radius: 8px;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius: 12px;
 }
 
-/* ===== Modern Stat Card ===== */
+/* ===== Modern Stat Card – nâng cấp ===== */
 .stat-card-blue {
-  background: linear-gradient(135deg, #EEF4FF 0%, #DBEAFE 100%);
-  border: 1px solid rgba(10, 92, 255, 0.12);
+  background: linear-gradient(135deg, #EEF4FF 0%, #E0EDFF 100%);
+  border: none;
+  box-shadow: 0 2px 8px rgba(10, 92, 255, 0.08);
 }
 .stat-card-orange {
-  background: linear-gradient(135deg, #FEF0E8 0%, #FED7BB 100%);
-  border: 1px solid rgba(242, 107, 56, 0.12);
+  background: linear-gradient(135deg, #FEF0E8 0%, #FEE3D6 100%);
+  border: none;
+  box-shadow: 0 2px 8px rgba(242, 107, 56, 0.08);
 }
 .stat-card-green {
-  background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);
-  border: 1px solid rgba(16, 185, 129, 0.12);
+  background: linear-gradient(135deg, #ECFDF5 0%, #DCFCE7 100%);
+  border: none;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.08);
 }
 .stat-card-purple {
   background: linear-gradient(135deg, #F5F3FF 0%, #EDE9FE 100%);
-  border: 1px solid rgba(139, 92, 246, 0.12);
+  border: none;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.08);
 }
 
-/* ===== Left Navigation ===== */
+/* ===== Left Navigation – nâng cấp ===== */
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   padding: 10px 14px;
-  border-radius: 10px;
+  border-radius: 12px;
   font-size: 0.9rem;
   font-weight: 500;
   color: #475569;
-  transition: background 180ms ease, color 180ms ease;
+  transition: all 200ms cubic-bezier(0.2, 0, 0, 1);
   cursor: pointer;
   border: none;
   background: transparent;
   width: 100%;
   text-align: left;
 }
-
 .nav-item:hover {
   background: #FEF0E8;
   color: #F26B38;
+  transform: translateX(2px);
 }
-
 .nav-item.active {
   background: linear-gradient(135deg, #FEF0E8, #FED7BB);
   color: #D9541E;
   font-weight: 600;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.6), 0 2px 6px rgba(242,107,56,0.1);
 }
-
 .nav-item.active svg {
   color: #F26B38;
 }
 
 /* ===== Feed Header ===== */
 .feed-header {
-  background: linear-gradient(135deg, #F26B38 0%, #D9541E 100%);
-  border-radius: 16px;
-  padding: 24px;
+  background: linear-gradient(125deg, #F26B38 0%, #D9541E 100%);
+  border-radius: 24px;
+  padding: 28px 32px;
   color: white;
-  margin-bottom: 20px;
-  box-shadow: 0 4px 14px rgba(242, 107, 56, 0.35);
+  margin-bottom: 24px;
+  box-shadow: var(--shadow-orange);
 }
 
 /* ===== Premium Card Hover ===== */
 .post-card-hover {
-  transition: transform 200ms ease, box-shadow 200ms ease;
+  transition: transform 220ms cubic-bezier(0.2, 0, 0, 1), box-shadow 250ms ease;
 }
 .post-card-hover:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.10);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-xl);
 }
 
-/* ===== Rank Badge Top 3 ===== */
+/* ===== Rank Badge Top 3 – nâng cấp ===== */
 .rank-gold {
   background: linear-gradient(135deg, #F59E0B, #D97706);
   color: white;
   border-radius: 50%;
-  width: 28px; height: 28px;
+  width: 30px; height: 30px;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 0.75rem;
-  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.5);
+  font-weight: 800; font-size: 0.8rem;
+  box-shadow: 0 4px 10px rgba(245, 158, 11, 0.4);
 }
 .rank-silver {
   background: linear-gradient(135deg, #94A3B8, #64748B);
   color: white;
   border-radius: 50%;
-  width: 28px; height: 28px;
+  width: 30px; height: 30px;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 0.75rem;
-  box-shadow: 0 2px 8px rgba(100, 116, 139, 0.4);
+  font-weight: 800; font-size: 0.8rem;
+  box-shadow: 0 4px 10px rgba(100, 116, 139, 0.3);
 }
 .rank-bronze {
   background: linear-gradient(135deg, #CD7C4F, #A8622A);
   color: white;
   border-radius: 50%;
-  width: 28px; height: 28px;
+  width: 30px; height: 30px;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 0.75rem;
-  box-shadow: 0 2px 8px rgba(168, 98, 42, 0.4);
+  font-weight: 800; font-size: 0.8rem;
+  box-shadow: 0 4px 10px rgba(168, 98, 42, 0.35);
 }
 
-/* ===== Header Glassmorphism ===== */
+/* ===== Header Glassmorphism – nâng cấp ===== */
 .header-glass {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
-  box-shadow: 0 1px 16px rgba(15, 23, 42, 0.06);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.05);
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.02);
 }
 
-/* ===== Gradient Button ===== */
+/* ===== Gradient Button – nâng cấp ===== */
 .btn-gradient-orange {
-  background: linear-gradient(135deg, #F26B38 0%, #D9541E 100%);
+  background: linear-gradient(105deg, #F26B38 0%, #E05A24 100%);
   color: white;
   border: none;
-  box-shadow: 0 2px 10px rgba(242, 107, 56, 0.35);
-  transition: box-shadow 200ms ease, transform 150ms ease;
+  box-shadow: var(--shadow-orange);
+  transition: box-shadow 250ms ease, transform 150ms ease;
 }
 .btn-gradient-orange:hover {
-  box-shadow: 0 4px 18px rgba(242, 107, 56, 0.5);
+  box-shadow: var(--shadow-orange-hover);
   transform: translateY(-1px);
 }
 .btn-gradient-orange:active {
   transform: scale(0.97);
-  box-shadow: 0 2px 8px rgba(242, 107, 56, 0.3);
+  box-shadow: 0 4px 12px rgba(242, 107, 56, 0.3);
 }
 
 /* ===== Progress Bar FPT ===== */
 .progress-fpt [data-slot="progress-indicator"] {
-  background: linear-gradient(90deg, #F26B38, #D9541E) !important;
+  background: linear-gradient(90deg, #F26B38, #E05A24) !important;
+  border-radius: 999px;
 }
 
 /* ===== Avatar Ring ===== */
 .avatar-ring {
   ring: 3px solid white;
-  box-shadow: 0 0 0 3px white, 0 0 0 5px rgba(242, 107, 56, 0.3);
+  box-shadow: 0 0 0 3px white, 0 0 0 5px rgba(242, 107, 56, 0.35);
 }
 
-/* ===== Animated Notification Dot ===== */
+/* ===== Animated Notification Dot – nâng cấp ===== */
 @keyframes pulse-dot {
   0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.3); opacity: 0.8; }
+  50% { transform: scale(1.25); opacity: 0.85; }
 }
 .notif-dot {
   animation: pulse-dot 2s ease-in-out infinite;
+  background: #F26B38;
+  width: 8px; height: 8px;
+  border-radius: 999px;
+  display: inline-block;
 }
 
-/* ===== Card Premium ===== */
+/* ===== Card Premium – nâng cấp ===== */
 .card-premium {
   background: white;
-  border-radius: 16px;
-  border: 1px solid rgba(15, 23, 42, 0.07);
+  border-radius: 20px;
+  border: 1px solid rgba(15, 23, 42, 0.05);
   box-shadow: var(--shadow-md);
-  transition: box-shadow 200ms ease;
+  transition: box-shadow 250ms ease, transform 200ms ease;
 }
 .card-premium:hover {
   box-shadow: var(--shadow-lg);
+  transform: translateY(-1px);
 }

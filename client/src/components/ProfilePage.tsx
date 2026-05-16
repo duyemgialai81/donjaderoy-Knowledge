@@ -10,7 +10,8 @@ import { Progress } from "./ui/progress";
 import { Separator } from "./ui/separator";
 import {
   Edit, Save, X, Mail, Calendar, Award, TrendingUp,
-  Users, BookOpen, Heart, MessageCircle, Eye, Trophy, Star
+  Users, BookOpen, Heart, MessageCircle, Eye, Trophy, Star,
+  GraduationCap, User
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { vi } from "date-fns/locale";
@@ -122,13 +123,23 @@ export function ProfilePage({
                 )}
 
                 <Badge
-                  className={`text-xs font-semibold mb-3 ${
+                  className={`text-xs font-semibold mb-3 inline-flex items-center gap-1 ${
                     user.role === "lecturer"
                       ? "bg-purple-100 text-purple-700 hover:bg-purple-100"
                       : "bg-blue-100 text-blue-700 hover:bg-blue-100"
                   }`}
                 >
-                  {user.role === "lecturer" ? "🎓 Giảng viên" : "👤 Sinh viên"}
+                  {user.role === "lecturer" ? (
+                    <>
+                      <GraduationCap className="h-3 w-3" />
+                      Giảng viên
+                    </>
+                  ) : (
+                    <>
+                      <User className="h-3 w-3" />
+                      Sinh viên
+                    </>
+                  )}
                 </Badge>
 
                 <div className="space-y-1.5 text-xs text-slate-500 mb-4">

@@ -1,4 +1,4 @@
-import { Filter, X, ChevronDown, BookOpen, GraduationCap, Search as SearchIcon } from "lucide-react";
+import { Filter, X, ChevronDown, BookOpen, GraduationCap, Search as SearchIcon, ChevronRight } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import {
@@ -228,7 +228,7 @@ export function FilterPanel({ filters, onFilterChange, isOpen, onToggle }: Filte
                   </Badge>
                   {filters.subject !== 'all' && (
                     <>
-                      <span className="text-gray-400">→</span>
+                      <ChevronRight className="h-3 w-3 text-gray-400" />
                       <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
                         {selectedSubject?.code} - {selectedSubject?.name || filters.subject}
                       </Badge>

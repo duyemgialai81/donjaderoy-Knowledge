@@ -11,7 +11,6 @@ import { vi } from "date-fns/locale";
 import { toast } from "sonner";
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
-import { env } from "process";
 
 interface PostCardProps {
   post: Post;
@@ -74,31 +73,22 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
   useEffect(() => {
     const token = localStorage.getItem('ksp_auth_token') || "";
     const client = new Client({
-      webSocketFactory: () => new SockJS(import.meta.env.VITE_WS_URL || 'https://donjaderoy81-knowledge.hf.space/ws'),
+      webSocketFactory: () => new SockJS(import.meta.env.VITE_WS_URL || 'https://donjaderoy-knowledge-iy-5ba.fly.dev/ws'),
       connectHeaders: { Authorization: `Bearer ${token}` },
-      debug: () => {}, // Tắt log cho danh sách đỡ rối
+      debug: () => {},
       onConnect: () => {
-        
-        // 📢 NGHE LƯỢT THÍCH
         client.subscribe(`/topic/post/${post.id}/likes`, (message) => {
           setLikesCount(Number(message.body));
         });
-
-        // 📢 NGHE BÌNH LUẬN MỚI -> CỘNG 1
         client.subscribe(`/topic/post/${post.id}/new-comment`, () => {
           setCommentsCount(prev => prev + 1);
         });
-
-        // 📢 NGHE XÓA BÌNH LUẬN -> TRỪ 1 (Không cho rớt dưới 0)
         client.subscribe(`/topic/post/${post.id}/delete-comment`, () => {
           setCommentsCount(prev => Math.max(0, prev - 1));
         });
-
-        // 📢 NGHE LƯỢT XEM MỚI (NẾU BACKEND CÓ BẮN)
         client.subscribe(`/topic/post/${post.id}/views`, (message) => {
           setViewsCount(Number(message.body));
         });
-
       }
     });
 
@@ -119,7 +109,6 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
   const authorBadges = author.badges || [];
   const latestBadge = authorBadges.length > 0 ? authorBadges[authorBadges.length - 1] : null;
 
-  // 3. XỬ LÝ SỰ KIỆN
   const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!currentUser?.id || isLoading) return;
@@ -220,95 +209,115 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
 
   return (
     <div
-      className="card-premium p-5 cursor-pointer"
+      className="card-premium group p-5 cursor-pointer bg-white border border-slate-100 hover:border-orange-200 transition-all duration-300 shadow-sm hover:shadow-xl rounded-2xl relative overflow-hidden"
       onClick={onClick}
     >
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <img src={author.avatar} alt={author.name} className="h-12 w-12 rounded-full object-cover" />
+      <div className="absolute inset-0 bg-gradient-to-br from-orange-50/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+      
+      <div className="relative z-10 flex items-start justify-between mb-5">
+        <div className="flex items-center gap-3.5">
+          <div className="relative">
+            <img 
+              src={author.avatar} 
+              alt={author.name} 
+              className="h-12 w-12 rounded-full object-cover ring-2 ring-white shadow-sm group-hover:ring-orange-200 transition-all" 
+            />
+            {latestBadge && (
+              <span className="absolute -bottom-1 -right-1 text-base bg-white rounded-full p-0.5 shadow-sm" title={latestBadge.name}>
+                {latestBadge.icon}
+              </span>
+            )}
+          </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="hover:text-orange-600 font-semibold">{author.name}</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-slate-900 group-hover:text-orange-600 font-bold transition-colors text-base">{author.name}</span>
               {author.role === 'lecturer' && (
-                <Badge variant="secondary" className="text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 border-transparent">
+                <Badge className="text-[10px] font-bold uppercase tracking-wider bg-purple-50 text-purple-600 hover:bg-purple-100 border-none px-2 py-0.5 rounded-md">
                   Giảng viên
                 </Badge>
               )}
-              {latestBadge && (
-                <span className="text-lg" title={latestBadge.name}>{latestBadge.icon}</span>
-              )}
             </div>
-            <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
+            <div className="flex items-center gap-2 text-xs text-slate-500 font-medium mt-0.5">
               <span>{author.major}</span>
-              {author.class && <span className="font-normal text-gray-400">• {author.class}</span>}
-              <span className="font-normal text-gray-400">• {timeAgo}</span>
+              {author.class && <span className="text-slate-400">• Lớp {author.class}</span>}
+              <span className="text-slate-400">• {timeAgo}</span>
             </div>
           </div>
         </div>
         <Button 
           variant="ghost" 
           size="icon"
-          className={`rounded-full ${isSaved ? "bg-orange-50 text-orange-600 hover:bg-orange-100 hover:text-orange-700" : "hover:bg-gray-100 text-gray-400 hover:text-gray-600"}`}
+          className={`rounded-xl h-9 w-9 transition-all duration-200 ${
+            isSaved 
+              ? "bg-orange-100 text-orange-600 hover:bg-orange-200" 
+              : "text-slate-400 hover:text-orange-500 hover:bg-orange-50"
+          }`}
           onClick={handleSave}
           disabled={isLoading}
         >
-          <Bookmark className={`h-5 w-5 ${isSaved ? 'fill-current' : ''}`} />
+          <Bookmark className={`h-4.5 w-4.5 ${isSaved ? 'fill-current' : ''}`} />
         </Button>
       </div>
 
-      <div className="mb-4">
-        <h2 className="mb-2 text-xl font-bold text-gray-900 hover:text-orange-600 transition-colors">
+      <div className="relative z-10 mb-5">
+        <h2 className="mb-2 text-xl font-extrabold text-slate-900 group-hover:text-orange-600 transition-colors tracking-tight leading-snug line-clamp-2">
           {post.title}
         </h2>
-        <p className="text-gray-600 line-clamp-3 leading-relaxed">{post.content}</p>
+        <p className="text-slate-600 text-sm line-clamp-3 leading-relaxed">
+          {post.content}
+        </p>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-4">
-        <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+      <div className="relative z-10 flex flex-wrap gap-2 mb-5">
+        <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 font-semibold px-3 py-1 rounded-full text-xs">
           {post.topic || 'Chủ đề chung'}
         </Badge>
         {post.major && (
-          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-semibold px-3 py-1 rounded-full text-xs">
             {post.major}
           </Badge>
         )}
         {tags.slice(0, 3).map((tag) => (
-          <Badge key={tag} variant="secondary" className="bg-gray-100 text-gray-600 hover:bg-gray-200 border-none">
+          <Badge 
+            key={tag} 
+            variant="secondary" 
+            className="bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium px-3 py-1 rounded-full text-xs transition-all hover:scale-105 cursor-pointer border-transparent"
+          >
             #{tag}
           </Badge>
         ))}
         {tags.length > 3 && (
-          <Badge variant="secondary" className="bg-gray-100 text-gray-600 hover:bg-gray-200 border-none">+{tags.length - 3}</Badge>
+          <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-medium px-2 py-1 rounded-full text-xs">
+            +{tags.length - 3}
+          </Badge>
         )}
       </div>
 
       {(post.attachments && post.attachments.length > 0) || post.videoUrl ? (
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="relative z-10 flex flex-wrap gap-3 mb-5">
           {post.attachments && post.attachments.length > 0 && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-100 rounded-lg text-sm font-medium">
-              <FileText className="h-4 w-4 text-orange-500" />
-              <span className="text-gray-700">{post.attachments.length} tệp đính kèm</span>
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold transition-all hover:bg-slate-100 cursor-pointer">
+              <FileText className="h-3.5 w-3.5 text-orange-500" />
+              <span className="text-slate-700">{post.attachments.length} tệp đính kèm</span>
             </div>
           )}
           {post.videoUrl && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-100 rounded-lg text-sm font-medium">
-              <Video className="h-4 w-4 text-blue-500" />
-              <span className="text-gray-700">Video đính kèm</span>
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold transition-all hover:bg-slate-100 cursor-pointer">
+              <Video className="h-3.5 w-3.5 text-blue-500" />
+              <span className="text-slate-700">Video đính kèm</span>
             </div>
           )}
         </div>
       ) : null}
 
-      <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-        <div className="flex items-center gap-6 text-sm font-medium text-gray-500">
+      <div className="relative z-10 flex items-center justify-between pt-4 border-t border-slate-100">
+        <div className="flex items-center gap-5 text-xs font-semibold text-slate-500">
           <div className="flex items-center gap-1.5">
             <Eye className="h-4 w-4" />
-            {/* Hiển thị Views từ State */}
             <span>{viewsCount.toLocaleString()} <span className="hidden sm:inline">lượt xem</span></span>
           </div>
           <div className="flex items-center gap-1.5">
             <MessageCircle className="h-4 w-4" />
-            {/* Hiển thị Comments từ State */}
             <span>{commentsCount} <span className="hidden sm:inline">bình luận</span></span>
           </div>
         </div>
@@ -317,18 +326,33 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
           <Button
             variant={isLiked ? "default" : "outline"}
             size="sm"
-            className={`rounded-full px-4 ${isLiked ? "bg-red-500 hover:bg-red-600 text-white border-transparent" : "hover:bg-gray-50 bg-white"}`}
+            className={`rounded-xl px-4 h-9 text-sm font-semibold transition-all duration-200 shadow-sm ${
+              isLiked 
+                ? "bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 text-white border-transparent shadow-md" 
+                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800"
+            }`}
             onClick={handleLike}
             disabled={isLoading}
           >
-            <Heart className={`h-4 w-4 mr-1.5 ${isLiked ? 'fill-current text-white' : 'text-gray-400'}`} />
+            <Heart className={`h-4 w-4 mr-1.5 transition-all ${isLiked ? 'fill-current' : ''}`} />
             {likesCount}
           </Button>
-          <Button variant="outline" size="sm" className="rounded-full w-9 p-0 bg-white hover:bg-gray-50" onClick={handleShare}>
-            <Share2 className="h-4 w-4 text-gray-400" />
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="rounded-xl h-9 w-9 p-0 bg-white border-slate-200 hover:bg-slate-50 hover:text-orange-600 transition-all shadow-sm"
+            onClick={handleShare}
+          >
+            <Share2 className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" className="rounded-full w-9 p-0 bg-white hover:bg-gray-50" onClick={handleReport} disabled={isLoading}>
-            <Flag className="h-4 w-4 text-gray-400" />
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="rounded-xl h-9 w-9 p-0 bg-white border-slate-200 hover:bg-slate-50 hover:text-red-500 transition-all shadow-sm"
+            onClick={handleReport} 
+            disabled={isLoading}
+          >
+            <Flag className="h-4 w-4" />
           </Button>
         </div>
       </div>
