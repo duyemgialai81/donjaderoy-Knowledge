@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:8080';
+const API_BASE = 'https://donjaderoy81-knowledge.hf.space';
 import { localStorage_service } from './localStorage';
 async function safeJson(res: Response) {
   try {
