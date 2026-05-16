@@ -32,7 +32,8 @@ public class SecurityConfig {
     private static final String[] PUBLIC_URLS = {
             "/api/auth/**",
             "/v3/api-docs/**",
-            "/swagger-ui/**"
+            "/swagger-ui/**",
+            "/swagger-ui.html"
     };
 
     @Bean
@@ -43,10 +44,21 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of("*"));
+        // Liệt kê các origin được phép (bao gồm local và production)
+        configuration.setAllowedOrigins(List.of(
+                "https://donjaderoy-knowledge-kq84.vercel.app", // Frontend trên Vercel
+                "http://localhost:3000",                        // React (CRA)
+                "http://localhost:5173",                        // Vite
+                "http://localhost:8080",                        // Cổng local khác nếu cần
+                "http://127.0.0.1:5173",
+                "http://127.0.0.1:3000"
+        ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
-        configuration.setAllowCredentials(true);
+        configuration.setAllowCredentials(true);  // Cho phép gửi cookie/token
+        // Nếu bạn muốn expose thêm header (VD: Authorization) thì dùng:
+        // configuration.setExposedHeaders(List.of("Authorization"));
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;

@@ -1,24 +1,13 @@
-# Build stage
-FROM maven:3.9.9-eclipse-temurin-17 AS builder
+FROM eclipse-temurin:17-jdk
 
 WORKDIR /app
 
-COPY pom.xml .
-RUN mvn dependency:go-offline
+COPY . .
 
-COPY src ./src
+RUN chmod +x mvnw
 
-RUN mvn clean package -DskipTests
-
-# Runtime stage
-FROM eclipse-temurin:17-jre-alpine
-
-WORKDIR /app
-
-RUN apk add --no-cache curl
-
-COPY --from=builder /app/target/*.jar app.jar
+RUN ./mvnw clean package -DskipTests
 
 EXPOSE 8080
 
-ENTRYPOINT ["java","-Xms256m","-Xmx1024m","-jar","app.jar"]
+CMD ["java", "-jar", "target/server-0.0.1-SNAPSHOT.jar"]
