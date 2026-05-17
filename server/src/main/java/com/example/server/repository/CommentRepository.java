@@ -1,6 +1,8 @@
 package com.example.server.repository;
 
 import com.example.server.entity.Comment;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -10,6 +12,7 @@ import java.util.List;
 public interface CommentRepository extends JpaRepository<Comment, String> {
     // Hàm này (mình vừa thêm) để lấy comment gốc của bài viết và xếp MỚI NHẤT LÊN ĐẦU
     List<Comment> findByPostIdOrderByCreatedAtDesc(String postId);
+    Page<Comment> findByPostIdAndParentIdIsNullOrderByCreatedAtDesc(String postId, Pageable pageable);
 
     // Các hàm cũ của bạn giữ nguyên
     List<Comment> findByPostId(String postId);
@@ -18,4 +21,5 @@ public interface CommentRepository extends JpaRepository<Comment, String> {
 
     // Hàm này dùng để xếp các comment trả lời (reply) theo thứ tự thời gian đọc cho thuận mắt
     List<Comment> findByParentIdOrderByCreatedAtAsc(String parentId);
+    Page<Comment> findByParentIdOrderByCreatedAtAsc(String parentId, Pageable pageable);
 }

@@ -39,11 +39,12 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public ResponseObject dashboard() {
         Map<String, Object> dashboard = new LinkedHashMap<>();
+        LocalDateTime now = LocalDateTime.now();
         dashboard.put("totalUsers", userRepository.count());
-        dashboard.put("activeUsers", userRepository.findAll().stream().filter(user -> Boolean.TRUE.equals(user.getIsActive())).count());
+        dashboard.put("activeUsers", userRepository.countByIsActive(true));
         dashboard.put("pendingReports", reportRepository.countByStatus(Report.Status.pending));
         dashboard.put("resolvedReports", reportRepository.countByStatus(Report.Status.resolved));
-        dashboard.put("activeBans", banRepository.findAll().stream().filter(ban -> Boolean.TRUE.equals(ban.getIsActive())).count());
+        dashboard.put("activeBans", banRepository.countActiveBans(now));
         dashboard.put("recentActions", adminActionRepository.findTop50ByOrderByCreatedAtDesc());
         return ResponseObject.success(dashboard, "OK");
     }
@@ -51,9 +52,10 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public ResponseObject listReports(String status, int page, int size) {
         try {
+            PageRequest pageRequest = PageRequest.of(normalizePage(page), normalizeSize(size));
             Page<Report> reports = (status == null || status.isBlank())
-                    ? reportRepository.findAll(PageRequest.of(page, size))
-                    : reportRepository.findByStatus(Report.Status.valueOf(status.toLowerCase()), PageRequest.of(page, size));
+                    ? reportRepository.findAll(pageRequest)
+                    : reportRepository.findByStatus(Report.Status.valueOf(status.toLowerCase()), pageRequest);
             return ResponseObject.success(
                     new PageableObject<>(reports.getContent(), reports.getNumber(), reports.getSize(),
                             reports.getTotalElements(), reports.getTotalPages()),
@@ -148,9 +150,10 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public ResponseObject searchUsers(String keyword, int page, int size) {
+        PageRequest pageRequest = PageRequest.of(normalizePage(page), normalizeSize(size));
         Page<User> users = (keyword == null || keyword.isBlank())
-                ? userRepository.findAll(PageRequest.of(page, size))
-                : userRepository.searchByNameOrEmail(keyword, PageRequest.of(page, size));
+                ? userRepository.findAll(pageRequest)
+                : userRepository.searchByNameOrEmail(keyword, pageRequest);
 
         List<Map<String, Object>> items = users.getContent().stream()
                 .map(user -> {
@@ -303,5 +306,16 @@ public class AdminServiceImpl implements AdminService {
         dto.setIsActive(user.getIsActive());
         dto.setCreatedAt(user.getCreatedAt());
         return dto;
+    }
+
+    private int normalizePage(int page) {
+        return Math.max(0, page);
+    }
+
+    private int normalizeSize(int size) {
+        if (size <= 0) {
+            return 20;
+        }
+        return Math.min(size, 100);
     }
 }

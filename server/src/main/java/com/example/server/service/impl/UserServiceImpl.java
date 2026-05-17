@@ -595,6 +595,7 @@ import java.util.stream.Collectors;
 
 @Service
 public class UserServiceImpl implements UserService {
+    private static final int MAX_PAGE_SIZE = 100;
 
     @Autowired private UserRepository userRepository;
     @Autowired private FollowRepository followRepository;
@@ -703,16 +704,10 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public ResponseObject getFollowers(String userId, int page, int size) {
-        List<String> followerIds = followRepository.findByFolloweeId(userId)
-                .stream()
-                .map(Follow::getFollowerId)
-                .collect(Collectors.toList());
-
-        if (followerIds.isEmpty()) {
-            return ResponseObject.success(List.of(), "Chưa có người theo dõi");
-        }
-
-        Page<User> followers = userRepository.findByIdIn(followerIds, PageRequest.of(page, size));
+        Page<User> followers = userRepository.findFollowersOfUser(
+                userId,
+                PageRequest.of(normalizePage(page), normalizeSize(size))
+        );
         List<UserDTO> followerDTOs = followers.stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
@@ -726,16 +721,10 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public ResponseObject getFollowing(String userId, int page, int size) {
-        List<String> followeeIds = followRepository.findByFollowerId(userId)
-                .stream()
-                .map(Follow::getFolloweeId)
-                .collect(Collectors.toList());
-
-        if (followeeIds.isEmpty()) {
-            return ResponseObject.success(List.of(), "Chưa theo dõi ai");
-        }
-
-        Page<User> following = userRepository.findByIdIn(followeeIds, PageRequest.of(page, size));
+        Page<User> following = userRepository.findFollowingOfUser(
+                userId,
+                PageRequest.of(normalizePage(page), normalizeSize(size))
+        );
         List<UserDTO> followingDTOs = following.stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
@@ -776,7 +765,10 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public ResponseObject searchUsers(String keyword, int page, int size) {
-        Page<User> users = userRepository.searchByNameOrEmail(keyword, PageRequest.of(page, size));
+        Page<User> users = userRepository.searchByNameOrEmail(
+                keyword,
+                PageRequest.of(normalizePage(page), normalizeSize(size))
+        );
         List<UserDTO> userDTOs = users.stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
@@ -879,16 +871,10 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public ResponseObject getBlockedUsers(String userId, int page, int size) {
-        List<String> blockedIds = blockRepository.findByBlockerId(userId)
-                .stream()
-                .map(Block::getBlockedId)
-                .collect(Collectors.toList());
-
-        if (blockedIds.isEmpty()) {
-            return ResponseObject.success(List.of(), "Danh sách chặn trống");
-        }
-
-        Page<User> blockedUsers = userRepository.findByIdIn(blockedIds, PageRequest.of(page, size));
+        Page<User> blockedUsers = userRepository.findBlockedUsersOfUser(
+                userId,
+                PageRequest.of(normalizePage(page), normalizeSize(size))
+        );
         List<UserDTO> blockedDTOs = blockedUsers.stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
@@ -922,6 +908,17 @@ public class UserServiceImpl implements UserService {
         dto.setIsActive(user.getIsActive());
         dto.setCreatedAt(user.getCreatedAt());
         return dto;
+    }
+
+    private int normalizePage(int page) {
+        return Math.max(0, page);
+    }
+
+    private int normalizeSize(int size) {
+        if (size <= 0) {
+            return 20;
+        }
+        return Math.min(size, MAX_PAGE_SIZE);
     }
 
     private void createNotification(String recipientId, String actorId,

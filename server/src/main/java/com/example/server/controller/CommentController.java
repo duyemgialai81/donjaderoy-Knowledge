@@ -23,13 +23,17 @@ public class CommentController {
     }
 
     @GetMapping("/post/{postId}")
-    public ResponseObject listByPost(@PathVariable String postId) {
-        return commentService.listByPost(postId);
+    public ResponseObject listByPost(@PathVariable String postId,
+                                     @RequestParam(defaultValue = "0") int page,
+                                     @RequestParam(defaultValue = "20") int size) {
+        return commentService.listByPost(postId, page, size);
     }
 
     @GetMapping("/{commentId}/replies")
-    public ResponseObject listReplies(@PathVariable String commentId) {
-        return commentService.listReplies(commentId);
+    public ResponseObject listReplies(@PathVariable String commentId,
+                                      @RequestParam(defaultValue = "0") int page,
+                                      @RequestParam(defaultValue = "20") int size) {
+        return commentService.listReplies(commentId, page, size);
     }
 
     @DeleteMapping("/{commentId}")

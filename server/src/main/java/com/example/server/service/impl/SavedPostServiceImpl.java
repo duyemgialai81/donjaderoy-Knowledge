@@ -16,12 +16,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 public class SavedPostServiceImpl implements SavedPostService {
+    private static final int MAX_PAGE_SIZE = 50;
 
     @Autowired
     private SavedPostRepository savedPostRepository;
@@ -93,23 +92,10 @@ public class SavedPostServiceImpl implements SavedPostService {
             return ResponseObject.error("User ID không hợp lệ");
         }
 
-        // Get all saved post IDs for this user
-        List<String> savedPostIds = savedPostRepository.findByUserId(userId)
-                .stream()
-                .map(SavedPost::getPostId)
-                .collect(Collectors.toList());
-
-        if (savedPostIds.isEmpty()) {
-            return ResponseObject.success(
-                    new com.example.server.model.response.PageableObject<>(
-                            List.of(), page, size, 0, 0
-                    ),
-                    "Chưa có bài viết đã lưu"
-            );
-        }
-
-        // Get post details with pagination
-        Page<Post> posts = postRepository.findByIdIn(savedPostIds, PageRequest.of(page, size));
+        Page<Post> posts = postRepository.findSavedPostsByUserId(
+                userId,
+                PageRequest.of(normalizePage(page), normalizeSize(size))
+        );
 
         return ResponseObject.success(
                 new com.example.server.model.response.PageableObject<>(posts),
@@ -140,5 +126,16 @@ public class SavedPostServiceImpl implements SavedPostService {
 
         int count = savedPostRepository.countByUserId(userId);
         return ResponseObject.success(new SavedCountDTO(count), "OK");
+    }
+
+    private int normalizePage(int page) {
+        return Math.max(0, page);
+    }
+
+    private int normalizeSize(int size) {
+        if (size <= 0) {
+            return 10;
+        }
+        return Math.min(size, MAX_PAGE_SIZE);
     }
 }

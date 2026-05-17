@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -23,6 +24,17 @@ public class ChatDTO {
         private String receiverId;      // ID người nhận (bắt buộc nếu conversationId null)
         private String content;         // Nội dung tin nhắn
         private String messageType;     // "text", "image", "video", "call_log"
+        private String replyToMessageId;
+        private String attachmentUrl;
+        private String attachmentName;
+        private Long attachmentSize;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class MessageEditRequest {
+        private String content;
     }
 
     @Data
@@ -36,7 +48,10 @@ public class ChatDTO {
         private String content;
         private String messageType;     // "text", "image", "video", "call_log"
         private LocalDateTime createdAt;
+        private LocalDateTime editedAt;
+        private LocalDateTime deletedAt;
         private Boolean isDeleted;      // Default: false
+        private String replyToMessageId;
 
         // === REACTION FIELDS (Discord-style) ===
         /**
@@ -56,6 +71,18 @@ public class ChatDTO {
         private String attachmentUrl;   // URL ảnh/file đính kèm (nếu có)
         private String attachmentName;  // Tên file gốc
         private Long attachmentSize;    // Size file (bytes)
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class MessagePageResponse {
+        private List<MessageResponse> messages;
+        private String nextBeforeMessageId;
+        private LocalDateTime nextBeforeCreatedAt;
+        private Boolean hasMore;
+        private Integer limit;
     }
 
     // ==================== TYPING INDICATOR ====================

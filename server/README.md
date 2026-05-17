@@ -2,6 +2,11 @@
 
 This folder contains a simple Spring Boot backend scaffold matching the front-end project.
 
+Microservice direction:
+- See `MICROSERVICES.md` for the service split and migration plan.
+- See `microservices/` for the new multi-module Spring Boot scaffold with API gateway and domain services.
+- The current monolith remains in `src/main` so migration can happen incrementally without breaking existing API behavior.
+
 Quick start (Windows):
 
 1. Make sure you have MySQL running and a database `duyem` created.

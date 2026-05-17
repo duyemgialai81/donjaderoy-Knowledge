@@ -14,5 +14,8 @@ public interface BanRepository extends JpaRepository<Ban, String> {
     @Query("SELECT COUNT(b) > 0 FROM Ban b WHERE b.userId = :userId AND b.isActive = true AND (b.endAt IS NULL OR b.endAt > :now)")
     boolean hasActiveBan(@Param("userId") String userId, @Param("now") LocalDateTime now);
 
+    @Query("SELECT COUNT(b) FROM Ban b WHERE b.isActive = true AND (b.endAt IS NULL OR b.endAt > :now)")
+    long countActiveBans(@Param("now") LocalDateTime now);
+
     List<Ban> findByUserIdAndIsActiveTrue(String userId);
 }

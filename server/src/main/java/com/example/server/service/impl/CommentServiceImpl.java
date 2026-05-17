@@ -8,6 +8,8 @@ import com.example.server.repository.CommentRepository;
 import com.example.server.repository.PostRepository;
 import com.example.server.service.CommentService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +19,7 @@ import java.util.UUID;
 
 @Service
 public class CommentServiceImpl implements CommentService {
+    private static final int MAX_PAGE_SIZE = 100;
 
     @Autowired
     private CommentRepository commentRepository;
@@ -63,15 +66,27 @@ public class CommentServiceImpl implements CommentService {
     }
 
     @Override
-    public ResponseObject listByPost(String postId) {
-        var list = commentRepository.findByPostIdOrderByCreatedAtDesc(postId);
-        return ResponseObject.success(list, "OK");
+    public ResponseObject listByPost(String postId, int page, int size) {
+        Page<Comment> comments = commentRepository.findByPostIdAndParentIdIsNullOrderByCreatedAtDesc(
+                postId,
+                PageRequest.of(normalizePage(page), normalizeSize(size))
+        );
+        return ResponseObject.success(
+                new com.example.server.model.response.PageableObject<>(comments),
+                "OK"
+        );
     }
 
     @Override
-    public ResponseObject listReplies(String commentId) {
-        var list = commentRepository.findByParentIdOrderByCreatedAtAsc(commentId);
-        return ResponseObject.success(list, "OK");
+    public ResponseObject listReplies(String commentId, int page, int size) {
+        Page<Comment> replies = commentRepository.findByParentIdOrderByCreatedAtAsc(
+                commentId,
+                PageRequest.of(normalizePage(page), normalizeSize(size))
+        );
+        return ResponseObject.success(
+                new com.example.server.model.response.PageableObject<>(replies),
+                "OK"
+        );
     }
 
     @Override
@@ -136,5 +151,16 @@ public class CommentServiceImpl implements CommentService {
         commentRepository.save(comment);
 
         return ResponseObject.success(comment, "Comment reported");
+    }
+
+    private int normalizePage(int page) {
+        return Math.max(0, page);
+    }
+
+    private int normalizeSize(int size) {
+        if (size <= 0) {
+            return 20;
+        }
+        return Math.min(size, MAX_PAGE_SIZE);
     }
 }

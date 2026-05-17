@@ -10,11 +10,11 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Optional;
 
 @Service
 public class NotificationServiceImpl implements NotificationService {
+    private static final int MAX_PAGE_SIZE = 100;
 
     @Autowired
     private NotificationRepository notificationRepository;
@@ -22,7 +22,10 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     public ResponseObject getNotifications(String userId, int page, int size) {
         Page<Notification> notifications = notificationRepository
-                .findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(page, size));
+                .findByUserIdOrderByCreatedAtDesc(
+                        userId,
+                        PageRequest.of(normalizePage(page), normalizeSize(size))
+                );
 
         return ResponseObject.success(
                 new com.example.server.model.response.PageableObject<>(notifications),
@@ -54,14 +57,7 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     @Transactional
     public ResponseObject markAllAsRead(String userId) {
-        List<Notification> unreadNotifications = notificationRepository
-                .findByUserIdAndIsRead(userId, false);
-
-        for (Notification notif : unreadNotifications) {
-            notif.setIsRead(true);
-            notificationRepository.save(notif);
-        }
-
+        notificationRepository.markAllReadByUserId(userId);
         return ResponseObject.success(null, "Đã đánh dấu tất cả đã đọc");
     }
 
@@ -85,9 +81,19 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     @Transactional
     public ResponseObject deleteAllNotifications(String userId) {
-        List<Notification> notifications = notificationRepository.findByUserId(userId);
-        notificationRepository.deleteAll(notifications);
+        notificationRepository.deleteAllByUserId(userId);
         return ResponseObject.success(null, "Đã xóa tất cả thông báo");
+    }
+
+    private int normalizePage(int page) {
+        return Math.max(0, page);
+    }
+
+    private int normalizeSize(int size) {
+        if (size <= 0) {
+            return 20;
+        }
+        return Math.min(size, MAX_PAGE_SIZE);
     }
 
     // DTO

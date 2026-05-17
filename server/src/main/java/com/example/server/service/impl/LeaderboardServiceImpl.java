@@ -17,13 +17,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
 public class LeaderboardServiceImpl implements LeaderboardService {
+    private static final int MAX_LIMIT = 100;
 
     @Autowired
     private LeaderboardRepository leaderboardRepository;
@@ -40,7 +40,7 @@ public class LeaderboardServiceImpl implements LeaderboardService {
     @Override
     public ResponseObject getTopUsers(int limit) {
         List<Leaderboard> topUsers = leaderboardRepository
-                .findAllByOrderByPointsDesc(PageRequest.of(0, limit))
+                .findAllByOrderByPointsDesc(PageRequest.of(0, normalizeLimit(limit)))
                 .getContent();
 
         List<LeaderboardDTO> result = topUsers.stream()
@@ -129,20 +129,8 @@ public class LeaderboardServiceImpl implements LeaderboardService {
 
     @Override
     public ResponseObject getLeaderboardByMajor(String majorId, int limit) {
-        // Get users from major
-        List<User> usersInMajor = userRepository.findByMajorId(majorId);
-
-        if (usersInMajor.isEmpty()) {
-            return ResponseObject.success(new ArrayList<>(), "Không có người dùng trong chuyên ngành này");
-        }
-
-        List<String> userIds = usersInMajor.stream()
-                .map(User::getId)
-                .collect(Collectors.toList());
-
-        // Get leaderboard entries for these users
         List<Leaderboard> leaderboards = leaderboardRepository
-                .findByUserIdInOrderByPointsDesc(userIds, PageRequest.of(0, limit))
+                .findByMajorIdOrderByPointsDesc(majorId, PageRequest.of(0, normalizeLimit(limit)))
                 .getContent();
 
         List<LeaderboardDTO> result = leaderboards.stream()
@@ -155,7 +143,7 @@ public class LeaderboardServiceImpl implements LeaderboardService {
     @Override
     public ResponseObject getTopPostersThisWeek(int limit) {
         List<Leaderboard> topPosters = leaderboardRepository
-                .findAllByOrderByPostsThisWeekDesc(PageRequest.of(0, limit))
+                .findAllByOrderByPostsThisWeekDesc(PageRequest.of(0, normalizeLimit(limit)))
                 .getContent();
 
         List<LeaderboardDTO> result = topPosters.stream()
@@ -230,5 +218,12 @@ public class LeaderboardServiceImpl implements LeaderboardService {
         }
 
         return dto;
+    }
+
+    private int normalizeLimit(int limit) {
+        if (limit <= 0) {
+            return 10;
+        }
+        return Math.min(limit, MAX_LIMIT);
     }
 }

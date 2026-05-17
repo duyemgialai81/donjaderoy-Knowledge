@@ -46,6 +46,7 @@ public class PostServiceImpl implements PostService {
 
     private static final int POINTS_POST = 10;
     private static final int POINTS_LIKE = 3;
+    private static final int MAX_PAGE_SIZE = 50;
 
     @Override
     @Transactional
@@ -111,14 +112,14 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
+    @Transactional
     public ResponseObject getPostById(String id) {
         Optional<Post> maybe = postRepository.findById(id);
         if (maybe.isEmpty()) return ResponseObject.error("Không tìm thấy bài viết");
 
         Post post = maybe.get();
-        // Increment views
-        post.setViews(post.getViews() + 1);
-        postRepository.save(post);
+        postRepository.incrementViews(id);
+        post.setViews((post.getViews() == null ? 0 : post.getViews()) + 1);
 
         return ResponseObject.success(post, "OK");
     }
@@ -126,13 +127,14 @@ public class PostServiceImpl implements PostService {
     @Override
     public ResponseObject listPosts(int page, int size, String majorId, String topic) {
         Page<Post> posts;
+        PageRequest pageRequest = PageRequest.of(normalizePage(page), normalizeSize(size));
 
         if (majorId != null && !majorId.isEmpty()) {
-            posts = postRepository.findByMajorId(majorId, PageRequest.of(page, size));
+            posts = postRepository.findByMajorIdAndStatusOrderByCreatedAtDesc(majorId, Post.Status.published, pageRequest);
         } else if (topic != null && !topic.isEmpty()) {
-            posts = postRepository.findByTopic(topic, PageRequest.of(page, size));
+            posts = postRepository.findByTopicAndStatusOrderByCreatedAtDesc(topic, Post.Status.published, pageRequest);
         } else {
-            posts = postRepository.findAll(PageRequest.of(page, size));
+            posts = postRepository.findByStatusOrderByCreatedAtDesc(Post.Status.published, pageRequest);
         }
 
         return ResponseObject.success(
@@ -219,7 +221,10 @@ public class PostServiceImpl implements PostService {
 
     @Override
     public ResponseObject getPostsByUser(String userId, int page, int size) {
-        Page<Post> posts = postRepository.findByAuthorId(userId, PageRequest.of(page, size));
+        Page<Post> posts = postRepository.findByAuthorIdOrderByCreatedAtDesc(
+                userId,
+                PageRequest.of(normalizePage(page), normalizeSize(size))
+        );
         return ResponseObject.success(
                 new com.example.server.model.response.PageableObject<>(posts),
                 "OK"
@@ -311,8 +316,8 @@ public class PostServiceImpl implements PostService {
             leaderboardRepository.save(lb);
         }
 
-        // Recalculate ranks
-        recalculateLeaderboardRanks();
+        // Do not recalculate every rank on each write; that becomes O(n) at large scale.
+        // Leaderboard refresh can run as a batch job or through the dedicated admin update endpoint.
     }
 
     // Recalculate all ranks
@@ -363,5 +368,16 @@ public class PostServiceImpl implements PostService {
                 }
             }
         }
+    }
+
+    private int normalizePage(int page) {
+        return Math.max(0, page);
+    }
+
+    private int normalizeSize(int size) {
+        if (size <= 0) {
+            return 10;
+        }
+        return Math.min(size, MAX_PAGE_SIZE);
     }
 }

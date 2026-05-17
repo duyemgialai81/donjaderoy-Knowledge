@@ -7,14 +7,27 @@ import com.example.server.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.*;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.HashOperations;
+import org.springframework.data.redis.core.ListOperations;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -22,11 +35,32 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class MessageCacheService {
 
+    private static final int MAX_CACHED_MESSAGES_PER_CONVERSATION = 1000;
+    private static final int MAX_MESSAGE_PAGE_SIZE = 101;
+
+    private static final String KEY_MESSAGE = "chat:message:";
+    private static final String KEY_CONVERSATION_MESSAGES = "chat:conversation:messages:";
+    private static final String KEY_REACTION_COUNTS = "chat:message:reaction-counts:";
+    private static final String KEY_USER_REACTION = "chat:message:user-reaction:";
+    private static final String KEY_USER_ONLINE = "chat:user-online:";
+
+    public static final Set<String> ALLOWED_EMOJIS = Set.of(
+            "\u2764\uFE0F",
+            "\uD83D\uDE02",
+            "\uD83D\uDC4D",
+            "\uD83D\uDE2E",
+            "\uD83D\uDE22",
+            "\uD83C\uDF89",
+            "\uD83D\uDC4E",
+            "\uD83D\uDD25",
+            "\u2B50",
+            "\uD83D\uDCAF"
+    );
+
     private final RedisTemplate<String, Object> redisTemplate;
     private final ValueOperations<String, Object> valueOps;
     private final HashOperations<String, String, Object> hashOps;
     private final ListOperations<String, Object> listOps;
-    private final SetOperations<String, Object> setOps;
 
     private final MessageRepository messageRepository;
     private final MessageReactionRepository reactionRepository;
@@ -37,252 +71,364 @@ public class MessageCacheService {
     @Value("${cache.reactions.ttl-minutes:60}")
     private long reactionsTtlMinutes;
 
-    // ==================== KEY PATTERNS ====================
-    private static final String KEY_MESSAGE = "msg:";
-    private static final String KEY_CONV_MESSAGES = "conv:msgs:";
-    private static final String KEY_REACTION = "react:";
-    private static final String KEY_REACTION_SET = "reacts:";
-    private static final String KEY_USER_ONLINE = "online:";
-
-    // ==================== MESSAGE CACHE ====================
+    @Value("${cache.user-online.ttl-minutes:15}")
+    private long userOnlineTtlMinutes;
 
     public Optional<Message> getMessage(String messageId) {
-        String key = KEY_MESSAGE + messageId;
-
-        Object cached = valueOps.get(key);
-        if (cached instanceof Message msg) {
-            log.debug("Cache HIT for message: {}", messageId);
-            redisTemplate.expire(key, Duration.ofMinutes(messagesTtlMinutes));
-            return Optional.of(msg);
+        String key = messageKey(messageId);
+        try {
+            Object cached = valueOps.get(key);
+            if (cached instanceof Message message) {
+                redisTemplate.expire(key, ttl(messagesTtlMinutes));
+                return Optional.of(message);
+            }
+        } catch (Exception e) {
+            log.warn("Redis message cache read failed for {}", messageId, e);
         }
 
-        log.debug("Cache MISS for message: {}, querying DB...", messageId);
         Optional<Message> dbMessage = messageRepository.findById(messageId);
-
-        dbMessage.ifPresent(msg -> {
-            valueOps.set(key, msg, Duration.ofMinutes(messagesTtlMinutes));
-            addToConversationIndex(msg.getConversationId(), messageId);
+        dbMessage.ifPresent(message -> {
+            try {
+                cacheMessage(message);
+            } catch (Exception e) {
+                log.warn("Redis message cache write failed for {}", messageId, e);
+            }
         });
-
         return dbMessage;
     }
 
     @Transactional
     public Message saveMessageWithCache(Message message) {
         Message saved = messageRepository.save(message);
-
-        String msgKey = KEY_MESSAGE + saved.getId();
-        valueOps.set(msgKey, saved, Duration.ofMinutes(messagesTtlMinutes));
-
-        String convKey = KEY_CONV_MESSAGES + saved.getConversationId();
-        listOps.rightPush(convKey, saved.getId());
-        redisTemplate.expire(convKey, Duration.ofMinutes(messagesTtlMinutes));
-        listOps.trim(convKey, -1000, -1);
-
-        log.debug("Cached message {} in conversation {}", saved.getId(), saved.getConversationId());
+        try {
+            cacheMessage(saved);
+            appendConversationMessage(saved.getConversationId(), saved.getId());
+        } catch (Exception e) {
+            log.warn("Redis message cache write failed for {}", saved.getId(), e);
+        }
         return saved;
     }
 
     public List<Message> getMessagesByConversation(String conversationId, int limit) {
-        String convKey = KEY_CONV_MESSAGES + conversationId;
+        int safeLimit = normalizeLimit(limit);
+        String convKey = conversationMessagesKey(conversationId);
+        try {
+            List<Object> cachedIds = listOps.range(convKey, -safeLimit, -1);
 
-        List<Object> msgIds = listOps.range(convKey, -limit, -1);
-
-        if (msgIds != null && !msgIds.isEmpty()) {
-            List<Message> messages = new ArrayList<>();
-            List<String> missingIds = new ArrayList<>();
-
-            for (Object idObj : msgIds) {
-                String msgId = (String) idObj;
-                getMessage(msgId).ifPresentOrElse(
-                        messages::add,
-                        () -> missingIds.add(msgId)
-                );
+            if (cachedIds != null && !cachedIds.isEmpty()) {
+                List<Message> cachedMessages = hydrateMessages(cachedIds);
+                if (!cachedMessages.isEmpty()) {
+                    return sortAscending(cachedMessages);
+                }
             }
-
-            if (!missingIds.isEmpty()) {
-                List<Message> dbMessages = messageRepository.findAllById(missingIds);
-                messages.addAll(dbMessages);
-            }
-
-            return messages.stream()
-                    .sorted(Comparator.comparing(Message::getCreatedAt))
-                    .limit(limit)
-                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.warn("Redis conversation cache read failed for {}", conversationId, e);
         }
 
-        log.info("Cache empty for conversation {}, fetching from DB", conversationId);
-        return messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId)
-                .stream().limit(limit).collect(Collectors.toList());
-    }
-
-    private void addToConversationIndex(String conversationId, String messageId) {
-        String convKey = KEY_CONV_MESSAGES + conversationId;
-        listOps.rightPush(convKey, messageId);
-        redisTemplate.expire(convKey, Duration.ofMinutes(messagesTtlMinutes));
-        listOps.trim(convKey, -1000, -1);
-    }
-
-    // ==================== REACTION CACHE ====================
-
-    @Transactional
-    public MessageReaction saveReactionWithCache(MessageReaction reaction) {
-        MessageReaction saved = reactionRepository.save(reaction);
-
-        // ✅ FIX 2: toEpochSecond cần ZoneOffset
-        String reactKey = KEY_REACTION + reaction.getMessageId() + ":" +
-                reaction.getUserId() + ":" + reaction.getEmoji();
-        valueOps.set(reactKey,
-                saved.getCreatedAt().toEpochSecond(ZoneOffset.UTC),
-                Duration.ofMinutes(reactionsTtlMinutes));
-
-        String counterKey = KEY_REACTION_SET + reaction.getMessageId();
-        String emoji = reaction.getEmoji();
-
-        hashOps.increment(counterKey, emoji, 1);
-        redisTemplate.expire(counterKey, Duration.ofMinutes(reactionsTtlMinutes));
-
-        setOps.add(counterKey + ":users", reaction.getUserId() + ":" + emoji);
-
-        log.debug("Cached reaction: {} -> {} on message {}",
-                reaction.getUserId(), reaction.getEmoji(), reaction.getMessageId());
-        return saved;
-    }
-
-    public Map<String, Long> getReactionCounts(String messageId) {
-        String key = MessageReaction.getRedisSetKey(messageId);
-
-        // Lấy nguyên bản dưới dạng Object từ Redis
-        Map<Object, Object> rawEntries = redisTemplate.opsForHash().entries(key);
-        Map<String, Long> result = new HashMap<>();
-
-        // Chuyển đổi an toàn từng phần tử
-        for (Map.Entry<Object, Object> entry : rawEntries.entrySet()) {
-            if (entry.getKey() != null && entry.getValue() != null) {
-                String emoji = String.valueOf(entry.getKey());
-                Long count = Long.parseLong(String.valueOf(entry.getValue()));
-                result.put(emoji, count);
-            }
+        List<Message> latestDesc = messageRepository.findLatestVisibleMessages(
+                conversationId,
+                PageRequest.of(0, safeLimit)
+        );
+        List<Message> latestAsc = reverseToAscending(latestDesc);
+        try {
+            rebuildConversationCache(conversationId, latestAsc);
+        } catch (Exception e) {
+            log.warn("Redis conversation cache rebuild failed for {}", conversationId, e);
         }
+        return latestAsc;
+    }
 
-        return result;
+    public List<Message> getMessagesBefore(String conversationId, LocalDateTime beforeCreatedAt, String beforeId, int limit) {
+        int safeLimit = normalizeLimit(limit);
+        List<Message> messagesDesc = messageRepository.findVisibleMessagesBefore(
+                conversationId,
+                beforeCreatedAt,
+                beforeId,
+                PageRequest.of(0, safeLimit)
+        );
+        List<Message> messagesAsc = reverseToAscending(messagesDesc);
+        messagesAsc.forEach(message -> {
+            try {
+                cacheMessage(message);
+            } catch (Exception e) {
+                log.warn("Redis message cache write failed for {}", message.getId(), e);
+            }
+        });
+        return messagesAsc;
+    }
+
+    public void cacheUpdatedMessage(Message message) {
+        try {
+            cacheMessage(message);
+        } catch (Exception e) {
+            log.warn("Redis message cache update failed for {}", message.getId(), e);
+        }
     }
 
     @Transactional
     public boolean toggleReaction(String messageId, String userId, String emoji) {
-        String reactionKey = MessageReaction.getRedisSetKey(messageId);
-        String userReactionKey = "user_reaction:" + messageId + ":" + userId;
+        List<MessageReaction> currentReactions = reactionRepository.findAllByMessageIdAndUserId(messageId, userId);
+        Optional<MessageReaction> currentReaction = currentReactions.stream().findFirst();
 
-        // Lấy reaction hiện tại của user từ Redis
-        Object rawCurrentReaction = redisTemplate.opsForValue().get(userReactionKey);
-        String currentReaction = rawCurrentReaction != null ? String.valueOf(rawCurrentReaction) : null;
-
-        // TRƯỜNG HỢP 1: Bấm lại vào emoji cũ -> Xoá thả cảm xúc (Unlike)
-        if (currentReaction != null && currentReaction.equals(emoji)) {
-            redisTemplate.delete(userReactionKey);
-
-            // Giảm an toàn số lượng (chống ClassCastException)
-            Object rawCount = redisTemplate.opsForHash().get(reactionKey, emoji);
-            if (rawCount != null) {
-                long count = Long.parseLong(String.valueOf(rawCount));
-                if (count > 1) {
-                    redisTemplate.opsForHash().put(reactionKey, emoji, String.valueOf(count - 1));
-                } else {
-                    redisTemplate.opsForHash().delete(reactionKey, emoji);
-                }
-            }
-            return false; // Trả về false nghĩa là đã gỡ reaction
+        if (currentReaction.isPresent() && emoji.equals(currentReaction.get().getEmoji())) {
+            currentReactions.forEach(reaction -> {
+                reactionRepository.delete(reaction);
+                decrementReactionCount(messageId, reaction.getEmoji());
+            });
+            safeDelete(userReactionKey(messageId, userId));
+            return false;
         }
 
-        // TRƯỜNG HỢP 2: Bấm vào emoji mới (hoặc chưa từng thả)
-        else {
-            // Xoá số đếm của emoji cũ (nếu trước đó đã thả cái khác)
-            if (currentReaction != null) {
-                Object rawOldCount = redisTemplate.opsForHash().get(reactionKey, currentReaction);
-                if (rawOldCount != null) {
-                    long oldCount = Long.parseLong(String.valueOf(rawOldCount));
-                    if (oldCount > 1) {
-                        redisTemplate.opsForHash().put(reactionKey, currentReaction, String.valueOf(oldCount - 1));
-                    } else {
-                        redisTemplate.opsForHash().delete(reactionKey, currentReaction);
-                    }
-                }
-            }
+        currentReactions.forEach(existing -> {
+            reactionRepository.delete(existing);
+            decrementReactionCount(messageId, existing.getEmoji());
+        });
 
-            // Lưu emoji mới của user
-            redisTemplate.opsForValue().set(userReactionKey, emoji);
+        MessageReaction saved = MessageReaction.builder()
+                .id(UUID.randomUUID().toString())
+                .messageId(messageId)
+                .userId(userId)
+                .emoji(emoji)
+                .createdAt(LocalDateTime.now())
+                .build();
+        reactionRepository.save(saved);
 
-            // Tăng an toàn số lượng emoji mới (chống ClassCastException)
-            Object rawNewCount = redisTemplate.opsForHash().get(reactionKey, emoji);
-            long newCount = rawNewCount != null ? Long.parseLong(String.valueOf(rawNewCount)) : 0L;
-            redisTemplate.opsForHash().put(reactionKey, emoji, String.valueOf(newCount + 1));
-
-            return true; // Trả về true nghĩa là đã thả reaction mới
+        try {
+            valueOps.set(userReactionKey(messageId, userId), emoji, ttl(reactionsTtlMinutes));
+            hashOps.increment(reactionCountsKey(messageId), emoji, 1);
+            redisTemplate.expire(reactionCountsKey(messageId), ttl(reactionsTtlMinutes));
+        } catch (Exception e) {
+            log.warn("Redis reaction cache write failed for message {}", messageId, e);
         }
+        return true;
+    }
+
+    public Map<String, Long> getReactionCounts(String messageId) {
+        String key = reactionCountsKey(messageId);
+        try {
+            Map<String, Long> cachedCounts = readLongHash(key);
+            if (!cachedCounts.isEmpty()) {
+                redisTemplate.expire(key, ttl(reactionsTtlMinutes));
+                return cachedCounts;
+            }
+        } catch (Exception e) {
+            log.warn("Redis reaction cache read failed for message {}", messageId, e);
+        }
+
+        Map<String, Long> dbCounts = reactionRepository.findByMessageId(messageId).stream()
+                .collect(Collectors.groupingBy(
+                        MessageReaction::getEmoji,
+                        LinkedHashMap::new,
+                        Collectors.counting()
+                ));
+        if (!dbCounts.isEmpty()) {
+            try {
+                dbCounts.forEach((emoji, count) -> hashOps.put(key, emoji, count));
+                redisTemplate.expire(key, ttl(reactionsTtlMinutes));
+            } catch (Exception e) {
+                log.warn("Redis reaction cache rebuild failed for message {}", messageId, e);
+            }
+        }
+        return dbCounts;
     }
 
     public boolean hasUserReacted(String messageId, String userId, String emoji) {
-        String key = KEY_REACTION + messageId + ":" + userId + ":" + emoji;
-        return Boolean.TRUE.equals(redisTemplate.hasKey(key));
+        return emoji.equals(getUserReaction(messageId, userId).orElse(null));
     }
 
     public Map<String, Boolean> getUserReactions(String messageId, String userId) {
-        Map<String, Boolean> userReactions = new HashMap<>();
+        Optional<String> selectedEmoji = getUserReaction(messageId, userId);
+        Map<String, Boolean> result = new HashMap<>();
         for (String emoji : ALLOWED_EMOJIS) {
-            userReactions.put(emoji, hasUserReacted(messageId, userId, emoji));
+            result.put(emoji, selectedEmoji.filter(emoji::equals).isPresent());
         }
-        return userReactions;
+        return result;
     }
 
-    // ==================== USER ONLINE STATUS ====================
-
     public void setUserOnline(String userId) {
-        String key = KEY_USER_ONLINE + userId;
-        valueOps.set(key, System.currentTimeMillis(), Duration.ofMinutes(15));
+        try {
+            valueOps.set(KEY_USER_ONLINE + userId, System.currentTimeMillis(), ttl(userOnlineTtlMinutes));
+        } catch (Exception e) {
+            log.warn("Redis online status write failed for user {}", userId, e);
+        }
     }
 
     public boolean isUserOnline(String userId) {
-        return Boolean.TRUE.equals(redisTemplate.hasKey(KEY_USER_ONLINE + userId));
+        try {
+            return Boolean.TRUE.equals(redisTemplate.hasKey(KEY_USER_ONLINE + userId));
+        } catch (Exception e) {
+            log.warn("Redis online status read failed for user {}", userId, e);
+            return false;
+        }
     }
 
-    public Set<String> filterOnlineUsers(Collection<String> userIds) {
+    public Set<String> filterOnlineUsers(Set<String> userIds) {
         return userIds.stream()
                 .filter(this::isUserOnline)
                 .collect(Collectors.toSet());
     }
 
-    // ==================== CACHE MANAGEMENT ====================
-
     public void invalidateConversationCache(String conversationId) {
-        String convKey = KEY_CONV_MESSAGES + conversationId;
-        redisTemplate.delete(convKey);
-        log.info("Invalidated cache for conversation: {}", conversationId);
+        safeDelete(conversationMessagesKey(conversationId));
     }
 
     public void invalidateMessageCache(String messageId) {
-        redisTemplate.delete(KEY_MESSAGE + messageId);
-        String reactCounterKey = KEY_REACTION_SET + messageId;
-        redisTemplate.delete(reactCounterKey);
-        redisTemplate.delete(reactCounterKey + ":users");
-        log.debug("Invalidated cache for message: {}", messageId);
+        safeDelete(messageKey(messageId));
+        safeDelete(reactionCountsKey(messageId));
     }
 
     public boolean isRedisHealthy() {
         try {
-            return redisTemplate.getConnectionFactory().getConnection().ping().equalsIgnoreCase("PONG");
+            RedisConnectionFactory factory = redisTemplate.getConnectionFactory();
+            return factory != null && "PONG".equalsIgnoreCase(factory.getConnection().ping());
         } catch (Exception e) {
             log.error("Redis health check failed", e);
             return false;
         }
     }
 
-    // ==================== CONSTANTS ====================
-
-    public static final Set<String> ALLOWED_EMOJIS = Set.of(
-            "❤️", "😂", "👍", "😮", "😢", "🎉", "👎", "🔥", "⭐", "💯"
-    );
-
     public static boolean isValidEmoji(String emoji) {
         return ALLOWED_EMOJIS.contains(emoji);
+    }
+
+    private Optional<String> getUserReaction(String messageId, String userId) {
+        String key = userReactionKey(messageId, userId);
+        try {
+            Object cached = valueOps.get(key);
+            if (cached != null) {
+                redisTemplate.expire(key, ttl(reactionsTtlMinutes));
+                return Optional.of(String.valueOf(cached));
+            }
+        } catch (Exception e) {
+            log.warn("Redis user reaction cache read failed for message {}", messageId, e);
+        }
+
+        Optional<String> dbEmoji = reactionRepository.findAllByMessageIdAndUserId(messageId, userId).stream()
+                .findFirst()
+                .map(MessageReaction::getEmoji);
+        dbEmoji.ifPresent(emoji -> {
+            try {
+                valueOps.set(key, emoji, ttl(reactionsTtlMinutes));
+            } catch (Exception e) {
+                log.warn("Redis user reaction cache write failed for message {}", messageId, e);
+            }
+        });
+        return dbEmoji;
+    }
+
+    private void cacheMessage(Message message) {
+        valueOps.set(messageKey(message.getId()), message, ttl(messagesTtlMinutes));
+    }
+
+    private void appendConversationMessage(String conversationId, String messageId) {
+        String key = conversationMessagesKey(conversationId);
+        listOps.rightPush(key, messageId);
+        listOps.trim(key, -MAX_CACHED_MESSAGES_PER_CONVERSATION, -1);
+        redisTemplate.expire(key, ttl(messagesTtlMinutes));
+    }
+
+    private void rebuildConversationCache(String conversationId, List<Message> messages) {
+        String key = conversationMessagesKey(conversationId);
+        redisTemplate.delete(key);
+        for (Message message : messages) {
+            cacheMessage(message);
+            listOps.rightPush(key, message.getId());
+        }
+        if (!messages.isEmpty()) {
+            listOps.trim(key, -MAX_CACHED_MESSAGES_PER_CONVERSATION, -1);
+            redisTemplate.expire(key, ttl(messagesTtlMinutes));
+        }
+    }
+
+    private List<Message> hydrateMessages(List<Object> ids) {
+        List<Message> messages = new ArrayList<>();
+        for (Object id : ids) {
+            if (id != null) {
+                getMessage(String.valueOf(id)).ifPresent(messages::add);
+            }
+        }
+        return messages;
+    }
+
+    private List<Message> reverseToAscending(List<Message> messagesDesc) {
+        List<Message> result = new ArrayList<>(messagesDesc);
+        Collections.reverse(result);
+        return result;
+    }
+
+    private List<Message> sortAscending(List<Message> messages) {
+        return messages.stream()
+                .sorted(Comparator.comparing(Message::getCreatedAt).thenComparing(Message::getId))
+                .toList();
+    }
+
+    private void decrementReactionCount(String messageId, String emoji) {
+        try {
+            String key = reactionCountsKey(messageId);
+            Object current = hashOps.get(key, emoji);
+            long count = current == null ? reactionRepository.countByMessageIdAndEmoji(messageId, emoji) + 1 : parseLong(current);
+            if (count <= 1) {
+                hashOps.delete(key, emoji);
+            } else {
+                hashOps.put(key, emoji, count - 1);
+            }
+            redisTemplate.expire(key, ttl(reactionsTtlMinutes));
+        } catch (Exception e) {
+            log.warn("Redis reaction cache decrement failed for message {}", messageId, e);
+        }
+    }
+
+    private Map<String, Long> readLongHash(String key) {
+        Map<String, Long> result = new HashMap<>();
+        Map<String, Object> rawEntries = hashOps.entries(key);
+        for (Map.Entry<String, Object> entry : rawEntries.entrySet()) {
+            if (entry.getKey() != null && entry.getValue() != null) {
+                result.put(entry.getKey(), parseLong(entry.getValue()));
+            }
+        }
+        return result;
+    }
+
+    private long parseLong(Object value) {
+        try {
+            return Long.parseLong(String.valueOf(value));
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
+    }
+
+    private int normalizeLimit(int limit) {
+        if (limit <= 0) {
+            return 50;
+        }
+        return Math.min(limit, MAX_MESSAGE_PAGE_SIZE);
+    }
+
+    private Duration ttl(long minutes) {
+        return Duration.ofMinutes(Math.max(1, minutes));
+    }
+
+    private String messageKey(String messageId) {
+        return KEY_MESSAGE + messageId;
+    }
+
+    private String conversationMessagesKey(String conversationId) {
+        return KEY_CONVERSATION_MESSAGES + conversationId;
+    }
+
+    private String reactionCountsKey(String messageId) {
+        return KEY_REACTION_COUNTS + messageId;
+    }
+
+    private String userReactionKey(String messageId, String userId) {
+        return KEY_USER_REACTION + messageId + ":" + userId;
+    }
+
+    private void safeDelete(String key) {
+        try {
+            redisTemplate.delete(key);
+        } catch (Exception e) {
+            log.warn("Redis cache delete failed for key {}", key, e);
+        }
     }
 }
