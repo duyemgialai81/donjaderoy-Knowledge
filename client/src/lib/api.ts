@@ -1,6 +1,6 @@
 import { localStorage_service } from './localStorage';
 
-const DEFAULT_API_BASE = 'http://localhost:8080';
+const DEFAULT_API_BASE = 'https://vananhcs-face-id.hf.space';
 
 function normalizeHttpUrl(value?: string) {
   const raw = (value || DEFAULT_API_BASE).trim().replace(/\/+$/, '');
