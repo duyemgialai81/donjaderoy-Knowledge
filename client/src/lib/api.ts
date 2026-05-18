@@ -1,6 +1,6 @@
 import { localStorage_service } from './localStorage';
 
-const DEFAULT_API_BASE = 'http://3.27.136.219:8080';
+const DEFAULT_API_BASE = 'https://duyem.duckdns.org';
 
 function normalizeHttpUrl(value?: string) {
   const raw = (value || DEFAULT_API_BASE).trim().replace(/\/+$/, '');
