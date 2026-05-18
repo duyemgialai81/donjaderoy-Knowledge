@@ -4,7 +4,9 @@ const DEFAULT_API_BASE = 'http://3.27.136.219:8080';
 
 function normalizeHttpUrl(value?: string) {
   const raw = (value || DEFAULT_API_BASE).trim().replace(/\/+$/, '');
+
   if (!raw) return DEFAULT_API_BASE;
+
   const httpUrl = raw.startsWith('ws://')
     ? `http://${raw.slice('ws://'.length)}`
     : raw.startsWith('wss://')
@@ -13,19 +15,8 @@ function normalizeHttpUrl(value?: string) {
         ? raw
         : `http://${raw}`;
 
-  try {
-    const url = new URL(httpUrl);
-    const isLocalHost = ['localhost', '127.0.0.1', '0.0.0.0'].includes(url.hostname);
-    const isHttpsPage = typeof window !== 'undefined' && window.location.protocol === 'https:';
-    if (isHttpsPage && url.protocol === 'http:' && !isLocalHost) {
-      url.protocol = 'https:';
-    }
-    return url.toString().replace(/\/+$/, '');
-  } catch {
-    return httpUrl;
-  }
+  return httpUrl.replace(/\/+$/, '');
 }
-
 export const API_BASE = normalizeHttpUrl(import.meta.env.VITE_API_URL);
 export const WS_BASE = normalizeHttpUrl(import.meta.env.VITE_WS_URL || `${API_BASE}/ws`);
 
