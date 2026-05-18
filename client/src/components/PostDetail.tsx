@@ -110,45 +110,33 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
 
     const token = localStorage.getItem('ksp_auth_token') || "";
     const client = new Client({
-      webSocketFactory: () => new SockJS(import.meta.env.VITE_WS_URL || 'https://donjaderoy-knowledge.onrender.com/ws'),
+      webSocketFactory: () => new SockJS(api.getWebSocketUrl()),
       connectHeaders: { Authorization: `Bearer ${token}` },
       debug: () => {}, 
       onConnect: () => {
-        
-        // 📢 LOA 1: BÀI VIẾT ĐƯỢC LIKE
         client.subscribe(`/topic/post/${post.id}/likes`, (message) => {
           setCurrentLikesCount(Number(message.body)); 
         });
-
-        // 📢 LOA 2: CÓ BÌNH LUẬN MỚI
         client.subscribe(`/topic/post/${post.id}/new-comment`, (message) => {
           const newComment = JSON.parse(message.body);
-          
           setPostComments(prev => {
             const isMyOwnComment = tempCommentIdsRef.current.has(newComment.content);
             let cleanList = prev;
-            
             if (isMyOwnComment) {
                 cleanList = prev.filter(c => !(c.id.startsWith("temp_") && c.content === newComment.content));
                 tempCommentIdsRef.current.delete(newComment.content);
             }
-
             if (cleanList.some(c => c.id === newComment.id)) return cleanList;
             return [...cleanList, newComment];
           });
-
           api.getUser(newComment.authorId, token).then(u => {
             if (u) setCommentAuthors(old => ({ ...old, [u.id]: u }));
           });
         });
-
-        // 📢 LOA 3: CÓ BÌNH LUẬN BỊ XÓA
         client.subscribe(`/topic/post/${post.id}/delete-comment`, (message) => {
             const deletedId = message.body;
             setPostComments(prev => prev.filter(c => c.id !== deletedId && c.parentId !== deletedId));
         });
-
-        // 📢 LOA 4: BÌNH LUẬN ĐƯỢC LIKE/SỬA
         client.subscribe(`/topic/post/${post.id}/update-comment`, (message) => {
             const updatedComment = JSON.parse(message.body);
             setPostComments(prev => prev.map(c => c.id === updatedComment.id ? updatedComment : c));

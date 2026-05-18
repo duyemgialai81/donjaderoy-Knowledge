@@ -1,5 +1,22 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'https://donjaderoy-knowledge.onrender.com';
 import { localStorage_service } from './localStorage';
+
+const DEFAULT_API_BASE = 'http://localhost:8080';
+
+function normalizeHttpUrl(value?: string) {
+  const raw = (value || DEFAULT_API_BASE).trim().replace(/\/+$/, '');
+  if (!raw) return DEFAULT_API_BASE;
+  if (raw.startsWith('ws://')) return `http://${raw.slice('ws://'.length)}`;
+  if (raw.startsWith('wss://')) return `https://${raw.slice('wss://'.length)}`;
+  return /^https?:\/\//i.test(raw) ? raw : `http://${raw}`;
+}
+
+export const API_BASE = normalizeHttpUrl(import.meta.env.VITE_API_URL);
+export const WS_BASE = normalizeHttpUrl(import.meta.env.VITE_WS_URL || `${API_BASE}/ws`);
+
+export function getWebSocketUrl() {
+  return WS_BASE;
+}
+
 async function safeJson(res: Response) {
   try {
     return await res.json();
@@ -27,21 +44,26 @@ export async function request(method: string, path: string, body?: any, token?: 
     }
   }
 
-  const res = await fetch(`${API_BASE}${path}`, {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const res = await fetch(`${API_BASE}${normalizedPath}`, {
     method,
     headers,
-    body: body ? JSON.stringify(body) : undefined
+    body: body !== undefined ? JSON.stringify(body) : undefined
   });
 
   if (res.status === 401) {
     console.error(`401 UNAUTHORIZED for ${method} ${path}. Check if the Bearer Token is correctly stored/passed: ${_token ? 'Token present but invalid.' : 'Token is missing.'}`);
   }
 
+  const parsed = await safeJson(res);
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`API error: ${res.status} ${text}`);
+    const message = parsed?.message || JSON.stringify(parsed || {});
+    throw new Error(`API error: ${res.status} ${message}`);
   }
-  return safeJson(res);
+  if (parsed && typeof parsed === 'object' && parsed.isSuccess === false) {
+    throw new Error(parsed.message || 'Backend request failed');
+  }
+  return parsed;
 }
 
 function unwrapResponse(res: any) {
@@ -50,8 +72,14 @@ function unwrapResponse(res: any) {
   if (res.data && Array.isArray(res.data)) return res.data;
   if (res.data && res.data.data && Array.isArray(res.data.data)) return res.data.data;
   if (res.data && res.data.content && Array.isArray(res.data.content)) return res.data.content;
+  if (res.content && Array.isArray(res.content)) return res.content;
   if (res.items && Array.isArray(res.items)) return res.items;
   return res;
+}
+
+function unwrapData(res: any) {
+  if (!res) return res;
+  return res.data !== undefined ? res.data : res;
 }
 
 // ==================== AUTH ====================
@@ -199,16 +227,14 @@ export async function unlikePost(postId: string, token?: string) {
 
 export async function getPostLikesCount(postId: string, token?: string) {
   const res = await request('GET', `/api/posts-like/${encodeURIComponent(postId)}/likes/count`, undefined, token);
-  const innerResponse = res?.data; 
-  const count = innerResponse?.data; 
+  const count = unwrapData(res);
   return Number(count) || 0; 
 }
 
 export async function checkLikeStatus(postId: string, userId: string, token?: string) {
-  const res = await request('GET', `/api/posts-like/${encodeURIComponent(postId)}/like-status?userId=${encodeURIComponent(userId)}`, undefined, token);
-  const innerResponse = res?.data; 
-  const likeStatusDTO = innerResponse?.data;
-  const isLiked = likeStatusDTO?.liked; 
+  const res = await request('GET', `/api/posts-like/${encodeURIComponent(postId)}/like-status`, undefined, token);
+  const likeStatusDTO = unwrapData(res);
+  const isLiked = likeStatusDTO?.isLiked ?? likeStatusDTO?.liked ?? likeStatusDTO?.following ?? false;
   return Boolean(isLiked);
 }
 
@@ -263,17 +289,17 @@ export async function getSavedPosts(userId: string, token?: string) {
 
 export async function checkSavedPost(userId: string, postId: string, token?: string) {
   const res = await request('GET', `/api/saved-posts/check?userId=${encodeURIComponent(userId)}&postId=${encodeURIComponent(postId)}`, undefined, token);
-  return res?.data || res;
+  return unwrapData(res);
 }
 
 export async function getSavedPostsCount(userId: string, token?: string) {
   const res = await request('GET', `/api/saved-posts/${encodeURIComponent(userId)}/count`, undefined, token);
-  return res?.data || res;
+  return unwrapData(res);
 }
 
 // ==================== USERS ====================
 export async function getUsers(page = 0, size = 50) {
-  const res = await request('GET', `/api/users?page=${page}&size=${size}`);
+  const res = await request('GET', `/api/users/search?keyword=&page=${page}&size=${size}`);
   const users = unwrapResponse(res);
   if (Array.isArray(users)) return users.map(normalizeUser);
   return users;
@@ -333,7 +359,9 @@ export async function updateUserProfile(userId: string, data: any, token?: strin
 
 export async function searchUsers(keyword: string, page = 0, size = 10, token?: string) {
   const res = await request('GET', `/api/users/search?keyword=${encodeURIComponent(keyword)}&page=${page}&size=${size}`, undefined, token);
-  return res?.data || res;
+  const users = unwrapResponse(res);
+  if (Array.isArray(users)) return users.map(normalizeUser);
+  return users;
 }
 
 export async function getUserStats(userId: string, token?: string) {
@@ -434,12 +462,12 @@ export async function getBadgeProgress(userId: string, token?: string) {
 // ==================== NOTIFICATIONS ====================
 export async function getNotifications(userId: string, page = 0, size = 20, token?: string) {
   const res = await request('GET', `/api/notifications/${encodeURIComponent(userId)}?page=${page}&size=${size}`, undefined, token);
-  return res?.data || res;
+  return unwrapResponse(res);
 }
 
 export async function getUnreadNotificationsCount(userId: string, token?: string) {
   const res = await request('GET', `/api/notifications/${encodeURIComponent(userId)}/unread-count`, undefined, token);
-  return res?.data || res;
+  return unwrapData(res);
 }
 
 export async function markNotificationAsRead(id: string, token?: string) {
@@ -580,6 +608,7 @@ export async function deleteDevice(id: string, token?: string) {
 export default {
   // Core
   request,
+  getWebSocketUrl,
   
   // Auth
   login,
