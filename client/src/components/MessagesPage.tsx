@@ -680,29 +680,26 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
 
   useEffect(() => {
     const root = document.documentElement;
-    const previousBodyOverflow = document.body.style.overflow;
-    const previousOverscroll = root.style.overscrollBehaviorY;
+    let raf = 0;
 
     const updateVisualHeight = () => {
-      const height = Math.round(window.visualViewport?.height || window.innerHeight);
-      root.style.setProperty("--app-visual-height", `${height}px`);
+      window.cancelAnimationFrame(raf);
+      raf = window.requestAnimationFrame(() => {
+        const height = Math.round(window.visualViewport?.height || window.innerHeight);
+        root.style.setProperty("--app-visual-height", `${height}px`);
+      });
     };
 
     updateVisualHeight();
-    document.body.style.overflow = "hidden";
-    root.style.overscrollBehaviorY = "none";
 
     window.visualViewport?.addEventListener("resize", updateVisualHeight);
-    window.visualViewport?.addEventListener("scroll", updateVisualHeight);
     window.addEventListener("resize", updateVisualHeight);
     window.addEventListener("orientationchange", updateVisualHeight);
 
     return () => {
-      document.body.style.overflow = previousBodyOverflow;
-      root.style.overscrollBehaviorY = previousOverscroll;
+      window.cancelAnimationFrame(raf);
       root.style.removeProperty("--app-visual-height");
       window.visualViewport?.removeEventListener("resize", updateVisualHeight);
-      window.visualViewport?.removeEventListener("scroll", updateVisualHeight);
       window.removeEventListener("resize", updateVisualHeight);
       window.removeEventListener("orientationchange", updateVisualHeight);
     };

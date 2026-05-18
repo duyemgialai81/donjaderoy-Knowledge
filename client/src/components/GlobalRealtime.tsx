@@ -35,6 +35,8 @@ export function GlobalRealtime() {
   const stompRef = useRef<Client | null>(null);
   const pendingCallRef = useRef<any | null>(null);
   const notifiedCallIdsRef = useRef<Set<string>>(new Set());
+  const realtimeMessageIdsRef = useRef<Set<string>>(new Set());
+  const processedCallSignalsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const currentUserId = toId(user?.id);
@@ -77,11 +79,22 @@ export function GlobalRealtime() {
       heartbeatOutgoing: 10000,
       debug: () => {},
       onConnect: () => {
-        client.subscribe("/user/queue/messages", (frame) => {
+        const subscribeUserQueue = (queue: string, handler: (frame: any) => void) => {
+          [`/user/queue/${queue}`, `/user/${currentUserId}/queue/${queue}`].forEach((destination) => {
+            client.subscribe(destination, handler);
+          });
+        };
+
+        subscribeUserQueue("messages", (frame) => {
           const message = safeParse(frame.body);
           if (!message || toId(message.senderId) === currentUserId) return;
 
           const id = toId(message.id) || `message_${Date.now()}`;
+          if (realtimeMessageIdsRef.current.has(id)) return;
+          realtimeMessageIdsRef.current.add(id);
+          if (realtimeMessageIdsRef.current.size > 300) {
+            realtimeMessageIdsRef.current = new Set(Array.from(realtimeMessageIdsRef.current).slice(-150));
+          }
           const description = message.content || "Bạn có tin nhắn mới.";
           emitRealtimeNotification({
             id,
@@ -98,12 +111,21 @@ export function GlobalRealtime() {
           });
         });
 
-        client.subscribe("/user/queue/call", (frame) => {
+        subscribeUserQueue("call", (frame) => {
           const event = safeParse(frame.body);
           if (!event) return;
           const callId = toId(event.callId);
           const senderId = toId(event.senderId);
           if (!callId || senderId === currentUserId) return;
+
+          const signalDataKey =
+            typeof event.signalData === "string" ? event.signalData : JSON.stringify(event.signalData || "");
+          const signalKey = `${callId}:${senderId}:${toId(event.type)}:${signalDataKey}`;
+          if (processedCallSignalsRef.current.has(signalKey)) return;
+          processedCallSignalsRef.current.add(signalKey);
+          if (processedCallSignalsRef.current.size > 500) {
+            processedCallSignalsRef.current = new Set(Array.from(processedCallSignalsRef.current).slice(-250));
+          }
 
           if (event.type === "start") {
             const next = mergePendingCall(event);
@@ -134,8 +156,8 @@ export function GlobalRealtime() {
               });
               toast(title, {
                 description: `${fallbackName} đang gọi cho bạn`,
-                duration: 3000,
-                action: { label: "Mở", onClick: openMessages },
+                duration: 15000,
+                action: { label: "Mở tin nhắn", onClick: openMessages },
               });
             }
             return;
@@ -155,7 +177,7 @@ export function GlobalRealtime() {
           }
         });
 
-        client.subscribe("/user/queue/errors", (frame) => {
+        subscribeUserQueue("errors", (frame) => {
           const message = safeParse(frame.body) || frame.body;
           if (message) console.warn("[Realtime]", message);
         });
