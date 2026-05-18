@@ -1,6 +1,6 @@
 import { localStorage_service } from './localStorage';
 
-const DEFAULT_API_BASE = 'https://vananhcs-face-id.hf.space';
+const DEFAULT_API_BASE = 'donjaderoy81-knowledge.hf.space';
 
 function normalizeHttpUrl(value?: string) {
   const raw = (value || DEFAULT_API_BASE).trim().replace(/\/+$/, '');
