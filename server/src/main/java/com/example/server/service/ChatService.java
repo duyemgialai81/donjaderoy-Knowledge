@@ -117,6 +117,7 @@ public class ChatService {
 
         List<ChatDTO.ConversationItem> items = myParticipants.getContent().stream()
                 .map(myPart -> buildConversationItem(userId, myPart))
+                .filter(item -> item.getStatus() == null || !"blocked".equalsIgnoreCase(item.getStatus()))
                 .sorted((a, b) -> {
                     if (a.getLastMessageTime() == null) return 1;
                     if (b.getLastMessageTime() == null) return -1;
@@ -256,6 +257,42 @@ public class ChatService {
     @Transactional
     public void markConversationAsRead(String conversationId, String userId) {
         markConversationAsRead(conversationId, userId, LocalDateTime.now());
+    }
+
+    @Transactional
+    public ChatDTO.ConversationItem acceptConversationRequest(String conversationId, String userId) {
+        if (!hasText(conversationId)) {
+            throw new IllegalArgumentException("conversationId is required");
+        }
+
+        ConversationParticipantId id = new ConversationParticipantId(conversationId, userId);
+        ConversationParticipant participant = participantRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("User is not a participant of this conversation"));
+
+        if (participant.getStatus() == ConversationParticipant.ParticipantStatus.blocked) {
+            throw new IllegalStateException("Conversation request was rejected");
+        }
+
+        participant.setStatus(ConversationParticipant.ParticipantStatus.accepted);
+        participant.setLastReadAt(LocalDateTime.now());
+        participantRepository.save(participant);
+        touchConversation(conversationId, LocalDateTime.now());
+        return buildConversationItem(userId, participant);
+    }
+
+    @Transactional
+    public void rejectConversationRequest(String conversationId, String userId) {
+        if (!hasText(conversationId)) {
+            throw new IllegalArgumentException("conversationId is required");
+        }
+
+        ConversationParticipantId id = new ConversationParticipantId(conversationId, userId);
+        ConversationParticipant participant = participantRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("User is not a participant of this conversation"));
+
+        participant.setStatus(ConversationParticipant.ParticipantStatus.blocked);
+        participantRepository.save(participant);
+        touchConversation(conversationId, LocalDateTime.now());
     }
 
     public Set<String> getParticipantIds(String conversationId) {

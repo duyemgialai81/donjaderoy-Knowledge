@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -105,6 +106,29 @@ public class ChatController {
         try {
             chatService.markConversationAsRead(conversationId, principal.getName());
             return new ResponseObject<>(true, "Da danh dau da doc");
+        } catch (Exception e) {
+            return ResponseObject.error(e.getMessage());
+        }
+    }
+
+    @RequestMapping(value = "/conversations/{conversationId}/accept", method = {RequestMethod.PUT, RequestMethod.POST})
+    public ResponseObject acceptConversationRequest(@PathVariable String conversationId, Principal principal) {
+        if (principal == null) return ResponseObject.error("Unauthorized: User not authenticated.");
+        try {
+            ChatDTO.ConversationItem item = chatService.acceptConversationRequest(conversationId, principal.getName());
+            broadcastToConversation(conversationId, "/queue/conversation-updates", item);
+            return new ResponseObject<>(item, "Da chap nhan tin nhan");
+        } catch (Exception e) {
+            return ResponseObject.error(e.getMessage());
+        }
+    }
+
+    @RequestMapping(value = "/conversations/{conversationId}/reject", method = {RequestMethod.PUT, RequestMethod.POST})
+    public ResponseObject rejectConversationRequest(@PathVariable String conversationId, Principal principal) {
+        if (principal == null) return ResponseObject.error("Unauthorized: User not authenticated.");
+        try {
+            chatService.rejectConversationRequest(conversationId, principal.getName());
+            return new ResponseObject<>(true, "Da tu choi tin nhan");
         } catch (Exception e) {
             return ResponseObject.error(e.getMessage());
         }

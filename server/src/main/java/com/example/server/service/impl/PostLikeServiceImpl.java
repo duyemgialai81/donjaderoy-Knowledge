@@ -56,7 +56,9 @@ public class PostLikeServiceImpl implements PostLikeService {
         if (p.isEmpty()) return ResponseObject.error("Không tìm thấy bài viết");
 
         if (postLikeRepository.existsByPostIdAndUserId(postId, userId)) {
-            return ResponseObject.error("Bạn đã thích bài viết này rồi");
+            int currentLikesCount = syncPostLikesCount(p.get(), postId);
+            broadcastLikesCount(postId, currentLikesCount);
+            return ResponseObject.success(currentLikesCount, "Đã đồng bộ lượt thích");
         }
 
         PostLike like = PostLike.builder()
@@ -67,18 +69,10 @@ public class PostLikeServiceImpl implements PostLikeService {
         postLikeRepository.save(like);
 
         Post post = p.get();
-        // Tăng đếm Like
-        int newLikesCount = (post.getLikesCount() == null ? 0 : post.getLikesCount()) + 1;
-        post.setLikesCount(newLikesCount);
-        postRepository.save(post);
+        int newLikesCount = syncPostLikesCount(post, postId);
 
         // 📢 LOA STOMP: Phát ngay tổng số Like MỚI cho mọi người đang xem bài viết này
-        try {
-            messagingTemplate.convertAndSend("/topic/post/" + postId + "/likes", newLikesCount);
-            System.out.println("❤️ [STOMP] Bài viết " + postId + " vừa lên " + newLikesCount + " Likes");
-        } catch (Exception e) {
-            System.out.println("❌ Lỗi khi gửi thông báo Like bài viết qua STOMP: " + e.getMessage());
-        }
+        broadcastLikesCount(postId, newLikesCount);
 
         String authorId = post.getAuthorId();
         if (!authorId.equals(userId)) {
@@ -95,7 +89,7 @@ public class PostLikeServiceImpl implements PostLikeService {
             );
         }
 
-        return ResponseObject.success(null, "Đã thích bài viết");
+        return ResponseObject.success(newLikesCount, "Đã thích bài viết");
     }
 
 // ============================================================
@@ -110,35 +104,48 @@ public class PostLikeServiceImpl implements PostLikeService {
 
         List<PostLike> likes = postLikeRepository.findByPostIdAndUserId(postId, userId);
 
-        if (likes.isEmpty()) return ResponseObject.error("Bạn chưa thích bài viết này");
+        if (likes.isEmpty()) {
+            int currentLikesCount = syncPostLikesCount(p.get(), postId);
+            broadcastLikesCount(postId, currentLikesCount);
+            return ResponseObject.success(currentLikesCount, "Đã đồng bộ lượt thích");
+        }
 
         postLikeRepository.deleteAll(likes);
+        postLikeRepository.flush();
 
         Post post = p.get();
-        // Giảm đếm Like (không bao giờ được âm)
-        int newLikesCount = Math.max(0, (post.getLikesCount() == null ? 0 : post.getLikesCount()) - 1);
-        post.setLikesCount(newLikesCount);
-        postRepository.save(post);
+        int newLikesCount = syncPostLikesCount(post, postId);
 
         // 📢 LOA STOMP: Phát ngay tổng số Like MỚI (Bị giảm đi)
-        try {
-            messagingTemplate.convertAndSend("/topic/post/" + postId + "/likes", newLikesCount);
-            System.out.println("💔 [STOMP] Bài viết " + postId + " vừa rớt xuống " + newLikesCount + " Likes");
-        } catch (Exception e) {
-            System.out.println("❌ Lỗi khi gửi thông báo Bỏ Like bài viết qua STOMP: " + e.getMessage());
-        }
+        broadcastLikesCount(postId, newLikesCount);
 
         String authorId = post.getAuthorId();
         if (!authorId.equals(userId)) {
             deductPointsFromUser(authorId, POINTS_LIKE, "Bỏ like");
         }
 
-        return ResponseObject.success(null, "Đã bỏ thích");
+        return ResponseObject.success(newLikesCount, "Đã bỏ thích");
     }
 
     // ============================================================
 // HÀM HELPER
 // ============================================================
+    private int syncPostLikesCount(Post post, String postId) {
+        long actualCount = postLikeRepository.countByPostId(postId);
+        int safeCount = (int) Math.min(actualCount, Integer.MAX_VALUE);
+        post.setLikesCount(safeCount);
+        postRepository.save(post);
+        return safeCount;
+    }
+
+    private void broadcastLikesCount(String postId, int likesCount) {
+        try {
+            messagingTemplate.convertAndSend("/topic/post/" + postId + "/likes", likesCount);
+        } catch (Exception e) {
+            System.out.println("Lỗi khi gửi thông báo Like bài viết qua STOMP: " + e.getMessage());
+        }
+    }
+
     private void awardPointsToUser(String userId, int points, String reason) {
         userRepository.findById(userId).ifPresent(user -> {
             int currentPoints = user.getPoints() == null ? 0 : user.getPoints();

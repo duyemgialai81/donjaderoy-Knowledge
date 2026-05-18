@@ -33,7 +33,7 @@ public class PostLikeController {
     }
     @GetMapping("/{postId}/likes/count")
     public ResponseObject<?>listLikeCount(@PathVariable String postId) {
-        return new ResponseObject<>(postLikeService.getPostLikesCount(postId),"Hiển Thị Dữ liệu thành công");
+        return postLikeService.getPostLikesCount(postId);
     }
     @GetMapping("/{postId}/like-status")
     public ResponseObject<?>listLikeCountUserCheck(@PathVariable String postId,Principal principal) {
@@ -41,7 +41,7 @@ public class PostLikeController {
             return ResponseObject.error("Unauthorized: User not authenticated.");
         }
         String userId = principal.getName();
-        return new ResponseObject<>(postLikeService.checkLikeStatus(postId,userId),"Hiển Thị Dữ liệu thành công");
+        return postLikeService.checkLikeStatus(postId,userId);
     }
 
 }
