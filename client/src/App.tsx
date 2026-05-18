@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "./lib/authContext";
 import { localStorage_service } from "./lib/localStorage";
 import { ProfilePage } from "./components/ProfilePage";
@@ -23,6 +23,7 @@ import { toast } from "sonner";
 
 function MainApp() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id: profileUserId } = useParams<{ id: string }>();
   const { user, isAuthenticated, isAdmin, logout, updateUser, setUser } = useAuth();
   
@@ -98,6 +99,14 @@ function MainApp() {
       });
     }
   }, [profileUserId]);
+
+  useEffect(() => {
+    if (profileUserId) return;
+    if (location.pathname === "/tin-nhan") setCurrentView("messages");
+    else if (location.pathname === "/cai-dat") setCurrentView("settings");
+    else if (location.pathname === "/quan-tri" && isAdmin) setCurrentView("admin");
+    else if (location.pathname === "/") setCurrentView("feed");
+  }, [location.pathname, profileUserId, isAdmin]);
 
   const filteredPosts = useMemo(() => {
     let filtered = [...posts];
@@ -178,15 +187,27 @@ function MainApp() {
   }, [posts, searchQuery, filters, activeTab, currentUser?.id]);
 
   const handleLikePost = async (postId: string) => {
+    const token = localStorage_service.getAuthToken() || undefined;
+    const userId = currentUser?.id;
+
+    try {
+      const [likes, liked] = await Promise.all([
+        api.getPostLikesCount(postId, token),
+        userId ? api.checkLikeStatus(postId, userId, token) : Promise.resolve(false),
+      ]);
+
+      setPosts(prev => prev.map(post =>
+        post.id === postId ? { ...post, likes, isLiked: liked } : post
+      ));
+      setSelectedPost(prev =>
+        prev?.id === postId ? { ...prev, likes, isLiked: liked } : prev
+      );
+      toast.success(liked ? "Đã thích bài viết!" : "Đã bỏ thích bài viết");
+    } catch (error) {
+      console.error("[LIKE SYNC] Error:", error);
+    }
+
     await refreshUserData();
-    setPosts(prev => prev.map(post => {
-      if (post.id === postId) {
-        const isLiked = !post.isLiked;
-        toast.success(isLiked ? "Đã thích bài viết!" : "Đã bỏ thích bài viết");
-        return { ...post, isLiked, likes: isLiked ? post.likes + 1 : post.likes - 1 };
-      }
-      return post;
-    }));
   };
 
   const handleCreatePost = async (newPostData: any) => {
@@ -293,7 +314,7 @@ function MainApp() {
   // 3. Messages View
   if (currentView === "messages") {
     return (
-      <div className="h-screen flex flex-col overflow-hidden bg-white">
+      <div className="h-screen flex flex-col overflow-hidden bg-white" style={{ height: "100dvh" }}>
         <Header {...headerProps} />
         <div className="flex-1 min-h-0 overflow-hidden bg-white">
           <MessagesPage currentUser={currentUser} />

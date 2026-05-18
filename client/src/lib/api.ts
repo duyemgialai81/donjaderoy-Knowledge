@@ -1,6 +1,6 @@
 import { localStorage_service } from './localStorage';
 
-const DEFAULT_API_BASE = 'donjaderoy81-knowledge.hf.space';
+const DEFAULT_API_BASE = 'https://donjaderoy81-knowledge.hf.space';
 
 function normalizeHttpUrl(value?: string) {
   const raw = (value || DEFAULT_API_BASE).trim().replace(/\/+$/, '');
@@ -31,6 +31,19 @@ export const WS_BASE = normalizeHttpUrl(import.meta.env.VITE_WS_URL || `${API_BA
 
 export function getWebSocketUrl() {
   return WS_BASE;
+}
+
+export function normalizeAvatarUrl(value?: string, seed?: string) {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  const fallbackSeed = encodeURIComponent(seed || 'default');
+  const fallback = `https://api.dicebear.com/7.x/avataaars/svg?seed=${fallbackSeed}`;
+
+  if (!raw) return fallback;
+  if (/^(https?:|data:|blob:)/i.test(raw)) return raw;
+  if (/^\/?avt\d+\.png$/i.test(raw)) return fallback;
+
+  const normalizedPath = raw.startsWith('/') ? raw : `/${raw}`;
+  return `${API_BASE}${normalizedPath}`;
 }
 
 async function safeJson(res: Response) {
@@ -96,6 +109,30 @@ function unwrapResponse(res: any) {
 function unwrapData(res: any) {
   if (!res) return res;
   return res.data !== undefined ? res.data : res;
+}
+
+function unwrapDeepData(res: any) {
+  let value = res;
+  for (let i = 0; i < 6; i += 1) {
+    if (!value || typeof value !== 'object' || !('data' in value)) break;
+    value = value.data;
+  }
+  return value;
+}
+
+function toFiniteNumber(value: any, fallback = 0) {
+  const payload = unwrapDeepData(value);
+  if (typeof payload === 'number') return Number.isFinite(payload) ? payload : fallback;
+  if (typeof payload === 'string') {
+    const parsed = Number(payload);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  if (payload && typeof payload === 'object') {
+    for (const key of ['count', 'likesCount', 'likes', 'total', 'value']) {
+      if (payload[key] !== undefined) return toFiniteNumber(payload[key], fallback);
+    }
+  }
+  return fallback;
 }
 
 // ==================== AUTH ====================
@@ -202,9 +239,7 @@ function normalizePost(post: any) {
 
 function normalizeUser(user: any) {
   if (!user) return user;
-  const avatar = user.avatar && typeof user.avatar === 'string' && user.avatar.trim()
-    ? user.avatar
-    : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id || user.email || 'default'}`;
+  const avatar = normalizeAvatarUrl(user.avatar, user.id || user.email || 'default');
   return { ...user, avatar: avatar };
 }
 
@@ -243,13 +278,12 @@ export async function unlikePost(postId: string, token?: string) {
 
 export async function getPostLikesCount(postId: string, token?: string) {
   const res = await request('GET', `/api/posts-like/${encodeURIComponent(postId)}/likes/count`, undefined, token);
-  const count = unwrapData(res);
-  return Number(count) || 0; 
+  return toFiniteNumber(res, 0);
 }
 
 export async function checkLikeStatus(postId: string, userId: string, token?: string) {
   const res = await request('GET', `/api/posts-like/${encodeURIComponent(postId)}/like-status`, undefined, token);
-  const likeStatusDTO = unwrapData(res);
+  const likeStatusDTO = unwrapDeepData(res);
   const isLiked = likeStatusDTO?.isLiked ?? likeStatusDTO?.liked ?? likeStatusDTO?.following ?? false;
   return Boolean(isLiked);
 }
@@ -625,6 +659,7 @@ export default {
   // Core
   request,
   getWebSocketUrl,
+  normalizeAvatarUrl,
   
   // Auth
   login,

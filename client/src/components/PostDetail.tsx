@@ -11,7 +11,7 @@ import { formatDistanceToNow } from "date-fns";
 import { vi } from "date-fns/locale";
 import { toast } from "sonner";
 import { Client } from '@stomp/stompjs';
-import SockJS from 'sockjs-client';
+import { createSockJsConnection } from "../lib/realtime";
 
 // Hàm xử lý thời gian chuẩn để sửa lỗi Java trả về mảng [2026, 4, 24...]
 const parseDateSafely = (dateVal: any): Date => {
@@ -29,6 +29,32 @@ interface PostDetailProps {
   onClose: () => void;
   onLike: () => void;
   onUserUpdate?: () => void;
+}
+
+function readLikeCountPayload(payload: any) {
+  let value = payload;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    try {
+      value = JSON.parse(trimmed);
+    } catch {
+      const parsed = Number(trimmed);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+  }
+
+  for (let i = 0; i < 5; i += 1) {
+    if (!value || typeof value !== "object") break;
+    if (value.data !== undefined) value = value.data;
+    else if (value.count !== undefined) value = value.count;
+    else if (value.likesCount !== undefined) value = value.likesCount;
+    else if (value.likes !== undefined) value = value.likes;
+    else break;
+  }
+
+  const count = Number(value);
+  return Number.isFinite(count) ? count : null;
 }
 
 export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: PostDetailProps) {
@@ -49,6 +75,16 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
   const stompClientRef = useRef<Client | null>(null);
   const tempCommentIdsRef = useRef<Set<string>>(new Set());
 
+  const syncLikeState = async (token?: string) => {
+    const [count, liked] = await Promise.all([
+      api.getPostLikesCount(post.id, token),
+      currentUser?.id ? api.checkLikeStatus(post.id, currentUser.id, token) : Promise.resolve(false),
+    ]);
+    setCurrentLikesCount(count);
+    setIsLiked(Boolean(liked));
+    return { count, liked: Boolean(liked) };
+  };
+
   // ==========================================
   // 1. TẢI DỮ LIỆU BAN ĐẦU
   // ==========================================
@@ -57,6 +93,11 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
     if (!isOpen) return;
 
     const token = localStorage.getItem('ksp_auth_token') || undefined; 
+
+    syncLikeState(token).catch(() => {
+      setCurrentLikesCount(post.likes || 0);
+      setIsLiked(Boolean(post.isLiked));
+    });
     
     api.getUser(post.authorId, token).then((res) => {
       if (mounted) setAuthor(res || null);
@@ -110,12 +151,13 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
 
     const token = localStorage.getItem('ksp_auth_token') || "";
     const client = new Client({
-      webSocketFactory: () => new SockJS(api.getWebSocketUrl()),
+      webSocketFactory: () => createSockJsConnection(),
       connectHeaders: { Authorization: `Bearer ${token}` },
       debug: () => {}, 
       onConnect: () => {
         client.subscribe(`/topic/post/${post.id}/likes`, (message) => {
-          setCurrentLikesCount(Number(message.body)); 
+          const nextCount = readLikeCountPayload(message.body);
+          if (nextCount !== null) setCurrentLikesCount(nextCount);
         });
         client.subscribe(`/topic/post/${post.id}/new-comment`, (message) => {
           const newComment = JSON.parse(message.body);
@@ -162,10 +204,12 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
   // ==========================================
   const handleLikeToggle = async () => {
     if (!currentUser?.id || isLiking) return;
+    const token = localStorage.getItem('ksp_auth_token') || undefined;
+    const prevIsLiked = isLiked;
+    const prevLikesCount = currentLikesCount;
+
     try {
       setIsLiking(true);
-      const token = localStorage.getItem('ksp_auth_token') || undefined;
-      const prevIsLiked = isLiked;
 
       setIsLiked(!prevIsLiked);
       setCurrentLikesCount(prev => prevIsLiked ? Math.max(0, prev - 1) : prev + 1);
@@ -175,10 +219,14 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
       } else {
         await api.likePost(post.id, token);
       }
+      await syncLikeState(token);
       
       onLike();
       if (onUserUpdate) onUserUpdate();
     } catch (err) {
+      setIsLiked(prevIsLiked);
+      setCurrentLikesCount(prevLikesCount);
+      try { await syncLikeState(token); } catch {}
       toast.error('Lỗi khi cập nhật lượt thích');
     } finally {
       setIsLiking(false);

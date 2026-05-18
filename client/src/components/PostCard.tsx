@@ -10,13 +10,39 @@ import { formatDistanceToNow } from "date-fns";
 import { vi } from "date-fns/locale";
 import { toast } from "sonner";
 import { Client } from '@stomp/stompjs';
-import SockJS from 'sockjs-client';
+import { createSockJsConnection } from "../lib/realtime";
 
 interface PostCardProps {
   post: Post;
   onClick: () => void;
   onLike: () => void;
   onUserUpdate?: () => void; 
+}
+
+function readLikeCountPayload(payload: any) {
+  let value = payload;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    try {
+      value = JSON.parse(trimmed);
+    } catch {
+      const parsed = Number(trimmed);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+  }
+
+  for (let i = 0; i < 5; i += 1) {
+    if (!value || typeof value !== "object") break;
+    if (value.data !== undefined) value = value.data;
+    else if (value.count !== undefined) value = value.count;
+    else if (value.likesCount !== undefined) value = value.likesCount;
+    else if (value.likes !== undefined) value = value.likes;
+    else break;
+  }
+
+  const count = Number(value);
+  return Number.isFinite(count) ? count : null;
 }
 
 export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps) {
@@ -32,6 +58,16 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
   const [viewsCount, setViewsCount] = useState(post.views || 0);
 
   const stompClientRef = useRef<Client | null>(null);
+
+  const syncLikeState = async (token?: string) => {
+    const [count, liked] = await Promise.all([
+      api.getPostLikesCount(post.id, token),
+      currentUser?.id ? api.checkLikeStatus(post.id, currentUser.id, token) : Promise.resolve(false),
+    ]);
+    setLikesCount(count);
+    setIsLiked(Boolean(liked));
+    return { count, liked: Boolean(liked) };
+  };
 
   // Đồng bộ lại State nếu component cha truyền props mới xuống
   useEffect(() => {
@@ -73,12 +109,13 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
   useEffect(() => {
     const token = localStorage.getItem('ksp_auth_token') || "";
     const client = new Client({
-      webSocketFactory: () => new SockJS(api.getWebSocketUrl()),
+      webSocketFactory: () => createSockJsConnection(),
       connectHeaders: { Authorization: `Bearer ${token}` },
       debug: () => {},
       onConnect: () => {
         client.subscribe(`/topic/post/${post.id}/likes`, (message) => {
-          setLikesCount(Number(message.body));
+          const nextCount = readLikeCountPayload(message.body);
+          if (nextCount !== null) setLikesCount(nextCount);
         });
         client.subscribe(`/topic/post/${post.id}/new-comment`, () => {
           setCommentsCount(prev => prev + 1);
@@ -113,11 +150,12 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
     e.stopPropagation();
     if (!currentUser?.id || isLoading) return;
 
+    const token = localStorage.getItem('ksp_auth_token') || undefined;
+    const prevIsLiked = isLiked;
+    const prevLikesCount = likesCount;
+
     try {
       setIsLoading(true);
-      const token = localStorage.getItem('ksp_auth_token') || undefined;
-
-      const prevIsLiked = isLiked;
       setIsLiked(!prevIsLiked);
       setLikesCount(prev => prevIsLiked ? Math.max(0, prev - 1) : prev + 1);
 
@@ -126,10 +164,14 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
       } else {
         await api.likePost(post.id, token);
       }
+      await syncLikeState(token);
       
       onLike();
       if (onUserUpdate) onUserUpdate();
     } catch (err) {
+      setIsLiked(prevIsLiked);
+      setLikesCount(prevLikesCount);
+      try { await syncLikeState(token); } catch {}
       toast.error('Lỗi khi cập nhật lượt thích');
     } finally {
       setIsLoading(false);

@@ -38,6 +38,22 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: "/tin-nhan",
+        element: (
+          <ProtectedRoute>
+            <App />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/cai-dat",
+        element: (
+          <ProtectedRoute>
+            <App />
+          </ProtectedRoute>
+        ),
+      },
+      {
         path: "/bang-xep-hang",
         element: (
           <ProtectedRoute>

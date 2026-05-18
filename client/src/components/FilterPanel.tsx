@@ -33,22 +33,22 @@ export function FilterPanel({ filters, onFilterChange, isOpen, onToggle }: Filte
   const [majors, setMajors] = useState<{ id: string; name: string; code?: string }[]>([]);
   const allTags = ['React', 'TypeScript', 'Node.js', 'Python', 'Java', 'SQL', 'UI/UX', 'Security', 'DevOps', 'Mobile'];
 
-  // Update available subjects when major changes
+  // Fetch majors from API
   useEffect(() => {
     let mounted = true;
-    // fetch majors from API 
     api.getMajors(token || undefined).then((res) => {
       const list = Array.isArray(res) ? res : (res?.data || res);
-      if (mounted && Array.isArray(list)) setMajors(list.map((m: any) => ({ id: m.id, name: m.name, code: m.code })));
+      if (mounted && Array.isArray(list))
+        setMajors(list.map((m: any) => ({ id: m.id, name: m.name, code: m.code })));
     }).catch(() => {
       setMajors([]);
     });
     return () => { mounted = false; };
   }, [token]);
 
+  // Fetch subjects when major changes
   useEffect(() => {
     if (filters.major && filters.major !== 'all') {
-      // filters.major is the major id; fetch major details including subjects
       const majorId = filters.major;
       api.getSubjectsForMajor(majorId, token || undefined).then((subjects) => {
         setAvailableSubjects(subjects || []);
@@ -67,10 +67,10 @@ export function FilterPanel({ filters, onFilterChange, isOpen, onToggle }: Filte
   }, [filters.major, majors, token]);
 
   const handleMajorChange = (value: string) => {
-    onFilterChange({ 
-      ...filters, 
+    onFilterChange({
+      ...filters,
       major: value,
-      subject: 'all' // Reset subject when major changes
+      subject: 'all',
     });
   };
 
@@ -86,34 +86,37 @@ export function FilterPanel({ filters, onFilterChange, isOpen, onToggle }: Filte
       major: 'all',
       subject: 'all',
       tags: [],
-      sortBy: 'newest'
+      sortBy: 'newest',
     });
   };
 
-  const activeFiltersCount = 
+  const activeFiltersCount =
     (filters.major !== 'all' ? 1 : 0) +
     (filters.subject !== 'all' ? 1 : 0) +
     filters.tags.length;
 
   const selectedMajor = majors.find((m: any) => m.id === filters.major);
-  const selectedSubject = availableSubjects.find((s: any) => s.id === filters.subject) || availableSubjects.find((s: any) => s.name === filters.subject);
+  const selectedSubject =
+    availableSubjects.find((s: any) => s.id === filters.subject) ||
+    availableSubjects.find((s: any) => s.name === filters.subject);
 
   return (
     <div className="bg-white border-b sticky top-16 z-40">
-      <div className="container mx-auto px-4 py-4">
-        {/* Filter Bar - Always Visible */}
-        <div className="flex items-center gap-4">
-          {/* Step 1: Select Major */}
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <GraduationCap className="h-4 w-4 text-orange-600" />
-              <span className="text-sm">Bước 1: Chọn ngành học</span>
+      <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
+
+        {/* ── Filter Bar ── */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-3 lg:gap-4">
+
+          {/* Step 1: Ngành học */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <GraduationCap className="h-4 w-4 text-orange-600 shrink-0" />
+              <span className="text-xs sm:text-sm text-gray-600 truncate">
+                Bước 1: Chọn ngành học
+              </span>
             </div>
-            <Select
-              value={filters.major}
-              onValueChange={handleMajorChange}
-            >
-              <SelectTrigger className="w-full">
+            <Select value={filters.major} onValueChange={handleMajorChange}>
+              <SelectTrigger className="w-full text-sm h-9 sm:h-10">
                 <SelectValue placeholder="Chọn ngành học..." />
               </SelectTrigger>
               <SelectContent>
@@ -121,7 +124,7 @@ export function FilterPanel({ filters, onFilterChange, isOpen, onToggle }: Filte
                 {majors.map((major) => (
                   <SelectItem key={major.id} value={major.id}>
                     <div className="flex items-center gap-2">
-                      <span className="text-orange-600">{major.code}</span>
+                      <span className="text-orange-600 font-medium">{major.code}</span>
                       <span>{major.name}</span>
                     </div>
                   </SelectItem>
@@ -130,23 +133,29 @@ export function FilterPanel({ filters, onFilterChange, isOpen, onToggle }: Filte
             </Select>
           </div>
 
-          {/* Step 2: Select Subject */}
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <BookOpen className="h-4 w-4 text-blue-600" />
-              <span className="text-sm">Bước 2: Chọn môn học</span>
+          {/* Step 2: Môn học */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <BookOpen className="h-4 w-4 text-blue-600 shrink-0" />
+              <span className="text-xs sm:text-sm text-gray-600 truncate">
+                Bước 2: Chọn môn học
+              </span>
             </div>
             <Select
               value={filters.subject}
-              onValueChange={(value: string) => onFilterChange({ ...filters, subject: value })}
+              onValueChange={(value: string) =>
+                onFilterChange({ ...filters, subject: value })
+              }
               disabled={!filters.major || filters.major === 'all'}
             >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder={
-                  filters.major && filters.major !== 'all' 
-                    ? "Chọn môn học..." 
-                    : "Chọn ngành trước..."
-                } />
+              <SelectTrigger className="w-full text-sm h-9 sm:h-10">
+                <SelectValue
+                  placeholder={
+                    filters.major && filters.major !== 'all'
+                      ? 'Chọn môn học...'
+                      : 'Chọn ngành trước...'
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả môn học</SelectItem>
@@ -164,17 +173,21 @@ export function FilterPanel({ filters, onFilterChange, isOpen, onToggle }: Filte
             </Select>
           </div>
 
-          {/* Step 3: Sort */}
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <SearchIcon className="h-4 w-4 text-green-600" />
-              <span className="text-sm">Bước 3: Sắp xếp kết quả</span>
+          {/* Step 3: Sắp xếp */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <SearchIcon className="h-4 w-4 text-green-600 shrink-0" />
+              <span className="text-xs sm:text-sm text-gray-600 truncate">
+                Bước 3: Sắp xếp kết quả
+              </span>
             </div>
             <Select
               value={filters.sortBy}
-              onValueChange={(value: string) => onFilterChange({ ...filters, sortBy: value })}
+              onValueChange={(value: string) =>
+                onFilterChange({ ...filters, sortBy: value })
+              }
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full text-sm h-9 sm:h-10">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -187,28 +200,35 @@ export function FilterPanel({ filters, onFilterChange, isOpen, onToggle }: Filte
             </Select>
           </div>
 
-          {/* Advanced Filter Toggle */}
-          <div className="flex items-center gap-2">
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 sm:shrink-0">
             {activeFiltersCount > 0 && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={clearFilters}
-                className="text-red-600 hover:text-red-700"
+                className="text-red-600 hover:text-red-700 px-2 sm:px-3"
               >
-                <X className="h-4 w-4 mr-1" />
-                Xóa bộ lọc
+                <X className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline">Xóa bộ lọc</span>
               </Button>
             )}
             <Button
-              variant={isOpen ? "default" : "outline"}
+              variant={isOpen ? 'default' : 'outline'}
+              size="sm"
               onClick={onToggle}
-              className={isOpen ? "bg-orange-600 hover:bg-orange-700" : ""}
+              className={`
+                h-9 sm:h-10 flex-1 sm:flex-none
+                ${isOpen ? 'bg-orange-600 hover:bg-orange-700 text-white' : ''}
+              `}
             >
-              <Filter className="h-4 w-4 mr-2" />
-              Tùy chỉnh
+              <Filter className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Tùy chỉnh</span>
               {activeFiltersCount > 0 && (
-                <Badge variant="destructive" className="ml-2 bg-white text-orange-600">
+                <Badge
+                  variant="destructive"
+                  className="ml-1.5 bg-white text-orange-600 text-xs px-1.5 py-0"
+                >
                   {activeFiltersCount}
                 </Badge>
               )}
@@ -216,20 +236,26 @@ export function FilterPanel({ filters, onFilterChange, isOpen, onToggle }: Filte
           </div>
         </div>
 
-        {/* Active Filter Path */}
+        {/* ── Active Filter Breadcrumb ── */}
         {(filters.major !== 'all' || filters.subject !== 'all') && (
-          <div className="mt-3 flex items-center gap-2 text-sm">
-            <span className="text-gray-500">Đang xem:</span>
-            <div className="flex items-center gap-2">
+          <div className="mt-2.5 flex items-center gap-2 text-xs sm:text-sm flex-wrap">
+            <span className="text-gray-500 shrink-0">Đang xem:</span>
+            <div className="flex items-center gap-1.5 flex-wrap">
               {filters.major !== 'all' && (
                 <>
-                    <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
-                      {selectedMajor?.code} - {selectedMajor?.name}
+                  <Badge
+                    variant="outline"
+                    className="bg-orange-50 text-orange-700 border-orange-200 text-xs"
+                  >
+                    {selectedMajor?.code} - {selectedMajor?.name}
                   </Badge>
                   {filters.subject !== 'all' && (
                     <>
-                      <ChevronRight className="h-3 w-3 text-gray-400" />
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                      <ChevronRight className="h-3 w-3 text-gray-400 shrink-0" />
+                      <Badge
+                        variant="outline"
+                        className="bg-blue-50 text-blue-700 border-blue-200 text-xs"
+                      >
                         {selectedSubject?.code} - {selectedSubject?.name || filters.subject}
                       </Badge>
                     </>
@@ -240,26 +266,28 @@ export function FilterPanel({ filters, onFilterChange, isOpen, onToggle }: Filte
           </div>
         )}
 
-        {/* Expanded Advanced Filters */}
+        {/* ── Advanced Filters Panel ── */}
         {isOpen && (
-          <div className="mt-4 p-4 border rounded-lg bg-gray-50">
-            <h3 className="mb-3 flex items-center gap-2">
+          <div className="mt-3 p-3 sm:p-4 border rounded-lg bg-gray-50">
+            <h3 className="mb-3 text-sm sm:text-base flex items-center gap-2 font-medium">
               <Filter className="h-4 w-4" />
               Bộ lọc nâng cao
             </h3>
 
             <div className="space-y-4">
-              {/* Tags Filter */}
+              {/* Tags */}
               <div>
-                <label className="text-sm mb-2 block">Lọc theo Tags</label>
+                <label className="text-xs sm:text-sm mb-2 block text-gray-600">
+                  Lọc theo Tags
+                </label>
                 <div className="flex flex-wrap gap-2 p-3 border rounded bg-white">
                   {allTags.map((tag) => (
                     <Badge
                       key={tag}
-                      variant={filters.tags.includes(tag) ? "default" : "outline"}
-                      className={`cursor-pointer transition-all ${
-                        filters.tags.includes(tag) 
-                          ? 'bg-orange-600 hover:bg-orange-700' 
+                      variant={filters.tags.includes(tag) ? 'default' : 'outline'}
+                      className={`cursor-pointer transition-all text-xs sm:text-sm ${
+                        filters.tags.includes(tag)
+                          ? 'bg-orange-600 hover:bg-orange-700'
                           : 'hover:bg-orange-100'
                       }`}
                       onClick={() => handleTagToggle(tag)}
@@ -275,12 +303,12 @@ export function FilterPanel({ filters, onFilterChange, isOpen, onToggle }: Filte
 
               {/* Subject Info */}
               {filters.subject && filters.subject !== 'all' && selectedSubject && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <h4 className="mb-2">Thông tin môn học</h4>
-                  <div className="grid grid-cols-3 gap-4 text-sm">
+                <div className="p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h4 className="mb-2 text-sm font-medium">Thông tin môn học</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs sm:text-sm">
                     <div>
                       <span className="text-gray-600">Mã môn:</span>
-                      <p className="text-blue-600">{selectedSubject.code}</p>
+                      <p className="text-blue-600 font-medium">{selectedSubject.code}</p>
                     </div>
                     <div>
                       <span className="text-gray-600">Số tín chỉ:</span>

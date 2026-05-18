@@ -5,21 +5,22 @@ import { ScrollArea } from "./ui/scroll-area";
 import { Badge } from "./ui/badge";
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
 } from "./ui/sheet";
-import { Separator } from "./ui/separator";
 import { formatDistanceToNow } from "date-fns";
 import { vi } from "date-fns/locale";
 import api from "../lib/api";
 import { useAuth } from "../lib/authContext";
+import { REALTIME_NOTIFICATION_EVENT, type RealtimeNotificationDetail } from "../lib/realtime";
 
 interface Notification {
   id: string;
-  type: "like" | "comment" | "follow" | "badge" | "mention";
+  type: "like" | "comment" | "follow" | "badge" | "mention" | "message" | "call";
   title: string;
   description?: string;
   createdAt: string;
@@ -89,6 +90,39 @@ export function NotificationCenter() {
     return () => clearInterval(interval);
   }, [currentUser?.id]);
 
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    const handleRealtimeNotification = (event: Event) => {
+      const detail = (event as CustomEvent<RealtimeNotificationDetail>).detail;
+      if (!detail?.title) return;
+
+      const id = detail.id || `realtime_${Date.now()}`;
+      const type: Notification["type"] =
+        detail.type === "message" || detail.type === "call" ? detail.type : "mention";
+
+      const icon = type === "call" ? "📞" : type === "message" ? "💬" : "📢";
+      const item: Notification = {
+        id,
+        type,
+        title: detail.title,
+        description: detail.description,
+        createdAt: detail.createdAt || new Date().toISOString(),
+        read: false,
+        icon,
+        link: detail.link,
+      };
+
+      setNotifications((prev) => {
+        if (prev.some((notification) => notification.id === id)) return prev;
+        return [item, ...prev];
+      });
+    };
+
+    window.addEventListener(REALTIME_NOTIFICATION_EVENT, handleRealtimeNotification);
+    return () => window.removeEventListener(REALTIME_NOTIFICATION_EVENT, handleRealtimeNotification);
+  }, [currentUser?.id]);
+
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const handleMarkAllAsRead = async () => {
@@ -134,6 +168,8 @@ export function NotificationCenter() {
       case "comment": return "bg-blue-100 text-blue-500";
       case "follow": return "bg-emerald-100 text-emerald-500";
       case "badge": return "bg-amber-100 text-amber-500";
+      case "message": return "bg-sky-100 text-sky-500";
+      case "call": return "bg-orange-100 text-orange-500";
       case "mention": return "bg-purple-100 text-purple-500";
       default: return "bg-slate-100 text-slate-500";
     }
@@ -151,30 +187,41 @@ export function NotificationCenter() {
           )}
         </Button>
       </SheetTrigger>
-      <SheetContent className="w-full sm:max-w-md p-0 overflow-hidden bg-[#FAFCFF] border-l border-slate-200/60 shadow-2xl">
-        <div className="bg-white/80 backdrop-blur-xl px-6 py-5 border-b border-slate-100 shadow-sm relative z-10">
-          <SheetHeader>
-            <SheetTitle className="flex items-center justify-between text-xl">
+      <SheetContent className="!left-0 !right-0 !top-0 !bottom-0 !h-[100dvh] !w-screen !max-w-none !gap-0 overflow-hidden border-l-0 bg-[#FAFCFF] p-0 shadow-2xl sm:!left-auto sm:!w-[28rem] sm:!max-w-md sm:border-l [&>[data-slot=sheet-close]]:hidden">
+        <div className="relative z-10 shrink-0 border-b border-slate-100 bg-white/90 px-4 py-4 shadow-sm backdrop-blur-xl sm:px-6 sm:py-5">
+          <SheetHeader className="gap-1 p-0 text-left">
+            <SheetTitle className="flex min-w-0 items-start justify-between gap-3 text-xl [&>span:first-child]:min-w-0 [&>span:first-child]:truncate">
               <span className="font-extrabold text-slate-900 tracking-tight">Thông báo</span>
               {unreadCount > 0 && (
-                <Badge className="text-[11px] font-bold uppercase tracking-wider bg-orange-100 text-orange-700 hover:bg-orange-100 border-none px-2.5 py-0.5 rounded-full shadow-sm">
+                <Badge className="shrink-0 rounded-full border-none bg-orange-100 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-orange-700 shadow-sm hover:bg-orange-100">
                   {unreadCount} mới
                 </Badge>
               )}
+              <SheetClose asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="ml-1 h-9 w-9 shrink-0 rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-orange-50 hover:text-orange-600 sm:h-8 sm:w-8"
+                  aria-label="Đóng thông báo"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </SheetClose>
             </SheetTitle>
-            <SheetDescription className="text-slate-500 text-sm font-medium mt-1">
+            <SheetDescription className="mt-1 pr-12 text-sm font-medium leading-5 text-slate-500 sm:pr-0">
               Cập nhật hoạt động và tương tác gần đây
             </SheetDescription>
           </SheetHeader>
           
           {notifications.length > 0 && (
-            <div className="flex gap-3 mt-5">
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleMarkAllAsRead}
                 disabled={unreadCount === 0}
-                className="flex-1 h-10 text-xs font-semibold text-slate-700 border-slate-200 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700 rounded-xl transition-all shadow-sm"
+                className="h-10 min-w-0 overflow-hidden whitespace-nowrap rounded-xl border-slate-200 px-2 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 sm:px-3"
               >
                 <CheckCheck className="h-4 w-4 mr-2 text-emerald-500" /> Đã đọc hết
               </Button>
@@ -182,7 +229,7 @@ export function NotificationCenter() {
                 variant="outline"
                 size="sm"
                 onClick={handleClearAll}
-                className="flex-1 h-10 text-xs font-semibold text-slate-700 border-slate-200 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-700 rounded-xl transition-all shadow-sm"
+                className="h-10 min-w-0 overflow-hidden whitespace-nowrap rounded-xl border-rose-100 px-2 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 sm:px-3"
               >
                 <Trash2 className="h-4 w-4 mr-2 text-rose-500" /> Xóa tất cả
               </Button>
@@ -190,8 +237,8 @@ export function NotificationCenter() {
           )}
         </div>
 
-        <ScrollArea className="h-[calc(100vh-160px)] px-5 py-5">
-          <div className="space-y-3 pb-6">
+        <ScrollArea className="min-h-0 flex-1 px-3 py-3 sm:px-5 sm:py-5">
+          <div className="space-y-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
             {notifications.length > 0 ? (
               notifications.map((notification) => (
                 <div
