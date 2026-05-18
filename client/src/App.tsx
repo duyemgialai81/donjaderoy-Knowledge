@@ -314,7 +314,7 @@ function MainApp() {
   // 3. Messages View
   if (currentView === "messages") {
     return (
-      <div className="h-screen flex flex-col overflow-hidden bg-white" style={{ height: "100dvh" }}>
+      <div className="h-screen flex flex-col overflow-hidden bg-white" style={{ height: "var(--app-visual-height, 100dvh)" }}>
         <Header {...headerProps} />
         <div className="flex-1 min-h-0 overflow-hidden bg-white">
           <MessagesPage currentUser={currentUser} />

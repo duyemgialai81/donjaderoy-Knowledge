@@ -673,6 +673,41 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     }
   };
 
+  const handleComposerFocus = () => {
+    window.setTimeout(() => messagesEndRef.current?.scrollIntoView({ block: "end" }), 120);
+    window.setTimeout(() => messagesEndRef.current?.scrollIntoView({ block: "end" }), 360);
+  };
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousOverscroll = root.style.overscrollBehaviorY;
+
+    const updateVisualHeight = () => {
+      const height = Math.round(window.visualViewport?.height || window.innerHeight);
+      root.style.setProperty("--app-visual-height", `${height}px`);
+    };
+
+    updateVisualHeight();
+    document.body.style.overflow = "hidden";
+    root.style.overscrollBehaviorY = "none";
+
+    window.visualViewport?.addEventListener("resize", updateVisualHeight);
+    window.visualViewport?.addEventListener("scroll", updateVisualHeight);
+    window.addEventListener("resize", updateVisualHeight);
+    window.addEventListener("orientationchange", updateVisualHeight);
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      root.style.overscrollBehaviorY = previousOverscroll;
+      root.style.removeProperty("--app-visual-height");
+      window.visualViewport?.removeEventListener("resize", updateVisualHeight);
+      window.visualViewport?.removeEventListener("scroll", updateVisualHeight);
+      window.removeEventListener("resize", updateVisualHeight);
+      window.removeEventListener("orientationchange", updateVisualHeight);
+    };
+  }, []);
+
   // ==================== COMPUTED ====================
   const isSearchMode = searchQuery.trim().length > 0;
   const inboxConvs = conversations.filter((c) => c.status === "accepted");
@@ -921,7 +956,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
             <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
               {/* Messages */}
               <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, background: "#f8f8f8" }}>
-                <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 0" }}>
+                <div className="messages-scroll-area" style={{ flex: 1, overflowY: "auto", padding: "16px 16px 0" }}>
                   {isLoadingMessages ? (
                     <div style={{ display: "flex", justifyContent: "center", padding: 32, color: ORANGE }}>
                       <Loader2 size={24} style={{ animation: "spin 1s linear infinite" }} />
@@ -1028,16 +1063,17 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                     </div>
                   </div>
                 ) : (
-                  <div style={{ padding: "10px 14px", background: "#fff", borderTop: "1px solid #f0f0f0", flexShrink: 0 }}>
-                    <form onSubmit={handleSendMessage} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div className="message-composer" style={{ padding: "10px 14px", background: "#fff", borderTop: "1px solid #f0f0f0", flexShrink: 0 }}>
+                    <form className="message-composer-form" onSubmit={handleSendMessage} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <button type="button" style={{ width: 38, height: 38, borderRadius: 10, border: "1px solid #f0f0f0", background: "#f8f8f8", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#b0b0b0", flexShrink: 0 }}><ImageIcon size={17} /></button>
-                      <div style={{ flex: 1, display: "flex", alignItems: "center", background: "#f8f8f8", borderRadius: 20, border: "1px solid #f0f0f0", padding: "0 12px" }}>
+                      <div className="message-composer-input" style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", background: "#f8f8f8", borderRadius: 20, border: "1px solid #f0f0f0", padding: "0 12px" }}>
                         <input
                           type="text"
                           value={messageInput}
                           onChange={handleInputChange}
+                          onFocus={handleComposerFocus}
                           placeholder="Nhập tin nhắn..."
-                          style={{ flex: 1, border: "none", background: "transparent", fontSize: 14, outline: "none", height: 42, color: "#1a1a1a" }}
+                          style={{ flex: 1, minWidth: 0, border: "none", background: "transparent", fontSize: 16, outline: "none", height: 42, color: "#1a1a1a" }}
                         />
                         <button type="button" style={{ background: "none", border: "none", cursor: "pointer", color: "#b0b0b0", display: "flex", alignItems: "center" }}><Smile size={17} /></button>
                       </div>
@@ -1233,9 +1269,18 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
         @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
         @keyframes pulse { 0%,100% { opacity: 0.6; transform: scale(1); } 50% { opacity: 0.3; transform: scale(1.1); } }
 
-        .messages-shell { width: 100%; }
+        .messages-shell {
+          width: 100%;
+          height: 100%;
+          min-height: 0;
+          overflow: hidden;
+        }
         .chat-list-panel { display: flex !important; }
         .mobile-back-btn { display: none; }
+        .messages-scroll-area {
+          -webkit-overflow-scrolling: touch;
+          overscroll-behavior: contain;
+        }
 
         @media (max-width: 768px) {
           .messages-rail {
@@ -1254,13 +1299,30 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
           .messages-shell.has-selected-chat .chat-list-panel {
             display: none !important;
           }
+          .messages-shell.has-selected-chat .messages-rail {
+            display: none !important;
+          }
           .messages-shell:not(.has-selected-chat) .chat-thread-panel {
             display: none !important;
           }
           .messages-shell.has-selected-chat .chat-thread-panel {
             display: flex !important;
-            width: calc(100vw - 56px) !important;
-            flex: 1 1 auto !important;
+            width: 100vw !important;
+            max-width: 100vw !important;
+            flex: 1 1 100% !important;
+          }
+          .messages-shell.has-selected-chat .messages-scroll-area {
+            padding: 12px 12px 0 !important;
+          }
+          .message-composer {
+            padding: 8px 10px max(8px, env(safe-area-inset-bottom)) !important;
+          }
+          .message-composer-form {
+            gap: 8px !important;
+            min-width: 0 !important;
+          }
+          .message-composer-input input {
+            font-size: 16px !important;
           }
           .chat-info-panel {
             display: none !important;
