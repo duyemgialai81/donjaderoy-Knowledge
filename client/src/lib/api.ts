@@ -5,9 +5,25 @@ const DEFAULT_API_BASE = 'donjaderoy81-knowledge.hf.space';
 function normalizeHttpUrl(value?: string) {
   const raw = (value || DEFAULT_API_BASE).trim().replace(/\/+$/, '');
   if (!raw) return DEFAULT_API_BASE;
-  if (raw.startsWith('ws://')) return `http://${raw.slice('ws://'.length)}`;
-  if (raw.startsWith('wss://')) return `https://${raw.slice('wss://'.length)}`;
-  return /^https?:\/\//i.test(raw) ? raw : `http://${raw}`;
+  const httpUrl = raw.startsWith('ws://')
+    ? `http://${raw.slice('ws://'.length)}`
+    : raw.startsWith('wss://')
+      ? `https://${raw.slice('wss://'.length)}`
+      : /^https?:\/\//i.test(raw)
+        ? raw
+        : `http://${raw}`;
+
+  try {
+    const url = new URL(httpUrl);
+    const isLocalHost = ['localhost', '127.0.0.1', '0.0.0.0'].includes(url.hostname);
+    const isHttpsPage = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    if (isHttpsPage && url.protocol === 'http:' && !isLocalHost) {
+      url.protocol = 'https:';
+    }
+    return url.toString().replace(/\/+$/, '');
+  } catch {
+    return httpUrl;
+  }
 }
 
 export const API_BASE = normalizeHttpUrl(import.meta.env.VITE_API_URL);
