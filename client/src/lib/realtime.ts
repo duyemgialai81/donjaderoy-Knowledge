@@ -18,9 +18,7 @@ export interface RealtimeNotificationDetail {
 }
 
 export function createSockJsConnection() {
-  return new SockJS(api.getWebSocketUrl(), undefined, {
-    transports: ["xhr-streaming", "xhr-polling"],
-  });
+  return new SockJS(api.getWebSocketUrl());
 }
 
 export function emitRealtimeNotification(detail: RealtimeNotificationDetail) {

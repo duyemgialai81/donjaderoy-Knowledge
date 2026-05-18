@@ -147,6 +147,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   const selectedChatIdRef = useRef<string | null>(null);
   const conversationsRef = useRef<ConversationItem[]>([]);
   const callSessionRef = useRef<CallSession | null>(null);
+  const realtimeMessageIdsRef = useRef<Set<string>>(new Set());
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -475,8 +476,22 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
           try { return JSON.parse(s); } catch { return null; }
         };
 
-        client.subscribe(`/user/queue/messages`, (frame) => {
+        const subscribeUserQueue = (queue: string, handler: (frame: any) => void) => {
+          [`/user/queue/${queue}`, `/user/${currentUserId}/queue/${queue}`].forEach((destination) => {
+            client.subscribe(destination, handler);
+          });
+        };
+
+        subscribeUserQueue("messages", (frame) => {
           const msg = safe(frame.body); if (!msg) return;
+          const messageKey = toId(msg.id) || `${toId(msg.conversationId)}:${toId(msg.senderId)}:${toId(msg.createdAt)}:${toId(msg.content)}`;
+          if (messageKey && realtimeMessageIdsRef.current.has(messageKey)) return;
+          if (messageKey) {
+            realtimeMessageIdsRef.current.add(messageKey);
+            if (realtimeMessageIdsRef.current.size > 300) {
+              realtimeMessageIdsRef.current = new Set(Array.from(realtimeMessageIdsRef.current).slice(-150));
+            }
+          }
           const convId = toId(msg.conversationId), senderId = toId(msg.senderId), receiverId = toId(msg.receiverId);
           const peerId = getEventPeerId(senderId, receiverId);
           setConversations((prev) => {
@@ -505,14 +520,14 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
           }
         });
 
-        client.subscribe(`/user/queue/typing`, (frame) => {
+        subscribeUserQueue("typing", (frame) => {
           const ev = safe(frame.body); if (!ev) return;
           const isTyping = ev.isTyping === true || ev.typing === true;
           const convKey = toId(ev.conversationId), peerId = getEventPeerId(ev.senderId, ev.receiverId);
           setTypingUsers((prev) => { const next = { ...prev }; if (convKey) next[convKey] = isTyping; if (peerId) next[`new_${peerId}`] = isTyping; return next; });
         });
 
-        client.subscribe(`/user/queue/call`, (frame) => {
+        subscribeUserQueue("call", (frame) => {
           const ev = safe(frame.body); if (!ev) return;
           const { type, callId, callType, senderId, signalData } = ev;
           const parsed = safe(signalData);
@@ -549,7 +564,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
           }
         });
 
-        client.subscribe(`/user/queue/reactions`, (frame) => {
+        subscribeUserQueue("reactions", (frame) => {
           const reaction = safe(frame.body); if (!reaction) return;
           setMessages((prev) => prev.map((msg) => {
             if (msg.id !== reaction.messageId) return msg;
