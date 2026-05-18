@@ -1130,7 +1130,6 @@
 //     </div>
 //   );
 // }
-
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { Client } from "@stomp/stompjs";
@@ -1171,6 +1170,8 @@ import {
   Users,
   BookOpen,
   Settings,
+  Plus,
+  Bell,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
@@ -1233,6 +1234,12 @@ interface CallSession {
 // ==================== CONSTANTS ====================
 const REACTION_EMOJIS = ['❤️', '😂', '👍', '😮', '😢', '🎉', '👎', '😡', '⭐', '🔥'];
 
+// ── ORANGE THEME ──
+const ORANGE = "#FF6B35";
+const ORANGE_LIGHT = "#FFF0EB";
+const ORANGE_MID = "#FF8A5C";
+const ORANGE_DARK = "#E85520";
+
 const formatCallDuration = (seconds: number) => {
   const mins = Math.floor(seconds / 60).toString().padStart(2, "0");
   const secs = Math.floor(seconds % 60).toString().padStart(2, "0");
@@ -1255,13 +1262,6 @@ const NAV_ITEMS = [
   { icon: Users, label: "Danh bạ", key: "contacts" },
   { icon: Users, label: "Nhóm", key: "groups" },
   { icon: BookOpen, label: "Lưu trữ", key: "saved" },
-];
-
-// ==================== CHAT FILTER TABS ====================
-const CHAT_TABS = [
-  { label: "Tất cả", value: "all" },
-  { label: "Chưa đọc", value: "unread", badge: true },
-  { label: "Ưa thích", value: "favorite" },
 ];
 
 export default function MessagesPage({ currentUser }: MessagesPageProps) {
@@ -1400,19 +1400,12 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     const peerId = getConversationPeerId(selectedChat);
     const convId = selectedChat.id.startsWith("new_") ? "" : selectedChat.id;
 
-    // Try common Spring Boot REST patterns in order
     const attempts = [
-      // Pattern 1: PUT /api/chat/conversations/{conversationId}/accept
       () => convId ? api.request("PUT", `/api/chat/conversations/${convId}/accept`) : Promise.reject(new Error("no convId")),
-      // Pattern 2: POST /api/chat/conversations/{conversationId}/accept
       () => convId ? api.request("POST", `/api/chat/conversations/${convId}/accept`) : Promise.reject(new Error("no convId")),
-      // Pattern 3: PUT /api/chat/accept with body
       () => api.request("PUT", `/api/chat/accept`, { conversationId: convId, targetUserId: peerId }),
-      // Pattern 4: POST /api/chat/accept with body
       () => api.request("POST", `/api/chat/accept`, { conversationId: convId, targetUserId: peerId }),
-      // Pattern 5: PUT /api/chat/requests/{targetUserId}/accept
       () => api.request("PUT", `/api/chat/requests/${peerId}/accept`),
-      // Pattern 6: POST /api/chat/requests/{targetUserId}/accept
       () => api.request("POST", `/api/chat/requests/${peerId}/accept`),
     ];
 
@@ -1423,30 +1416,19 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
         succeeded = true;
         break;
       } catch (e: any) {
-        // Only stop retrying on non-403/404 errors (e.g. network failure)
         const status = e?.status ?? e?.response?.status;
-        if (status && status !== 403 && status !== 404 && status !== 405) {
-          break;
-        }
-        // 403/404/405 → try next pattern
+        if (status && status !== 403 && status !== 404 && status !== 405) break;
         continue;
       }
     }
 
     if (succeeded) {
-      setConversations((prev) =>
-        prev.map((c) => c.id === selectedChat.id ? { ...c, status: "accepted" } : c)
-      );
+      setConversations((prev) => prev.map((c) => c.id === selectedChat.id ? { ...c, status: "accepted" } : c));
       toast.success("Đã chấp nhận tin nhắn");
     } else {
-      // Fallback: update UI optimistically and notify user to reload if backend call failed
-      setConversations((prev) =>
-        prev.map((c) => c.id === selectedChat.id ? { ...c, status: "accepted" } : c)
-      );
-      toast.warning("Đã cập nhật giao diện, nhưng server chưa phản hồi đúng endpoint. Vui lòng kiểm tra API.");
-      console.warn("[handleAcceptRequest] Tất cả endpoint đều thất bại. Cần cung cấp đúng API path cho chức năng chấp nhận tin nhắn.");
+      setConversations((prev) => prev.map((c) => c.id === selectedChat.id ? { ...c, status: "accepted" } : c));
+      toast.warning("Đã cập nhật giao diện, nhưng server chưa phản hồi đúng endpoint.");
     }
-
     setIsAcceptingRequest(false);
   };
 
@@ -1465,27 +1447,18 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
 
     let succeeded = false;
     for (const attempt of attempts) {
-      try {
-        await attempt();
-        succeeded = true;
-        break;
-      } catch (e: any) {
+      try { await attempt(); succeeded = true; break; }
+      catch (e: any) {
         const status = e?.status ?? e?.response?.status;
         if (status && status !== 403 && status !== 404 && status !== 405) break;
         continue;
       }
     }
 
-    // Always remove from UI regardless of backend result
     setConversations((prev) => prev.filter((c) => c.id !== selectedChat.id));
     setSelectedChatId(null);
-
-    if (succeeded) {
-      toast.success("Đã từ chối tin nhắn");
-    } else {
-      toast.warning("Đã xóa khỏi giao diện. Vui lòng kiểm tra API endpoint từ chối.");
-      console.warn("[handleRejectRequest] Tất cả endpoint đều thất bại.");
-    }
+    if (succeeded) toast.success("Đã từ chối tin nhắn");
+    else toast.warning("Đã xóa khỏi giao diện. Vui lòng kiểm tra API endpoint.");
   };
 
   // ==================== CALL SIGNALING ====================
@@ -1808,12 +1781,9 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
 
   const displayList: ConversationItem[] = isSearchMode
     ? searchResults.map((u) => ({ id: `new_${toId(u.id)}`, targetUserId: toId(u.id), name: u.name, avatar: u.avatar, lastMessage: "Nhắn để mở cuộc trò chuyện ngay.", time: "", unread: 0, isOnline: true, status: "accepted" }))
-    : chatFilter === "all"
-    ? conversations
-    : chatFilter === "unread"
-    ? conversations.filter((c) => (c.unread || 0) > 0)
-    : chatFilter === "pending"
-    ? pendingConvs
+    : chatFilter === "all" ? conversations
+    : chatFilter === "unread" ? conversations.filter((c) => (c.unread || 0) > 0)
+    : chatFilter === "pending" ? pendingConvs
     : conversations;
 
   const selectedPeerId = selectedChat ? getConversationPeerId(selectedChat) : "";
@@ -1822,64 +1792,114 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
 
   // ==================== RENDER ====================
   return (
-    <div style={{ display: "flex", height: "100%", minHeight: 0, background: "#f5f5f5", fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
-      {/* ── LEFT NAV ── */}
-      <nav style={{ width: 72, minWidth: 72, background: "#fff", borderRight: "1px solid #ececec", display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 16, gap: 4, zIndex: 10 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 12, background: "#6c63ff", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
+    <div style={{ display: "flex", height: "100%", minHeight: 0, background: "#f0f2f5", fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+
+      {/* ── LEFT SIDEBAR NAV ── */}
+      <nav style={{
+        width: 64, minWidth: 64, background: "#fff",
+        borderRight: "1px solid #f0f0f0",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        paddingTop: 12, paddingBottom: 12, gap: 2, zIndex: 10,
+      }}>
+        {/* Logo */}
+        <div style={{
+          width: 44, height: 44, borderRadius: 14,
+          background: `linear-gradient(135deg, ${ORANGE}, ${ORANGE_MID})`,
+          display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16,
+          boxShadow: `0 4px 12px ${ORANGE}40`,
+        }}>
           <MessageCircle size={20} color="#fff" />
         </div>
+
         {NAV_ITEMS.map((item) => (
           <button
             key={item.key}
             type="button"
             title={item.label}
             style={{
-              width: 48, height: 48, borderRadius: 14, border: "none", cursor: "pointer",
-              background: activeNav === item.key ? "#ede9ff" : "transparent",
-              color: activeNav === item.key ? "#6c63ff" : "#9ca3af",
+              width: 44, height: 44, borderRadius: 12, border: "none", cursor: "pointer",
+              background: activeNav === item.key ? ORANGE_LIGHT : "transparent",
+              color: activeNav === item.key ? ORANGE : "#b0b0b0",
               display: "flex", alignItems: "center", justifyContent: "center",
               transition: "all 0.15s",
             }}
           >
-            <item.icon size={22} />
+            <item.icon size={20} />
           </button>
         ))}
+
         <div style={{ flex: 1 }} />
-        <div style={{ marginBottom: 16 }}>
-          <img src={getAvatarUrl(currentUser?.avatar, currentUserId)} alt="Me" style={{ width: 40, height: 40, borderRadius: 12, objectFit: "cover", border: "2px solid #6c63ff" }} />
+
+        {/* User avatar at bottom */}
+        <div style={{ position: "relative" }}>
+          <img
+            src={getAvatarUrl(currentUser?.avatar, currentUserId)}
+            alt="Me"
+            style={{ width: 36, height: 36, borderRadius: 10, objectFit: "cover", border: `2px solid ${ORANGE}` }}
+          />
+          <span style={{ position: "absolute", bottom: 0, right: 0, width: 10, height: 10, borderRadius: "50%", background: "#22c55e", border: "2px solid #fff" }} />
         </div>
       </nav>
 
-      {/* ── CHAT LIST ── */}
-      <div style={{
-        width: 320, minWidth: 260, maxWidth: 360, background: "#fff", borderRight: "1px solid #ececec",
-        display: selectedChat ? "none" : "flex", flexDirection: "column", height: "100%", minHeight: 0,
-        // Show on desktop always
-        ...(typeof window !== "undefined" && window.innerWidth >= 768 ? { display: "flex" } : {}),
-      }}
+      {/* ── CHAT LIST PANEL ── */}
+      <div
         className="chat-list-panel"
+        style={{
+          width: 320, minWidth: 260, maxWidth: 360, background: "#fff",
+          borderRight: "1px solid #f0f0f0",
+          display: "flex", flexDirection: "column", height: "100%", minHeight: 0,
+        }}
       >
         {/* Header */}
-        <div style={{ padding: "20px 16px 0", flexShrink: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: "#111", margin: 0 }}>Tin nhắn</h1>
-            <button type="button" style={{ width: 36, height: 36, borderRadius: 10, border: "1px solid #ececec", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af" }}>
-              <MoreHorizontal size={18} />
-            </button>
+        <div style={{ padding: "16px 16px 0", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: "#1a1a1a", margin: 0 }}>Tin nhắn</h1>
+            <div style={{ display: "flex", gap: 6 }}>
+              {/* Plus button - orange */}
+              <button type="button" style={{
+                width: 34, height: 34, borderRadius: 10,
+                border: "none", background: ORANGE, cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", color: "#fff",
+                boxShadow: `0 2px 8px ${ORANGE}50`,
+              }}>
+                <Plus size={16} />
+              </button>
+              <button type="button" style={{
+                width: 34, height: 34, borderRadius: 10,
+                border: "1px solid #f0f0f0", background: "#fff", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", color: "#b0b0b0",
+              }}>
+                <Bell size={16} />
+              </button>
+              <button type="button" style={{
+                width: 34, height: 34, borderRadius: 10,
+                border: "1px solid #f0f0f0", background: "#fff", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", color: "#b0b0b0",
+              }}>
+                <MoreHorizontal size={16} />
+              </button>
+            </div>
           </div>
+
           {/* Search */}
           <div style={{ position: "relative", marginBottom: 12 }}>
-            <Search size={16} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#9ca3af" }} />
+            <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#b0b0b0" }} />
             <input
               type="text"
               placeholder="Tìm kiếm..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ width: "100%", height: 40, borderRadius: 12, border: "1px solid #ececec", paddingLeft: 36, paddingRight: 12, fontSize: 14, outline: "none", boxSizing: "border-box", background: "#f8f8f8", color: "#111" }}
+              style={{
+                width: "100%", height: 38, borderRadius: 10,
+                border: "1px solid #f0f0f0", paddingLeft: 36, paddingRight: 12,
+                fontSize: 14, outline: "none", boxSizing: "border-box",
+                background: "#f8f8f8", color: "#1a1a1a",
+              }}
             />
           </div>
+
           {/* Filter tabs */}
-          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
             {[
               { label: "Tất cả", value: "all" },
               { label: `Chưa đọc${totalUnread > 0 ? ` (${totalUnread})` : ""}`, value: "unread" },
@@ -1890,10 +1910,12 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                 type="button"
                 onClick={() => setChatFilter(tab.value as any)}
                 style={{
-                  padding: "6px 14px", borderRadius: 20, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 500,
-                  background: chatFilter === tab.value ? "#6c63ff" : "#f0f0f0",
-                  color: chatFilter === tab.value ? "#fff" : "#666",
+                  padding: "5px 12px", borderRadius: 20, border: "none", cursor: "pointer",
+                  fontSize: 12, fontWeight: 600,
+                  background: chatFilter === tab.value ? ORANGE : "#f0f0f0",
+                  color: chatFilter === tab.value ? "#fff" : "#888",
                   transition: "all 0.15s",
+                  boxShadow: chatFilter === tab.value ? `0 2px 8px ${ORANGE}40` : "none",
                 }}
               >
                 {tab.label}
@@ -1905,13 +1927,15 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
         {/* Conversation List */}
         <div style={{ flex: 1, overflowY: "auto", padding: "4px 8px" }}>
           {isLoadingChats || isSearching ? (
-            <div style={{ display: "flex", justifyContent: "center", padding: 32, color: "#6c63ff" }}>
+            <div style={{ display: "flex", justifyContent: "center", padding: 32, color: ORANGE }}>
               <Loader2 size={24} style={{ animation: "spin 1s linear infinite" }} />
             </div>
           ) : displayList.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "48px 16px", color: "#9ca3af" }}>
+            <div style={{ textAlign: "center", padding: "48px 16px", color: "#b0b0b0" }}>
               <Inbox size={40} style={{ margin: "0 auto 12px", opacity: 0.4 }} />
-              <div style={{ fontSize: 14 }}>{isSearchMode ? "Không tìm thấy kết quả" : chatFilter === "pending" ? "Không có tin nhắn chờ" : "Chưa có hội thoại nào"}</div>
+              <div style={{ fontSize: 14 }}>
+                {isSearchMode ? "Không tìm thấy kết quả" : chatFilter === "pending" ? "Không có tin nhắn chờ" : "Chưa có hội thoại nào"}
+              </div>
             </div>
           ) : (
             displayList.map((chat) => {
@@ -1924,33 +1948,32 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                   type="button"
                   onClick={() => { setSelectedChatId(chat.id); setShowInfo(false); }}
                   style={{
-                    width: "100%", display: "flex", alignItems: "center", gap: 12,
-                    padding: "10px 10px", borderRadius: 14, border: "none", cursor: "pointer", textAlign: "left",
-                    background: isActive ? "#ede9ff" : "transparent",
-                    transition: "background 0.15s",
-                    boxSizing: "border-box",
+                    width: "100%", display: "flex", alignItems: "center", gap: 10,
+                    padding: "9px 10px", borderRadius: 12, border: "none", cursor: "pointer", textAlign: "left",
+                    background: isActive ? ORANGE_LIGHT : "transparent",
+                    transition: "background 0.15s", boxSizing: "border-box",
                   }}
                 >
                   <div style={{ position: "relative", flexShrink: 0 }}>
-                    <img src={avatar} alt={chat.name} style={{ width: 52, height: 52, borderRadius: 16, objectFit: "cover" }} />
+                    <img src={avatar} alt={chat.name} style={{ width: 48, height: 48, borderRadius: 14, objectFit: "cover" }} />
                     {chat.isOnline && chat.status !== "pending" && (
-                      <span style={{ position: "absolute", bottom: 1, right: 1, width: 12, height: 12, borderRadius: "50%", background: "#22c55e", border: "2px solid #fff" }} />
+                      <span style={{ position: "absolute", bottom: 1, right: 1, width: 11, height: 11, borderRadius: "50%", background: "#22c55e", border: "2px solid #fff" }} />
                     )}
                     {chat.status === "pending" && (
-                      <span style={{ position: "absolute", bottom: 1, right: 1, width: 12, height: 12, borderRadius: "50%", background: "#f59e0b", border: "2px solid #fff" }} />
+                      <span style={{ position: "absolute", bottom: 1, right: 1, width: 11, height: 11, borderRadius: "50%", background: "#f59e0b", border: "2px solid #fff" }} />
                     )}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: "#111", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 150 }}>{chat.name}</div>
-                      <div style={{ fontSize: 11, color: "#9ca3af", whiteSpace: "nowrap", marginLeft: 4 }}>{chat.time}</div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 140 }}>{chat.name}</div>
+                      <div style={{ fontSize: 11, color: "#b0b0b0", whiteSpace: "nowrap", marginLeft: 4 }}>{chat.time}</div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
-                      <div style={{ fontSize: 13, color: isTyping ? "#6c63ff" : "#9ca3af", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 170, fontStyle: isTyping ? "italic" : "normal" }}>
+                      <div style={{ fontSize: 12, color: isTyping ? ORANGE : "#9ca3af", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 160, fontStyle: isTyping ? "italic" : "normal" }}>
                         {isTyping ? "Đang nhập..." : chat.status === "pending" ? "📨 Tin nhắn chờ phê duyệt" : (chat.lastMessage || "")}
                       </div>
                       {(chat.unread || 0) > 0 && (
-                        <span style={{ background: "#6c63ff", color: "#fff", fontSize: 11, fontWeight: 700, borderRadius: 10, padding: "1px 7px", minWidth: 20, textAlign: "center", flexShrink: 0 }}>{chat.unread}</span>
+                        <span style={{ background: ORANGE, color: "#fff", fontSize: 11, fontWeight: 700, borderRadius: 10, padding: "1px 7px", minWidth: 20, textAlign: "center", flexShrink: 0 }}>{chat.unread}</span>
                       )}
                     </div>
                   </div>
@@ -1966,45 +1989,45 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
         {selectedChat ? (
           <>
             {/* Chat Header */}
-            <div style={{ height: 64, background: "#fff", borderBottom: "1px solid #ececec", display: "flex", alignItems: "center", padding: "0 16px", gap: 12, flexShrink: 0 }}>
+            <div style={{ height: 60, background: "#fff", borderBottom: "1px solid #f0f0f0", display: "flex", alignItems: "center", padding: "0 16px", gap: 10, flexShrink: 0 }}>
               <button
                 type="button"
                 onClick={() => setSelectedChatId(null)}
-                style={{ width: 36, height: 36, borderRadius: 10, border: "1px solid #ececec", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#6c63ff" }}
                 className="mobile-back-btn"
+                style={{ width: 34, height: 34, borderRadius: 10, border: "1px solid #f0f0f0", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: ORANGE }}
               >
-                <ChevronLeft size={20} />
+                <ChevronLeft size={18} />
               </button>
               <div style={{ position: "relative" }}>
-                <img src={selectedChatAvatar} alt={selectedChat.name} style={{ width: 44, height: 44, borderRadius: 14, objectFit: "cover" }} />
-                {selectedChat.isOnline && <span style={{ position: "absolute", bottom: 1, right: 1, width: 11, height: 11, borderRadius: "50%", background: "#22c55e", border: "2px solid #fff" }} />}
+                <img src={selectedChatAvatar} alt={selectedChat.name} style={{ width: 42, height: 42, borderRadius: 13, objectFit: "cover" }} />
+                {selectedChat.isOnline && <span style={{ position: "absolute", bottom: 1, right: 1, width: 10, height: 10, borderRadius: "50%", background: "#22c55e", border: "2px solid #fff" }} />}
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#111" }}>{selectedChat.name}</div>
-                <div style={{ fontSize: 12, color: selectedChat.status === "pending" ? "#f59e0b" : isSelectedTyping ? "#6c63ff" : "#22c55e" }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>{selectedChat.name}</div>
+                <div style={{ fontSize: 12, color: selectedChat.status === "pending" ? "#f59e0b" : isSelectedTyping ? ORANGE : "#22c55e" }}>
                   {selectedChat.status === "pending" ? "⏳ Chờ phê duyệt" : selectedStatus}
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button type="button" onClick={() => startCall("audio")} style={{ width: 36, height: 36, borderRadius: 10, border: "1px solid #ececec", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#6c63ff" }}><Phone size={17} /></button>
-                <button type="button" onClick={() => startCall("video")} style={{ width: 36, height: 36, borderRadius: 10, border: "1px solid #ececec", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#6c63ff" }}><Video size={17} /></button>
-                <button type="button" onClick={() => setShowInfo((p) => !p)} style={{ width: 36, height: 36, borderRadius: 10, border: "1px solid #ececec", background: showInfo ? "#ede9ff" : "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#6c63ff" }}><Info size={17} /></button>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button type="button" onClick={() => startCall("audio")} style={{ width: 34, height: 34, borderRadius: 10, border: "1px solid #f0f0f0", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: ORANGE }}><Phone size={16} /></button>
+                <button type="button" onClick={() => startCall("video")} style={{ width: 34, height: 34, borderRadius: 10, border: "1px solid #f0f0f0", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: ORANGE }}><Video size={16} /></button>
+                <button type="button" onClick={() => setShowInfo((p) => !p)} style={{ width: 34, height: 34, borderRadius: 10, border: "1px solid #f0f0f0", background: showInfo ? ORANGE_LIGHT : "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: ORANGE }}><Info size={16} /></button>
               </div>
             </div>
 
             <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
               {/* Messages */}
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, background: "#f8f8f8" }}>
                 <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 0" }}>
                   {isLoadingMessages ? (
-                    <div style={{ display: "flex", justifyContent: "center", padding: 32, color: "#6c63ff" }}>
+                    <div style={{ display: "flex", justifyContent: "center", padding: 32, color: ORANGE }}>
                       <Loader2 size={24} style={{ animation: "spin 1s linear infinite" }} />
                     </div>
                   ) : messages.length === 0 ? (
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 12, color: "#9ca3af", textAlign: "center", padding: 24 }}>
-                      <img src={selectedChatAvatar} alt="" style={{ width: 80, height: 80, borderRadius: 24, objectFit: "cover", marginBottom: 8, border: "3px solid #ede9ff" }} />
-                      <div style={{ fontSize: 18, fontWeight: 700, color: "#111" }}>{selectedChat.name}</div>
-                      <div style={{ fontSize: 13, color: "#9ca3af", maxWidth: 300 }}>Đây là nơi bắt đầu cuộc trò chuyện. Hãy nhắn tin trước!</div>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 12, color: "#b0b0b0", textAlign: "center", padding: 24 }}>
+                      <img src={selectedChatAvatar} alt="" style={{ width: 72, height: 72, borderRadius: 22, objectFit: "cover", marginBottom: 8, border: `3px solid ${ORANGE_LIGHT}` }} />
+                      <div style={{ fontSize: 17, fontWeight: 700, color: "#1a1a1a" }}>{selectedChat.name}</div>
+                      <div style={{ fontSize: 13, color: "#b0b0b0", maxWidth: 280 }}>Hãy nhắn tin trước để bắt đầu!</div>
                     </div>
                   ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: 4, maxWidth: 720, margin: "0 auto" }}>
@@ -2012,34 +2035,32 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                         const isMe = msg.senderId === "me";
                         const showAvatar = !isMe && (idx === messages.length - 1 || messages[idx + 1]?.senderId !== msg.senderId);
                         return (
-                          <div key={msg.id} style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start", alignItems: "flex-end", gap: 8, position: "relative" }}
+                          <div key={msg.id}
+                            style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start", alignItems: "flex-end", gap: 8, position: "relative" }}
                             onMouseLeave={() => setShowReactionPicker(null)}>
                             {!isMe && (
-                              <div style={{ width: 36, flexShrink: 0 }}>
-                                {showAvatar ? <img src={selectedChatAvatar} alt="" style={{ width: 36, height: 36, borderRadius: 12, objectFit: "cover" }} /> : <div style={{ width: 36 }} />}
+                              <div style={{ width: 32, flexShrink: 0 }}>
+                                {showAvatar ? <img src={selectedChatAvatar} alt="" style={{ width: 32, height: 32, borderRadius: 10, objectFit: "cover" }} /> : <div style={{ width: 32 }} />}
                               </div>
                             )}
                             <div style={{ maxWidth: "68%", position: "relative" }}>
                               <div
                                 style={{
-                                  background: isMe ? "#6c63ff" : "#f3f4f6",
-                                  color: isMe ? "#fff" : "#111",
+                                  background: isMe ? `linear-gradient(135deg, ${ORANGE}, ${ORANGE_MID})` : "#fff",
+                                  color: isMe ? "#fff" : "#1a1a1a",
                                   borderRadius: isMe ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-                                  padding: "10px 14px",
-                                  fontSize: 14,
-                                  lineHeight: 1.5,
-                                  wordBreak: "break-word",
-                                  cursor: "pointer",
+                                  padding: "10px 14px", fontSize: 14, lineHeight: 1.5,
+                                  wordBreak: "break-word", cursor: "pointer",
+                                  boxShadow: isMe ? `0 2px 8px ${ORANGE}40` : "0 1px 4px rgba(0,0,0,0.06)",
                                 }}
                                 onMouseEnter={() => setShowReactionPicker(msg.id)}
                               >
                                 {msg.text}
                               </div>
-                              <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 3, textAlign: isMe ? "right" : "left" }}>{msg.time}</div>
+                              <div style={{ fontSize: 11, color: "#b0b0b0", marginTop: 3, textAlign: isMe ? "right" : "left" }}>{msg.time}</div>
 
-                              {/* Reaction picker */}
                               {showReactionPicker === msg.id && (
-                                <div style={{ position: "absolute", bottom: "100%", [isMe ? "right" : "left"]: 0, background: "#fff", borderRadius: 24, boxShadow: "0 4px 20px rgba(0,0,0,0.12)", border: "1px solid #ececec", padding: "6px 10px", display: "flex", gap: 4, zIndex: 20, marginBottom: 4 }}>
+                                <div style={{ position: "absolute", bottom: "100%", [isMe ? "right" : "left"]: 0, background: "#fff", borderRadius: 24, boxShadow: "0 4px 20px rgba(0,0,0,0.12)", border: "1px solid #f0f0f0", padding: "6px 10px", display: "flex", gap: 4, zIndex: 20, marginBottom: 4 }}>
                                   {REACTION_EMOJIS.map((emoji) => (
                                     <button key={emoji} type="button" onClick={() => handleToggleReaction(msg.id, emoji)}
                                       style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, padding: 2, borderRadius: 8, transition: "transform 0.1s" }}
@@ -2050,13 +2071,12 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                                 </div>
                               )}
 
-                              {/* Reactions display */}
                               {msg.reactions && Object.entries(msg.reactions).some(([, c]) => c > 0) && (
                                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, justifyContent: isMe ? "flex-end" : "flex-start" }}>
                                   {Object.entries(msg.reactions).map(([emoji, count]) => count > 0 && (
                                     <button key={emoji} type="button" onClick={() => handleToggleReaction(msg.id, emoji)}
-                                      style={{ display: "flex", alignItems: "center", gap: 3, padding: "2px 8px", borderRadius: 12, border: `1px solid ${msg.userReactions?.[emoji] ? "#6c63ff" : "#ececec"}`, background: msg.userReactions?.[emoji] ? "#ede9ff" : "#fff", cursor: "pointer", fontSize: 12 }}>
-                                      <span>{emoji}</span><span style={{ fontWeight: 600, color: "#6c63ff" }}>{count}</span>
+                                      style={{ display: "flex", alignItems: "center", gap: 3, padding: "2px 8px", borderRadius: 12, border: `1px solid ${msg.userReactions?.[emoji] ? ORANGE : "#f0f0f0"}`, background: msg.userReactions?.[emoji] ? ORANGE_LIGHT : "#fff", cursor: "pointer", fontSize: 12 }}>
+                                      <span>{emoji}</span><span style={{ fontWeight: 600, color: ORANGE }}>{count}</span>
                                     </button>
                                   ))}
                                 </div>
@@ -2067,10 +2087,10 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                       })}
                       {isSelectedTyping && (
                         <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
-                          <img src={selectedChatAvatar} alt="" style={{ width: 36, height: 36, borderRadius: 12, objectFit: "cover" }} />
-                          <div style={{ background: "#f3f4f6", borderRadius: "18px 18px 18px 4px", padding: "12px 16px", display: "flex", gap: 4 }}>
+                          <img src={selectedChatAvatar} alt="" style={{ width: 32, height: 32, borderRadius: 10, objectFit: "cover" }} />
+                          <div style={{ background: "#fff", borderRadius: "18px 18px 18px 4px", padding: "12px 16px", display: "flex", gap: 4, boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
                             {[0, 0.15, 0.3].map((delay, i) => (
-                              <span key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: "#9ca3af", display: "block", animation: `bounce 1s ${delay}s infinite` }} />
+                              <span key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: "#b0b0b0", display: "block", animation: `bounce 1s ${delay}s infinite` }} />
                             ))}
                           </div>
                         </div>
@@ -2082,56 +2102,49 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
 
                 {/* Input area */}
                 {selectedChat.status === "pending" ? (
-                  <div style={{ padding: 16, background: "#fff", borderTop: "1px solid #ececec", flexShrink: 0 }}>
+                  <div style={{ padding: 16, background: "#fff", borderTop: "1px solid #f0f0f0", flexShrink: 0 }}>
                     <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 16, padding: 16, textAlign: "center" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 8 }}>
-                        <ShieldAlert size={20} color="#f59e0b" />
+                        <ShieldAlert size={18} color="#f59e0b" />
                         <span style={{ fontWeight: 600, color: "#92400e", fontSize: 14 }}>Tin nhắn chờ phê duyệt</span>
                       </div>
                       <p style={{ fontSize: 13, color: "#78350f", marginBottom: 12, lineHeight: 1.5 }}>
-                        <strong>{selectedChat.name}</strong> muốn nhắn tin với bạn. Chấp nhận để bắt đầu trò chuyện và mở khóa gọi audio, video.
+                        <strong>{selectedChat.name}</strong> muốn nhắn tin với bạn.
                       </p>
                       <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-                        <button
-                          type="button"
-                          onClick={handleRejectRequest}
-                          style={{ padding: "9px 20px", borderRadius: 12, border: "1px solid #fca5a5", background: "#fff", color: "#dc2626", cursor: "pointer", fontSize: 14, fontWeight: 600, transition: "all 0.15s" }}
-                        >
+                        <button type="button" onClick={handleRejectRequest}
+                          style={{ padding: "8px 20px", borderRadius: 10, border: "1px solid #fca5a5", background: "#fff", color: "#dc2626", cursor: "pointer", fontSize: 14, fontWeight: 600 }}>
                           ✕ Từ chối
                         </button>
-                        <button
-                          type="button"
-                          onClick={handleAcceptRequest}
-                          disabled={isAcceptingRequest}
-                          style={{ padding: "9px 20px", borderRadius: 12, border: "none", background: "#6c63ff", color: "#fff", cursor: isAcceptingRequest ? "not-allowed" : "pointer", fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, opacity: isAcceptingRequest ? 0.7 : 1, transition: "all 0.15s" }}
-                        >
-                          {isAcceptingRequest ? <Loader2 size={15} style={{ animation: "spin 1s linear infinite" }} /> : <Check size={15} />}
+                        <button type="button" onClick={handleAcceptRequest} disabled={isAcceptingRequest}
+                          style={{ padding: "8px 20px", borderRadius: 10, border: "none", background: ORANGE, color: "#fff", cursor: isAcceptingRequest ? "not-allowed" : "pointer", fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, opacity: isAcceptingRequest ? 0.7 : 1, boxShadow: `0 2px 8px ${ORANGE}50` }}>
+                          {isAcceptingRequest ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Check size={14} />}
                           Chấp nhận
                         </button>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div style={{ padding: "12px 16px", background: "#fff", borderTop: "1px solid #ececec", flexShrink: 0 }}>
-                    <form onSubmit={handleSendMessage} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <button type="button" style={{ width: 40, height: 40, borderRadius: 12, border: "1px solid #ececec", background: "#f8f8f8", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", flexShrink: 0 }}><ImageIcon size={18} /></button>
-                      <div style={{ flex: 1, display: "flex", alignItems: "center", background: "#f8f8f8", borderRadius: 24, border: "1px solid #ececec", padding: "0 12px" }}>
+                  <div style={{ padding: "10px 14px", background: "#fff", borderTop: "1px solid #f0f0f0", flexShrink: 0 }}>
+                    <form onSubmit={handleSendMessage} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <button type="button" style={{ width: 38, height: 38, borderRadius: 10, border: "1px solid #f0f0f0", background: "#f8f8f8", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#b0b0b0", flexShrink: 0 }}><ImageIcon size={17} /></button>
+                      <div style={{ flex: 1, display: "flex", alignItems: "center", background: "#f8f8f8", borderRadius: 20, border: "1px solid #f0f0f0", padding: "0 12px" }}>
                         <input
                           type="text"
                           value={messageInput}
                           onChange={handleInputChange}
                           placeholder="Nhập tin nhắn..."
-                          style={{ flex: 1, border: "none", background: "transparent", fontSize: 14, outline: "none", height: 44, color: "#111" }}
+                          style={{ flex: 1, border: "none", background: "transparent", fontSize: 14, outline: "none", height: 42, color: "#1a1a1a" }}
                         />
-                        <button type="button" style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", display: "flex", alignItems: "center" }}><Smile size={18} /></button>
+                        <button type="button" style={{ background: "none", border: "none", cursor: "pointer", color: "#b0b0b0", display: "flex", alignItems: "center" }}><Smile size={17} /></button>
                       </div>
                       {messageInput.trim() ? (
-                        <button type="submit" style={{ width: 44, height: 44, borderRadius: 14, border: "none", background: "#6c63ff", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.15s" }}>
-                          <Send size={18} />
+                        <button type="submit" style={{ width: 42, height: 42, borderRadius: 12, border: "none", background: ORANGE, color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: `0 2px 8px ${ORANGE}50` }}>
+                          <Send size={17} />
                         </button>
                       ) : (
-                        <button type="button" style={{ width: 44, height: 44, borderRadius: 14, border: "1px solid #ececec", background: "#fff", color: "#6c63ff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                          <ThumbsUp size={18} />
+                        <button type="button" style={{ width: 42, height: 42, borderRadius: 12, border: "1px solid #f0f0f0", background: "#fff", color: ORANGE, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <ThumbsUp size={17} />
                         </button>
                       )}
                     </form>
@@ -2141,52 +2154,45 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
 
               {/* ── INFO PANEL ── */}
               {showInfo && (
-                <div style={{ width: 280, minWidth: 260, borderLeft: "1px solid #ececec", background: "#fff", display: "flex", flexDirection: "column", height: "100%", flexShrink: 0 }}>
-                  {/* Close + Tabs */}
-                  <div style={{ padding: "16px 16px 0", flexShrink: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                      <span style={{ fontWeight: 700, fontSize: 15, color: "#111" }}>Thông tin hội thoại</span>
-                      <button type="button" onClick={() => setShowInfo(false)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #ececec", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af" }}><X size={16} /></button>
+                <div style={{ width: 272, minWidth: 250, borderLeft: "1px solid #f0f0f0", background: "#fff", display: "flex", flexDirection: "column", height: "100%", flexShrink: 0 }}>
+                  <div style={{ padding: "14px 14px 0", flexShrink: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                      <span style={{ fontWeight: 700, fontSize: 14, color: "#1a1a1a" }}>Thông tin hội thoại</span>
+                      <button type="button" onClick={() => setShowInfo(false)} style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid #f0f0f0", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#b0b0b0" }}><X size={14} /></button>
                     </div>
-                    <div style={{ display: "flex", gap: 0, background: "#f3f4f6", borderRadius: 12, padding: 4 }}>
+                    <div style={{ display: "flex", gap: 0, background: "#f3f4f6", borderRadius: 10, padding: 3 }}>
                       {[{ label: "Thông tin", value: "info" }, { label: "Đoạn chat", value: "chat" }].map((tab) => (
-                        <button
-                          key={tab.value}
-                          type="button"
-                          onClick={() => setInfoTab(tab.value as any)}
-                          style={{ flex: 1, padding: "8px 0", borderRadius: 10, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, background: infoTab === tab.value ? "#fff" : "transparent", color: infoTab === tab.value ? "#6c63ff" : "#9ca3af", boxShadow: infoTab === tab.value ? "0 1px 4px rgba(0,0,0,0.08)" : "none", transition: "all 0.15s" }}
+                        <button key={tab.value} type="button" onClick={() => setInfoTab(tab.value as any)}
+                          style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, background: infoTab === tab.value ? "#fff" : "transparent", color: infoTab === tab.value ? ORANGE : "#9ca3af", boxShadow: infoTab === tab.value ? "0 1px 4px rgba(0,0,0,0.08)" : "none", transition: "all 0.15s" }}
                         >{tab.label}</button>
                       ))}
                     </div>
                   </div>
 
-                  <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+                  <div style={{ flex: 1, overflowY: "auto", padding: 14 }}>
                     {infoTab === "info" ? (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                        {/* Avatar card */}
-                        <div style={{ background: "linear-gradient(135deg,#ede9ff,#f5f3ff)", borderRadius: 20, padding: 20, textAlign: "center" }}>
-                          <img src={selectedChatAvatar} alt={selectedChat.name} style={{ width: 72, height: 72, borderRadius: 22, objectFit: "cover", border: "3px solid #fff", boxShadow: "0 4px 16px rgba(108,99,255,0.2)" }} />
-                          <div style={{ fontSize: 16, fontWeight: 700, color: "#111", marginTop: 10 }}>{selectedChat.name}</div>
-                          <div style={{ fontSize: 12, color: "#6c63ff", marginTop: 4 }}>{selectedChat.isOnline ? "🟢 Đang hoạt động" : "⭕ Ngoại tuyến"}</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                        <div style={{ background: `linear-gradient(135deg, ${ORANGE_LIGHT}, #fff8f5)`, borderRadius: 18, padding: 18, textAlign: "center" }}>
+                          <img src={selectedChatAvatar} alt={selectedChat.name} style={{ width: 64, height: 64, borderRadius: 20, objectFit: "cover", border: "3px solid #fff", boxShadow: `0 4px 16px ${ORANGE}30` }} />
+                          <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginTop: 10 }}>{selectedChat.name}</div>
+                          <div style={{ fontSize: 12, color: ORANGE, marginTop: 4 }}>{selectedChat.isOnline ? "🟢 Đang hoạt động" : "⭕ Ngoại tuyến"}</div>
                         </div>
 
-                        {/* Stats */}
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                           {[
                             { label: "Tin nhắn", value: messages.length },
-                            { label: "Trạng thái", value: selectedChat.status === "pending" ? "Chờ" : "Đã kết nối" },
+                            { label: "Trạng thái", value: selectedChat.status === "pending" ? "Chờ" : "Kết nối" },
                           ].map((stat) => (
-                            <div key={stat.label} style={{ background: "#f8f8f8", borderRadius: 14, padding: "12px 14px" }}>
-                              <div style={{ fontSize: 18, fontWeight: 700, color: "#6c63ff" }}>{stat.value}</div>
-                              <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>{stat.label}</div>
+                            <div key={stat.label} style={{ background: "#f8f8f8", borderRadius: 12, padding: "10px 12px" }}>
+                              <div style={{ fontSize: 16, fontWeight: 700, color: ORANGE }}>{stat.value}</div>
+                              <div style={{ fontSize: 11, color: "#b0b0b0", marginTop: 2 }}>{stat.label}</div>
                             </div>
                           ))}
                         </div>
 
-                        {/* Quick actions */}
                         <div>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Hành động nhanh</div>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#b0b0b0", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Hành động nhanh</div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                             {[
                               { icon: Phone, label: "Gọi thoại", onClick: () => startCall("audio") },
                               { icon: Video, label: "Video call", onClick: () => startCall("video") },
@@ -2194,50 +2200,45 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                               { icon: Archive, label: "Lưu trữ hội thoại", onClick: () => {} },
                             ].map((action) => (
                               <button key={action.label} type="button" onClick={action.onClick}
-                                style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 12, border: "1px solid #ececec", background: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#374151", transition: "all 0.15s", textAlign: "left" }}>
-                                <action.icon size={16} color="#6c63ff" />
+                                style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 10, border: "1px solid #f0f0f0", background: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#374151", transition: "all 0.15s", textAlign: "left" }}>
+                                <action.icon size={15} color={ORANGE} />
                                 {action.label}
                               </button>
                             ))}
                           </div>
                         </div>
 
-                        {/* Pending actions */}
                         {selectedChat.status === "pending" && (
-                          <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 16, padding: 14 }}>
+                          <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 14, padding: 12 }}>
                             <div style={{ fontSize: 13, fontWeight: 700, color: "#92400e", marginBottom: 8 }}>Tin nhắn chờ</div>
-                            <p style={{ fontSize: 12, color: "#78350f", marginBottom: 12 }}>Chấp nhận để bắt đầu trao đổi với {selectedChat.name}.</p>
                             <div style={{ display: "flex", gap: 8 }}>
-                              <button type="button" onClick={handleRejectRequest} style={{ flex: 1, padding: "8px 0", borderRadius: 10, border: "1px solid #fca5a5", background: "#fff", color: "#dc2626", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>Từ chối</button>
-                              <button type="button" onClick={handleAcceptRequest} disabled={isAcceptingRequest} style={{ flex: 1, padding: "8px 0", borderRadius: 10, border: "none", background: "#6c63ff", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
-                                {isAcceptingRequest ? <Loader2 size={14} /> : <Check size={14} />} Chấp nhận
+                              <button type="button" onClick={handleRejectRequest} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "1px solid #fca5a5", background: "#fff", color: "#dc2626", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>Từ chối</button>
+                              <button type="button" onClick={handleAcceptRequest} disabled={isAcceptingRequest} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", background: ORANGE, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                                {isAcceptingRequest ? <Loader2 size={13} /> : <Check size={13} />} Chấp nhận
                               </button>
                             </div>
                           </div>
                         )}
 
-                        {/* Block */}
-                        <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 16, padding: 14 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: "#991b1b", marginBottom: 6 }}>Bảo mật</div>
-                          <p style={{ fontSize: 12, color: "#b91c1c", marginBottom: 10, lineHeight: 1.5 }}>Nếu phát hiện spam, bạn có thể chặn người dùng này.</p>
-                          <button type="button" style={{ width: "100%", padding: "8px 0", borderRadius: 10, border: "none", background: "#dc2626", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+                        <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 14, padding: 12 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: "#991b1b", marginBottom: 6 }}>Bảo mật</div>
+                          <button type="button" style={{ width: "100%", padding: "7px 0", borderRadius: 8, border: "none", background: "#dc2626", color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
                             Chặn người dùng
                           </button>
                         </div>
                       </div>
                     ) : (
-                      /* Chat tab - show messages summary */
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Tin nhắn gần đây</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#b0b0b0", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Tin nhắn gần đây</div>
                         {messages.length === 0 ? (
-                          <div style={{ textAlign: "center", padding: 24, color: "#9ca3af", fontSize: 13 }}>Chưa có tin nhắn nào</div>
+                          <div style={{ textAlign: "center", padding: 24, color: "#b0b0b0", fontSize: 13 }}>Chưa có tin nhắn nào</div>
                         ) : [...messages].reverse().slice(0, 20).map((msg) => {
                           const isMe = msg.senderId === "me";
                           return (
                             <div key={msg.id} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                              <img src={isMe ? getAvatarUrl(currentUser?.avatar, currentUserId) : selectedChatAvatar} alt="" style={{ width: 28, height: 28, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
+                              <img src={isMe ? getAvatarUrl(currentUser?.avatar, currentUserId) : selectedChatAvatar} alt="" style={{ width: 26, height: 26, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
                               <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}>{isMe ? "Bạn" : selectedChat.name} · {msg.time}</div>
+                                <div style={{ fontSize: 11, color: "#b0b0b0", marginBottom: 2 }}>{isMe ? "Bạn" : selectedChat.name} · {msg.time}</div>
                                 <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.4, wordBreak: "break-word" }}>{msg.text}</div>
                               </div>
                             </div>
@@ -2251,12 +2252,12 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
             </div>
           </>
         ) : (
-          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12, color: "#9ca3af" }}>
-            <div style={{ width: 80, height: 80, borderRadius: 24, background: "#ede9ff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <MessageCircle size={36} color="#6c63ff" />
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12, color: "#b0b0b0" }}>
+            <div style={{ width: 72, height: 72, borderRadius: 22, background: ORANGE_LIGHT, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <MessageCircle size={32} color={ORANGE} />
             </div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: "#374151" }}>Chọn cuộc trò chuyện</div>
-            <div style={{ fontSize: 14, color: "#9ca3af" }}>Chọn một hội thoại bên trái để bắt đầu</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: "#374151" }}>Chọn cuộc trò chuyện</div>
+            <div style={{ fontSize: 13, color: "#b0b0b0" }}>Chọn một hội thoại bên trái để bắt đầu</div>
           </div>
         )}
       </div>
@@ -2264,34 +2265,31 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
       {/* ── CALL MODAL ── */}
       {callSession && (
         <div style={{ position: "fixed", inset: 0, zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", padding: 16 }}>
-          <div style={{ width: "100%", maxWidth: 520, background: "linear-gradient(180deg,#1e1b2e 0%,#0f0d1a 100%)", borderRadius: 28, overflow: "hidden", boxShadow: "0 32px 80px rgba(0,0,0,0.5)" }}>
-            <div style={{ padding: 28 }}>
-              {/* Header */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(108,99,255,0.2)", padding: "6px 14px", borderRadius: 20 }}>
-                  {callSession.mode === "video" ? <Camera size={14} color="#a5b4fc" /> : <Phone size={14} color="#a5b4fc" />}
-                  <span style={{ fontSize: 12, color: "#a5b4fc", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em" }}>{callSession.mode === "video" ? "Video call" : "Audio call"}</span>
+          <div style={{ width: "100%", maxWidth: 480, background: "linear-gradient(180deg,#1a0f0a 0%,#0f0806 100%)", borderRadius: 28, overflow: "hidden", boxShadow: "0 32px 80px rgba(0,0,0,0.5)" }}>
+            <div style={{ padding: 26 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, background: `${ORANGE}25`, padding: "5px 12px", borderRadius: 20 }}>
+                  {callSession.mode === "video" ? <Camera size={13} color={ORANGE_MID} /> : <Phone size={13} color={ORANGE_MID} />}
+                  <span style={{ fontSize: 11, color: ORANGE_MID, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em" }}>{callSession.mode === "video" ? "Video call" : "Audio call"}</span>
                 </div>
-                <button type="button" onClick={() => closeCall(true)} style={{ width: 36, height: 36, borderRadius: 10, border: "none", background: "rgba(255,255,255,0.1)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}><X size={18} /></button>
+                <button type="button" onClick={() => closeCall(true)} style={{ width: 34, height: 34, borderRadius: 10, border: "none", background: "rgba(255,255,255,0.1)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}><X size={17} /></button>
               </div>
 
-              {/* Peer info */}
-              <div style={{ textAlign: "center", marginBottom: 28 }}>
+              <div style={{ textAlign: "center", marginBottom: 26 }}>
                 <div style={{ position: "relative", display: "inline-block" }}>
-                  {callSession.status === "active" && <div style={{ position: "absolute", inset: -8, borderRadius: "50%", background: "rgba(108,99,255,0.3)", animation: "pulse 2s infinite" }} />}
-                  <img src={callSession.peerAvatar} alt={callSession.peerName} style={{ width: 100, height: 100, borderRadius: 28, objectFit: "cover", border: "3px solid rgba(255,255,255,0.15)", position: "relative" }} />
+                  {callSession.status === "active" && <div style={{ position: "absolute", inset: -8, borderRadius: "50%", background: `${ORANGE}30`, animation: "pulse 2s infinite" }} />}
+                  <img src={callSession.peerAvatar} alt={callSession.peerName} style={{ width: 90, height: 90, borderRadius: 26, objectFit: "cover", border: "3px solid rgba(255,255,255,0.15)", position: "relative" }} />
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: "#fff", marginTop: 14 }}>{callSession.peerName}</div>
-                <div style={{ fontSize: 14, color: "#a5b4fc", marginTop: 6 }}>
+                <div style={{ fontSize: 20, fontWeight: 700, color: "#fff", marginTop: 12 }}>{callSession.peerName}</div>
+                <div style={{ fontSize: 13, color: ORANGE_MID, marginTop: 5 }}>
                   {callSession.status === "incoming" ? "Đang gọi đến..." : callSession.status === "connecting" ? "Đang kết nối..." : `Đang gọi ${formatCallDuration(callSession.elapsedSeconds)}`}
                 </div>
               </div>
 
-              {/* Video */}
               {callSession.mode === "video" && callSession.status !== "incoming" && (
-                <div style={{ position: "relative", borderRadius: 20, overflow: "hidden", background: "#111", height: 220, marginBottom: 24 }}>
+                <div style={{ position: "relative", borderRadius: 18, overflow: "hidden", background: "#111", height: 200, marginBottom: 22 }}>
                   <video ref={remoteVideoRef} autoPlay playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  <div style={{ position: "absolute", bottom: 12, right: 12, width: 80, height: 112, borderRadius: 12, overflow: "hidden", border: "2px solid rgba(255,255,255,0.2)" }}>
+                  <div style={{ position: "absolute", bottom: 10, right: 10, width: 72, height: 100, borderRadius: 10, overflow: "hidden", border: "2px solid rgba(255,255,255,0.2)" }}>
                     <video ref={localVideoRef} autoPlay muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   </div>
                 </div>
@@ -2300,26 +2298,25 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                 <audio ref={remoteAudioRef} autoPlay playsInline />
               )}
 
-              {/* Buttons */}
               {callSession.status === "incoming" ? (
                 <div style={{ display: "flex", justifyContent: "center", gap: 24 }}>
-                  <button type="button" onClick={rejectCall} style={{ width: 64, height: 64, borderRadius: "50%", border: "none", background: "#ef4444", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 20px rgba(239,68,68,0.4)" }}><PhoneOff size={24} color="#fff" /></button>
-                  <button type="button" onClick={acceptCall} style={{ width: 64, height: 64, borderRadius: "50%", border: "none", background: "#22c55e", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 20px rgba(34,197,94,0.4)" }}>{callSession.mode === "video" ? <Video size={24} color="#fff" /> : <Phone size={24} color="#fff" />}</button>
+                  <button type="button" onClick={rejectCall} style={{ width: 60, height: 60, borderRadius: "50%", border: "none", background: "#ef4444", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 20px rgba(239,68,68,0.4)" }}><PhoneOff size={22} color="#fff" /></button>
+                  <button type="button" onClick={acceptCall} style={{ width: 60, height: 60, borderRadius: "50%", border: "none", background: ORANGE, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 4px 20px ${ORANGE}50` }}>{callSession.mode === "video" ? <Video size={22} color="#fff" /> : <Phone size={22} color="#fff" />}</button>
                 </div>
               ) : (
-                <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
+                <div style={{ display: "flex", justifyContent: "center", gap: 10 }}>
                   {[
-                    { icon: callSession.isMuted ? MicOff : Mic, onClick: toggleMute, active: callSession.isMuted, label: "Mic" },
-                    ...(callSession.mode === "video" ? [{ icon: callSession.isCameraOff ? VideoOff : Video, onClick: toggleCamera, active: callSession.isCameraOff, label: "Cam" }] : []),
-                    { icon: Volume2, onClick: toggleSpeaker, active: !callSession.isSpeakerOn, label: "Speaker" },
+                    { icon: callSession.isMuted ? MicOff : Mic, onClick: toggleMute, active: callSession.isMuted },
+                    ...(callSession.mode === "video" ? [{ icon: callSession.isCameraOff ? VideoOff : Video, onClick: toggleCamera, active: callSession.isCameraOff }] : []),
+                    { icon: Volume2, onClick: toggleSpeaker, active: !callSession.isSpeakerOn },
                   ].map((btn, i) => (
                     <button key={i} type="button" onClick={btn.onClick}
-                      style={{ width: 52, height: 52, borderRadius: 16, border: "none", background: btn.active ? "#ef4444" : "rgba(255,255,255,0.12)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", transition: "all 0.15s" }}>
-                      <btn.icon size={22} />
+                      style={{ width: 50, height: 50, borderRadius: 14, border: "none", background: btn.active ? "#ef4444" : "rgba(255,255,255,0.12)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
+                      <btn.icon size={20} />
                     </button>
                   ))}
-                  <button type="button" onClick={() => closeCall(true)} style={{ width: 52, height: 52, borderRadius: 16, border: "none", background: "#ef4444", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(239,68,68,0.4)" }}>
-                    <PhoneOff size={22} color="#fff" />
+                  <button type="button" onClick={() => closeCall(true)} style={{ width: 50, height: 50, borderRadius: 14, border: "none", background: "#ef4444", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(239,68,68,0.4)" }}>
+                    <PhoneOff size={20} color="#fff" />
                   </button>
                 </div>
               )}
@@ -2333,27 +2330,20 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
         @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
         @keyframes pulse { 0%,100% { opacity: 0.6; transform: scale(1); } 50% { opacity: 0.3; transform: scale(1.1); } }
 
-        .chat-list-panel {
-          display: flex !important;
-        }
-
-        .mobile-back-btn {
-          display: none;
-        }
+        .chat-list-panel { display: flex !important; }
+        .mobile-back-btn { display: none; }
 
         @media (max-width: 768px) {
           .chat-list-panel {
             position: fixed !important;
-            left: 72px !important;
+            left: 64px !important;
             top: 0 !important;
             bottom: 0 !important;
             z-index: 5 !important;
-            width: calc(100vw - 72px) !important;
+            width: calc(100vw - 64px) !important;
             max-width: 100vw !important;
           }
-          .mobile-back-btn {
-            display: flex !important;
-          }
+          .mobile-back-btn { display: flex !important; }
         }
       `}</style>
     </div>
