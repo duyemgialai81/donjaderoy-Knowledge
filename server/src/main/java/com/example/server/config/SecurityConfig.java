@@ -80,6 +80,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/posts-like/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/posts-like/*/likes/count").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/posts-like/*/like-status").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/files").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/majors/**").permitAll()
                         .requestMatchers("/api/chat/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/users", "/api/users/**").authenticated()
