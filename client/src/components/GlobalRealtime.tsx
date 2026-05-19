@@ -181,6 +181,12 @@ export function GlobalRealtime() {
           const message = safeParse(frame.body) || frame.body;
           if (message) console.warn("[Realtime]", message);
         });
+
+        client.publish({ destination: "/app/presence.ping", body: "{}" });
+        const presenceTimer = window.setInterval(() => {
+          if (client.connected) client.publish({ destination: "/app/presence.ping", body: "{}" });
+        }, 60000);
+        (client as any).__presenceTimer = presenceTimer;
       },
     });
 
@@ -188,6 +194,8 @@ export function GlobalRealtime() {
     stompRef.current = client;
 
     return () => {
+      const presenceTimer = (client as any).__presenceTimer;
+      if (presenceTimer) window.clearInterval(presenceTimer);
       if (client.active) client.deactivate();
     };
   }, [navigate, user?.id]);

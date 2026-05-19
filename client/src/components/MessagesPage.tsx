@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { Client } from "@stomp/stompjs";
+import { useNavigate } from "react-router-dom";
 import {
   Archive,
   Camera,
@@ -18,8 +19,11 @@ import {
   PhoneOff,
   Search,
   Send,
+  ScreenShare,
+  ScreenShareOff,
   ShieldAlert,
   Smile,
+  SwitchCamera,
   ThumbsUp,
   User as UserIcon,
   Video,
@@ -59,6 +63,7 @@ interface SearchUserItem {
   id: string;
   name: string;
   avatar?: string;
+  isOnline?: boolean;
 }
 
 interface MessageItem {
@@ -81,6 +86,8 @@ interface CallSession {
   elapsedSeconds: number;
   isMuted: boolean;
   isCameraOff: boolean;
+  isScreenSharing: boolean;
+  cameraFacing: "user" | "environment";
   isSpeakerOn: boolean;
   peerId: string;
   peerName: string;
@@ -123,6 +130,7 @@ const NAV_ITEMS = [
 ];
 
 export default function MessagesPage({ currentUser }: MessagesPageProps) {
+  const navigate = useNavigate();
   const [activeNav] = useState("messages");
   const [chatFilter, setChatFilter] = useState<"all" | "unread" | "pending" | "favorite">("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -154,6 +162,8 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
   const incomingOfferRef = useRef<RTCSessionDescriptionInit | null>(null);
   const iceCandidateQueueRef = useRef<RTCIceCandidateInit[]>([]);
@@ -217,7 +227,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
       ...conversations,
       ...searchResults.map((u) => ({
         id: `new_${toId(u.id)}`, targetUserId: toId(u.id),
-        name: u.name, avatar: u.avatar, status: "accepted", isOnline: true,
+        name: u.name, avatar: u.avatar, status: "accepted", isOnline: Boolean(u.isOnline),
       })),
     ].find((c) => c.id === selectedChatId);
   }, [conversations, searchResults, selectedChatId]);
@@ -250,6 +260,8 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
       elapsedSeconds: 0,
       isMuted: false,
       isCameraOff: mode === "audio",
+      isScreenSharing: false,
+      cameraFacing: "user",
       isSpeakerOn: true,
       peerId: senderId,
       peerName: ev.senderName || caller?.name || "Người gọi",
@@ -274,7 +286,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
           name: c.targetUserName || "Người dùng", avatar: c.targetUserAvatar,
           lastMessage: c.lastMessage || "Bắt đầu cuộc trò chuyện mới.",
           time: c.lastMessageTime ? new Date(c.lastMessageTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
-          unread: c.unreadCount || 0, status: c.status || "accepted", isOnline: true,
+          unread: c.unreadCount || 0, status: c.status || "accepted", isOnline: Boolean(c.targetIsOnline),
         }));
       } catch (e) { console.error(e); }
 
@@ -286,7 +298,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
       friends.forEach((f: any) => {
         const fId = toId(f.id);
         if (!existingIds.has(fId)) {
-          final.push({ id: `new_${fId}`, targetUserId: fId, name: f.name || "Người dùng", avatar: f.avatar, lastMessage: "Sẵn sàng mở cuộc trò chuyện.", time: "", unread: 0, isOnline: true, status: "accepted" });
+          final.push({ id: `new_${fId}`, targetUserId: fId, name: f.name || "Người dùng", avatar: f.avatar, lastMessage: "Sẵn sàng mở cuộc trò chuyện.", time: "", unread: 0, isOnline: Boolean(f.isOnline), status: "accepted" });
         }
       });
       setConversations(dedupConversations(final));
@@ -294,7 +306,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   };
 
   // ==================== ACCEPT / REJECT PENDING ====================
-  const handleAcceptRequest = async () => {
+  const handleAcceptRequestLegacy = async () => {
     if (!selectedChat) return;
     setIsAcceptingRequest(true);
     const convId = selectedChat.id.startsWith("new_") ? "" : selectedChat.id;
@@ -306,6 +318,25 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     } catch {
       setConversations((prev) => prev.map((c) => c.id === selectedChat.id ? { ...c, status: "accepted" } : c));
       toast.warning("Đã mở hội thoại trên giao diện. Backend cần deploy endpoint accept mới.");
+    } finally {
+      setIsAcceptingRequest(false);
+    }
+  };
+
+  const handleAcceptRequest = async () => {
+    if (!selectedChat) return;
+    setIsAcceptingRequest(true);
+    const convId = selectedChat.id.startsWith("new_") ? "" : selectedChat.id;
+
+    try {
+      if (!convId) throw new Error("Không thể chấp nhận hội thoại chưa có id.");
+      const res = await api.request("PUT", `/api/chat/conversations/${convId}/accept`);
+      const accepted = res?.data || {};
+      setConversations((prev) => prev.map((c) => c.id === selectedChat.id ? { ...c, ...accepted, id: convId, status: "accepted", unread: c.unread } : c));
+      await loadChatsAndFriends();
+      toast.success("Đã chấp nhận tin nhắn");
+    } catch (error: any) {
+      toast.error(error?.message || "Không thể chấp nhận tin nhắn.");
     } finally {
       setIsAcceptingRequest(false);
     }
@@ -383,6 +414,39 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     return pc;
   };
 
+  const replaceLocalVideoTrack = (track: MediaStreamTrack) => {
+    const sender = peerConnectionRef.current?.getSenders().find((s) => s.track?.kind === "video");
+    sender?.replaceTrack(track).catch(() => toast.error("Không thể đổi nguồn video."));
+
+    const audioTracks = localStreamRef.current?.getAudioTracks() || cameraStreamRef.current?.getAudioTracks() || [];
+    localStreamRef.current?.getVideoTracks().forEach((oldTrack) => {
+      if (oldTrack.id !== track.id) oldTrack.stop();
+    });
+    localStreamRef.current = new MediaStream([...audioTracks, track]);
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = new MediaStream([track]);
+      localVideoRef.current.play().catch(() => {});
+    }
+  };
+
+  const stopScreenShare = async () => {
+    const s = callSessionRef.current;
+    if (!s || s.mode !== "video" || !s.isScreenSharing) return;
+    screenStreamRef.current?.getTracks().forEach((track) => track.stop());
+    screenStreamRef.current = null;
+    try {
+      const cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: s.cameraFacing }, audio: false });
+      cameraStreamRef.current?.getVideoTracks().forEach((track) => track.stop());
+      cameraStreamRef.current = cameraStream;
+      const [cameraTrack] = cameraStream.getVideoTracks();
+      if (cameraTrack) replaceLocalVideoTrack(cameraTrack);
+      setCallSession((prev) => prev ? { ...prev, isScreenSharing: false, isCameraOff: false } : prev);
+    } catch {
+      toast.error("Không thể bật lại camera.");
+      setCallSession((prev) => prev ? { ...prev, isScreenSharing: false, isCameraOff: true } : prev);
+    }
+  };
+
   const closeCall = (isLocal = true, isReject = false) => {
     if (acceptCallTimeoutRef.current) clearTimeout(acceptCallTimeoutRef.current);
     const s = callSessionRef.current;
@@ -394,6 +458,8 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     if (peerConnectionRef.current) { peerConnectionRef.current.close(); peerConnectionRef.current = null; }
     remoteStreamRef.current = null; incomingOfferRef.current = null; iceCandidateQueueRef.current = [];
     if (localStreamRef.current) { localStreamRef.current.getTracks().forEach((t) => t.stop()); localStreamRef.current = null; }
+    if (cameraStreamRef.current) { cameraStreamRef.current.getTracks().forEach((t) => t.stop()); cameraStreamRef.current = null; }
+    if (screenStreamRef.current) { screenStreamRef.current.getTracks().forEach((t) => t.stop()); screenStreamRef.current = null; }
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
     if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
@@ -406,12 +472,13 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     closeCall(false);
     const callId = `call_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
     const targetId = getConversationPeerId(selectedChat);
-    const newSession: CallSession = { id: callId, mode, status: "connecting", startedAt: null, elapsedSeconds: 0, isMuted: false, isCameraOff: mode === "audio", isSpeakerOn: true, peerId: targetId, peerName: selectedChat.name, peerAvatar: selectedChatAvatar, hasMediaPermission: true, error: null };
+    const newSession: CallSession = { id: callId, mode, status: "connecting", startedAt: null, elapsedSeconds: 0, isMuted: false, isCameraOff: mode === "audio", isScreenSharing: false, cameraFacing: "user", isSpeakerOn: true, peerId: targetId, peerName: selectedChat.name, peerAvatar: selectedChatAvatar, hasMediaPermission: true, error: null };
     callSessionRef.current = newSession; setCallSession(newSession);
     try {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error("Trình duyệt không hỗ trợ media devices.");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: mode === "video" });
       localStreamRef.current = stream;
+      if (mode === "video") cameraStreamRef.current = stream.clone();
       if (localVideoRef.current) { localVideoRef.current.srcObject = stream; localVideoRef.current.play().catch(() => {}); }
       const pc = createPeerConnection(targetId, callId, mode);
       const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
@@ -428,6 +495,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: s.mode === "video" });
       localStreamRef.current = stream;
+      if (s.mode === "video") cameraStreamRef.current = stream.clone();
       if (localVideoRef.current) { localVideoRef.current.srcObject = stream; localVideoRef.current.play().catch(() => {}); }
       const pc = createPeerConnection(s.peerId, s.id, s.mode);
       const next = { ...s, status: "active" as CallStatus, startedAt: Date.now() };
@@ -447,6 +515,45 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   const rejectCall = () => closeCall(true, true);
   const toggleMute = () => setCallSession((prev) => { if (!prev) return prev; const m = !prev.isMuted; localStreamRef.current?.getAudioTracks().forEach((t) => (t.enabled = !m)); return { ...prev, isMuted: m }; });
   const toggleCamera = () => setCallSession((prev) => { if (!prev || prev.mode !== "video") return prev; const c = !prev.isCameraOff; localStreamRef.current?.getVideoTracks().forEach((t) => (t.enabled = !c)); return { ...prev, isCameraOff: c }; });
+  const toggleScreenShare = async () => {
+    const s = callSessionRef.current;
+    if (!s || s.mode !== "video" || s.status === "incoming") return;
+    if (s.isScreenSharing) {
+      await stopScreenShare();
+      return;
+    }
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      toast.error("Trình duyệt không hỗ trợ chia sẻ màn hình.");
+      return;
+    }
+    try {
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      screenStreamRef.current = screenStream;
+      const [screenTrack] = screenStream.getVideoTracks();
+      if (!screenTrack) throw new Error("Không có màn hình được chọn.");
+      screenTrack.onended = () => { void stopScreenShare(); };
+      replaceLocalVideoTrack(screenTrack);
+      setCallSession((prev) => prev ? { ...prev, isScreenSharing: true, isCameraOff: false } : prev);
+    } catch (error: any) {
+      toast.error(error?.message || "Không thể chia sẻ màn hình.");
+    }
+  };
+  const switchCamera = async () => {
+    const s = callSessionRef.current;
+    if (!s || s.mode !== "video" || s.isScreenSharing) return;
+    const nextFacing = s.cameraFacing === "user" ? "environment" : "user";
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: nextFacing }, audio: false });
+      cameraStreamRef.current?.getVideoTracks().forEach((track) => track.stop());
+      cameraStreamRef.current = stream;
+      const [track] = stream.getVideoTracks();
+      if (!track) throw new Error("Không tìm thấy camera.");
+      replaceLocalVideoTrack(track);
+      setCallSession((prev) => prev ? { ...prev, cameraFacing: nextFacing, isCameraOff: false } : prev);
+    } catch {
+      toast.error("Thiết bị không có camera trước/sau để đổi.");
+    }
+  };
   const toggleSpeaker = () => setCallSession((prev) => (prev ? { ...prev, isSpeakerOn: !prev.isSpeakerOn } : prev));
 
   const handleToggleReaction = (messageId: string, emoji: string) => {
@@ -533,7 +640,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
           const parsed = safe(signalData);
           if (type === "start") {
             const caller = conversationsRef.current.find((c) => getConversationPeerId(c) === toId(senderId));
-            const incoming: CallSession = { id: callId, mode: callType, status: "incoming", startedAt: null, elapsedSeconds: 0, isMuted: false, isCameraOff: callType === "audio", isSpeakerOn: true, peerId: toId(senderId), peerName: caller?.name || "Người gọi", peerAvatar: caller?.avatar || getAvatarUrl("", senderId), hasMediaPermission: true, error: null };
+            const incoming: CallSession = { id: callId, mode: callType, status: "incoming", startedAt: null, elapsedSeconds: 0, isMuted: false, isCameraOff: callType === "audio", isScreenSharing: false, cameraFacing: "user", isSpeakerOn: true, peerId: toId(senderId), peerName: caller?.name || "Người gọi", peerAvatar: caller?.avatar || getAvatarUrl("", senderId), hasMediaPermission: true, error: null };
             callSessionRef.current = incoming; setCallSession(incoming);
           } else if (type === "offer" && parsed) {
             incomingOfferRef.current = parsed;
@@ -574,12 +681,35 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
             return { ...msg, reactions: reaction.reactions, userReactions: updated };
           }));
         });
+
+        subscribeUserQueue("online-status", (frame) => {
+          const status = safe(frame.body); if (!status) return;
+          const userId = toId(status.userId);
+          if (!userId) return;
+          setConversations((prev) => prev.map((c) => getConversationPeerId(c) === userId ? { ...c, isOnline: Boolean(status.isOnline) } : c));
+          setSearchResults((prev) => prev.map((u) => toId(u.id) === userId ? { ...u, isOnline: Boolean(status.isOnline) } : u));
+        });
+
+        subscribeUserQueue("errors", (frame) => {
+          const message = safe(frame.body) || frame.body;
+          if (message) toast.error(String(message));
+        });
+
+        client.publish({ destination: "/app/presence.ping", body: "{}" });
+        const presenceTimer = window.setInterval(() => {
+          if (client.connected) client.publish({ destination: "/app/presence.ping", body: "{}" });
+        }, 60000);
+        (client as any).__presenceTimer = presenceTimer;
       },
     });
 
     client.activate();
     stompClientRef.current = client;
-    return () => { if (client.active) client.deactivate(); };
+    return () => {
+      const presenceTimer = (client as any).__presenceTimer;
+      if (presenceTimer) window.clearInterval(presenceTimer);
+      if (client.active) client.deactivate();
+    };
   }, [currentUserId]);
 
   useEffect(() => {
@@ -598,7 +728,11 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     return () => window.removeEventListener(INCOMING_CALL_EVENT, onIncomingCall);
   }, [currentUserId]);
 
-  useEffect(() => { loadChatsAndFriends(); }, []);
+  useEffect(() => {
+    loadChatsAndFriends();
+    const refreshTimer = window.setInterval(loadChatsAndFriends, 60000);
+    return () => window.clearInterval(refreshTimer);
+  }, []);
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, typingUsers]);
 
   useEffect(() => {
@@ -678,6 +812,12 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     window.setTimeout(() => messagesEndRef.current?.scrollIntoView({ block: "end" }), 360);
   };
 
+  const openSelectedProfile = () => {
+    const peerId = selectedChat ? getConversationPeerId(selectedChat) : "";
+    if (!peerId) return;
+    navigate(`/nguoi-dung/${peerId}`);
+  };
+
   useEffect(() => {
     const root = document.documentElement;
     let raf = 0;
@@ -712,7 +852,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   const totalUnread = inboxConvs.reduce((s, c) => s + (c.unread || 0), 0);
 
   const displayList: ConversationItem[] = isSearchMode
-    ? searchResults.map((u) => ({ id: `new_${toId(u.id)}`, targetUserId: toId(u.id), name: u.name, avatar: u.avatar, lastMessage: "Nhắn để mở cuộc trò chuyện ngay.", time: "", unread: 0, isOnline: true, status: "accepted" }))
+    ? searchResults.map((u) => ({ id: `new_${toId(u.id)}`, targetUserId: toId(u.id), name: u.name, avatar: u.avatar, lastMessage: "Nhắn để mở cuộc trò chuyện ngay.", time: "", unread: 0, isOnline: Boolean(u.isOnline), status: "accepted" }))
     : chatFilter === "all" ? conversations
     : chatFilter === "unread" ? conversations.filter((c) => (c.unread || 0) > 0)
     : chatFilter === "pending" ? pendingConvs
@@ -720,7 +860,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
 
   const selectedPeerId = selectedChat ? getConversationPeerId(selectedChat) : "";
   const isSelectedTyping = selectedChat ? Boolean(typingUsers[selectedChat.id] || (selectedPeerId && typingUsers[`new_${selectedPeerId}`])) : false;
-  const selectedStatus = isSelectedTyping ? "Đang soạn tin nhắn..." : selectedChat?.isOnline ? "Đang hoạt động" : "Hoạt động gần đây";
+  const selectedStatus = isSelectedTyping ? "Đang soạn tin nhắn..." : selectedChat?.isOnline ? "Đang hoạt động" : "Ngoại tuyến";
 
   // ==================== RENDER ====================
   return (
@@ -1132,7 +1272,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                             {[
                               { icon: Phone, label: "Gọi thoại", onClick: () => startCall("audio") },
                               { icon: Video, label: "Video call", onClick: () => startCall("video") },
-                              { icon: UserIcon, label: "Xem trang cá nhân", onClick: () => {} },
+                              { icon: UserIcon, label: "Xem trang cá nhân", onClick: openSelectedProfile },
                               { icon: Archive, label: "Lưu trữ hội thoại", onClick: () => {} },
                             ].map((action) => (
                               <button key={action.label} type="button" onClick={action.onClick}
@@ -1244,6 +1384,8 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                   {[
                     { icon: callSession.isMuted ? MicOff : Mic, onClick: toggleMute, active: callSession.isMuted },
                     ...(callSession.mode === "video" ? [{ icon: callSession.isCameraOff ? VideoOff : Video, onClick: toggleCamera, active: callSession.isCameraOff }] : []),
+                    ...(callSession.mode === "video" ? [{ icon: callSession.isScreenSharing ? ScreenShareOff : ScreenShare, onClick: toggleScreenShare, active: callSession.isScreenSharing }] : []),
+                    ...(callSession.mode === "video" ? [{ icon: SwitchCamera, onClick: switchCamera, active: false }] : []),
                     { icon: Volume2, onClick: toggleSpeaker, active: !callSession.isSpeakerOn },
                   ].map((btn, i) => (
                     <button key={i} type="button" onClick={btn.onClick}

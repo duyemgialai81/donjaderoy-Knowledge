@@ -16,6 +16,8 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { vi } from "date-fns/locale";
 import { PostCard } from "./PostCard";
+import api from "../lib/api";
+import { localStorage_service } from "../lib/localStorage";
 
 interface ProfilePageProps {
   user: UserType;
@@ -34,10 +36,31 @@ export function ProfilePage({
   const [editedName, setEditedName] = useState(user?.name || "");
   const [editedBio, setEditedBio] = useState("");
   const [activeTab, setActiveTab] = useState("posts");
+  const [followModal, setFollowModal] = useState<"followers" | "following" | null>(null);
+  const [followUsers, setFollowUsers] = useState<any[]>([]);
+  const [isLoadingFollowUsers, setIsLoadingFollowUsers] = useState(false);
 
   const handleSave = () => {
     if (onUpdateProfile) onUpdateProfile({ name: editedName, bio: editedBio });
     setIsEditing(false);
+  };
+
+  const openFollowModal = async (type: "followers" | "following") => {
+    if (!user?.id) return;
+    setFollowModal(type);
+    setFollowUsers([]);
+    setIsLoadingFollowUsers(true);
+    try {
+      const token = localStorage_service.getAuthToken() || undefined;
+      const users = type === "followers"
+        ? await api.getFollowers(user.id, token)
+        : await api.getFollowing(user.id, token);
+      setFollowUsers(Array.isArray(users) ? users : []);
+    } catch {
+      setFollowUsers([]);
+    } finally {
+      setIsLoadingFollowUsers(false);
+    }
   };
 
   const userPosts    = posts?.filter((p) => p.authorId === user?.id) || [];
@@ -212,11 +235,20 @@ export function ProfilePage({
                   { value: user.postsCount || 0,   label: "Bài viết" },
                   { value: user.followers || 0,    label: "Theo dõi" },
                   { value: user.following || 0,    label: "Đang theo" },
-                ].map(({ value, label }) => (
-                  <div key={label} className="rounded-xl bg-slate-50 py-2.5">
+                ].map(({ value, label }, index) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => {
+                      if (index === 1) openFollowModal("followers");
+                      if (index === 2) openFollowModal("following");
+                    }}
+                    disabled={index === 0}
+                    className="rounded-xl bg-slate-50 py-2.5 transition-colors hover:bg-orange-50 disabled:hover:bg-slate-50"
+                  >
                     <div className="text-lg font-bold text-[#F26B38]">{value}</div>
                     <div className="text-[10px] text-slate-500">{label}</div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -343,6 +375,51 @@ export function ProfilePage({
           </div>
         </div>
       </div>
+
+      {followModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+              <h3 className="font-semibold text-slate-800">
+                {followModal === "followers" ? "Người theo dõi" : "Đang theo dõi"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setFollowModal(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="max-h-[60vh] overflow-y-auto p-2">
+              {isLoadingFollowUsers ? (
+                <div className="py-10 text-center text-sm text-slate-500">Đang tải...</div>
+              ) : followUsers.length === 0 ? (
+                <div className="py-10 text-center text-sm text-slate-500">Chưa có người dùng nào</div>
+              ) : (
+                followUsers.map((item) => {
+                  const avatar = item.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.id || item.email || "default"}`;
+                  return (
+                    <a
+                      key={item.id}
+                      href={`/nguoi-dung/${item.id}`}
+                      className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-slate-50"
+                    >
+                      <img src={avatar} alt={item.name || ""} className="h-11 w-11 rounded-xl object-cover" />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold text-slate-800">{item.name || "Người dùng"}</div>
+                        <div className="truncate text-xs text-slate-500">{item.email || item.role || ""}</div>
+                      </div>
+                      <span className="rounded-lg bg-orange-50 px-2 py-1 text-xs font-semibold text-[#F26B38]">Xem</span>
+                    </a>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
