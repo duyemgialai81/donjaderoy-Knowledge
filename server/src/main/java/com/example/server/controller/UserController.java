@@ -83,6 +83,45 @@ public class UserController {
         }
     }
 
+    @PostMapping("/me/avatar")
+    public ResponseObject uploadMyAvatar(@RequestParam("file") MultipartFile file, Principal principal) {
+        if (principal == null) return ResponseObject.error("Unauthorized");
+        return saveAvatar(principal.getName(), file);
+    }
+
+    private ResponseObject saveAvatar(String userId, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            return ResponseObject.error("File is required");
+        }
+        String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
+        if (!contentType.startsWith("image/")) {
+            return ResponseObject.error("Only image files are allowed");
+        }
+        if (file.getSize() > 5 * 1024 * 1024) {
+            return ResponseObject.error("Avatar must be smaller than 5MB");
+        }
+        try {
+            String original = file.getOriginalFilename() == null ? "" : file.getOriginalFilename();
+            String ext = ".jpg";
+            int dot = original.lastIndexOf('.');
+            if (dot >= 0 && dot < original.length() - 1) {
+                ext = original.substring(dot).replaceAll("[^A-Za-z0-9.]", "").toLowerCase(Locale.ROOT);
+            }
+            Path dir = Paths.get("uploads", "avatars").toAbsolutePath().normalize();
+            Files.createDirectories(dir);
+            String fileName = userId + "-" + UUID.randomUUID() + ext;
+            Path target = dir.resolve(fileName).normalize();
+            file.transferTo(target.toFile());
+            String avatarUrl = "/uploads/avatars/" + fileName;
+            UserDTO dto = new UserDTO();
+            dto.setAvatar(avatarUrl);
+            userService.updateProfile(userId, dto);
+            return ResponseObject.success(Map.of("avatar", avatarUrl), "Avatar uploaded");
+        } catch (Exception e) {
+            return ResponseObject.error("Upload failed: " + e.getMessage());
+        }
+    }
+
     @GetMapping("/search")
     public ResponseObject searchUsers(
             @RequestParam String keyword,
