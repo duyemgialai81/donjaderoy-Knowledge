@@ -293,6 +293,13 @@ export async function getCommentsByPost(postId: string, token?: string) {
   return comments;
 }
 
+export async function getCommentReplies(commentId: string, token?: string) {
+  const res = await request('GET', `/api/comments/${encodeURIComponent(commentId)}/replies`, undefined, token);
+  const comments = unwrapResponse(res);
+  if (Array.isArray(comments)) return comments.map(normalizeComment);
+  return comments;
+}
+
 // 👇 THÊM 3 HÀM NÀY VÀO ĐÂY 👇
 export async function likeComment(commentId: string, token?: string) {
   const res = await request('POST', `/api/comments/${encodeURIComponent(commentId)}/like`, undefined, token);
@@ -408,9 +415,9 @@ export async function uploadUserAvatar(userId: string, file: File, token?: strin
   const formData = new FormData();
   formData.append('file', file);
   const _token = token || localStorage_service.getAuthToken();
-  const res = await fetch(`${API_BASE}/api/users/${encodeURIComponent(userId)}/avatar`, {
+  const res = await fetch(`${API_BASE}/api/users/me/avatar`, {
     method: 'POST',
-    headers: _token ? { Authorization: `Bearer ${_token}` } : undefined,
+    headers: _token ? { Authorization: `Bearer ${_token}`, 'X-Auth-Token': _token } : undefined,
     body: formData,
   });
   const parsed = await safeJson(res);
@@ -426,7 +433,7 @@ export async function uploadFile(file: File, token?: string) {
   const _token = token || localStorage_service.getAuthToken();
   const res = await fetch(`${API_BASE}/api/files`, {
     method: 'POST',
-    headers: _token ? { Authorization: `Bearer ${_token}` } : undefined,
+    headers: _token ? { Authorization: `Bearer ${_token}`, 'X-Auth-Token': _token } : undefined,
     body: formData,
   });
   const parsed = await safeJson(res);
@@ -713,6 +720,7 @@ export default {
   // Comments
   addComment,
   getCommentsByPost,
+  getCommentReplies,
   likeComment,
   reportComment,
   updateComment,

@@ -366,7 +366,7 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
 
         <div className="flex items-center gap-2">
           <Button
-            variant={isLiked ? "default" : "outline"}
+            variant="outline"
             size="sm"
             className={`rounded-xl px-4 h-9 text-sm font-semibold transition-all duration-200 shadow-sm ${
               isLiked 

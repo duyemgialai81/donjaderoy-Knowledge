@@ -98,7 +98,7 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
 
     syncLikeState(token).catch(() => {
       setCurrentLikesCount(post.likes || 0);
-      setIsLiked(Boolean(post.isLiked));
+      setIsLiked(false);
     });
     
     api.getUser(post.authorId, token).then((res) => {
@@ -111,9 +111,17 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
       }).catch(() => {});
     }
 
-    api.getCommentsByPost(post.id, token).then((res) => {
+    api.getCommentsByPost(post.id, token).then(async (res) => {
       if (!mounted) return;
-      const list = Array.isArray(res) ? res : (res?.data || res) || [];
+      const rootList = Array.isArray(res) ? res : (res?.data || res) || [];
+      const replyLists = await Promise.all(
+        (Array.isArray(rootList) ? rootList : []).map((comment: any) => api.getCommentReplies(comment.id, token).catch(() => []))
+      );
+      if (!mounted) return;
+      const list = (Array.isArray(rootList) ? rootList : []).map((comment: any, index: number) => ({
+        ...comment,
+        replies: Array.isArray(replyLists[index]) ? replyLists[index] : [],
+      }));
       
       const flatList: Comment[] = [];
       const authorIds = new Set<string>();
@@ -623,7 +631,7 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
             </div>
             <div className="flex items-center gap-2">
               <Button
-                variant={isLiked ? "default" : "outline"}
+                variant="outline"
                 onClick={handleLikeToggle}
                 disabled={!currentUser?.id || isLiking}
                 className={`h-9 px-4 rounded-xl text-sm font-semibold transition-all ${
