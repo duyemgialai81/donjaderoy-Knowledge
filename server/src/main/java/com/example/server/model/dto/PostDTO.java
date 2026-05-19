@@ -16,4 +16,13 @@ public class PostDTO {
     private String topic;
     private String status;
     private String videoUrl;
+    private List<AttachmentDTO> attachments;
+
+    @Data
+    public static class AttachmentDTO {
+        private String name;
+        private String type;
+        private String size;
+        private String url;
+    }
 }

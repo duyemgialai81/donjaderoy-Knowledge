@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "posts")
@@ -38,6 +39,9 @@ public class Post {
     private Integer views;
     private Integer likesCount;
     private Integer commentsCount;
+
+    @Transient
+    private List<Attachment> attachments;
 
     public enum Status { published, draft, pending }
 }

@@ -44,6 +44,9 @@ public class PostServiceImpl implements PostService {
     @Autowired
     private UserBadgeRepository userBadgeRepository;
 
+    @Autowired
+    private AttachmentRepository attachmentRepository;
+
     private static final int POINTS_POST = 10;
     private static final int POINTS_LIKE = 3;
     private static final int MAX_PAGE_SIZE = 50;
@@ -96,6 +99,24 @@ public class PostServiceImpl implements PostService {
             }
         }
 
+        if (postDTO.getAttachments() != null && !postDTO.getAttachments().isEmpty()) {
+            List<Attachment> savedAttachments = new ArrayList<>();
+            for (PostDTO.AttachmentDTO attachmentDTO : postDTO.getAttachments()) {
+                if (attachmentDTO.getUrl() == null || attachmentDTO.getUrl().isBlank()) continue;
+                Attachment attachment = attachmentRepository.save(Attachment.builder()
+                        .id(UUID.randomUUID().toString())
+                        .postId(saved.getId())
+                        .name(attachmentDTO.getName())
+                        .type(attachmentDTO.getType())
+                        .size(attachmentDTO.getSize())
+                        .url(attachmentDTO.getUrl())
+                        .createdAt(LocalDateTime.now())
+                        .build());
+                savedAttachments.add(attachment);
+            }
+            saved.setAttachments(savedAttachments);
+        }
+
         // Award points for creating post (+10 points)
         awardPointsToUser(authUserId, POINTS_POST, "Tạo bài viết");
 
@@ -120,6 +141,7 @@ public class PostServiceImpl implements PostService {
         Post post = maybe.get();
         postRepository.incrementViews(id);
         post.setViews((post.getViews() == null ? 0 : post.getViews()) + 1);
+        post.setAttachments(attachmentRepository.findByPostId(id));
 
         return ResponseObject.success(post, "OK");
     }
@@ -136,6 +158,7 @@ public class PostServiceImpl implements PostService {
         } else {
             posts = postRepository.findByStatusOrderByCreatedAtDesc(Post.Status.published, pageRequest);
         }
+        posts.getContent().forEach(post -> post.setAttachments(attachmentRepository.findByPostId(post.getId())));
 
         return ResponseObject.success(
                 new com.example.server.model.response.PageableObject<>(posts),
