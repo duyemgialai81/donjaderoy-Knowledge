@@ -255,7 +255,7 @@ export function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePostModalPr
               onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
               onDragLeave={() => setIsDragOver(false)}
               onDrop={(e) => { e.preventDefault(); setIsDragOver(false); void uploadPostFiles(e.dataTransfer.files); }}
-              className={`border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer ${
+              className={`block w-full border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer ${
                 isDragOver
                   ? "border-[#F26B38] bg-[#FEF0E8]"
                   : "border-slate-200 hover:border-[#F26B38] hover:bg-slate-50"
