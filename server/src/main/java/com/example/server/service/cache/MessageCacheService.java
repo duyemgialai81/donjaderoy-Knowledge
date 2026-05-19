@@ -2,6 +2,8 @@ package com.example.server.service.cache;
 
 import com.example.server.entity.Message;
 import com.example.server.entity.MessageReaction;
+import com.example.server.model.dto.ChatDTO;
+import com.example.server.model.dto.UserDTO;
 import com.example.server.repository.MessageReactionRepository;
 import com.example.server.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +45,8 @@ public class MessageCacheService {
     private static final String KEY_REACTION_COUNTS = "chat:message:reaction-counts:";
     private static final String KEY_USER_REACTION = "chat:message:user-reaction:";
     private static final String KEY_USER_ONLINE = "chat:user-online:";
+    private static final String KEY_CHAT_MUTUAL_FOLLOWERS = "chat:mutual-followers:";
+    private static final String KEY_CHAT_CONVERSATIONS = "chat:conversations:";
 
     public static final Set<String> ALLOWED_EMOJIS = Set.of(
             "\u2764\uFE0F",
@@ -73,6 +77,9 @@ public class MessageCacheService {
 
     @Value("${cache.user-online.ttl-minutes:15}")
     private long userOnlineTtlMinutes;
+
+    @Value("${cache.chat-list.ttl-seconds:45}")
+    private long chatListTtlSeconds;
 
     public Optional<Message> getMessage(String messageId) {
         String key = messageKey(messageId);
@@ -155,6 +162,66 @@ public class MessageCacheService {
             }
         });
         return messagesAsc;
+    }
+
+    public Optional<List<UserDTO>> getCachedMutualFollowers(String userId) {
+        String key = chatMutualFollowersKey(userId);
+        try {
+            Object cached = valueOps.get(key);
+            if (cached instanceof List<?> list) {
+                List<UserDTO> users = list.stream()
+                        .filter(UserDTO.class::isInstance)
+                        .map(UserDTO.class::cast)
+                        .toList();
+                if (users.size() == list.size()) {
+                    redisTemplate.expire(key, chatListTtl());
+                    return Optional.of(users);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Redis mutual followers cache read failed for user {}", userId, e);
+        }
+        return Optional.empty();
+    }
+
+    public void cacheMutualFollowers(String userId, List<UserDTO> users) {
+        try {
+            valueOps.set(chatMutualFollowersKey(userId), new ArrayList<>(users), chatListTtl());
+        } catch (Exception e) {
+            log.warn("Redis mutual followers cache write failed for user {}", userId, e);
+        }
+    }
+
+    public Optional<List<ChatDTO.ConversationItem>> getCachedConversations(String userId) {
+        String key = chatConversationsKey(userId);
+        try {
+            Object cached = valueOps.get(key);
+            if (cached instanceof List<?> list) {
+                List<ChatDTO.ConversationItem> conversations = list.stream()
+                        .filter(ChatDTO.ConversationItem.class::isInstance)
+                        .map(ChatDTO.ConversationItem.class::cast)
+                        .toList();
+                if (conversations.size() == list.size()) {
+                    redisTemplate.expire(key, chatListTtl());
+                    return Optional.of(conversations);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Redis conversations cache read failed for user {}", userId, e);
+        }
+        return Optional.empty();
+    }
+
+    public void cacheConversations(String userId, List<ChatDTO.ConversationItem> conversations) {
+        try {
+            valueOps.set(chatConversationsKey(userId), new ArrayList<>(conversations), chatListTtl());
+        } catch (Exception e) {
+            log.warn("Redis conversations cache write failed for user {}", userId, e);
+        }
+    }
+
+    public void invalidateChatListCache(String userId) {
+        safeDelete(chatConversationsKey(userId));
     }
 
     public void cacheUpdatedMessage(Message message) {
@@ -408,6 +475,10 @@ public class MessageCacheService {
         return Duration.ofMinutes(Math.max(1, minutes));
     }
 
+    private Duration chatListTtl() {
+        return Duration.ofSeconds(Math.max(5, chatListTtlSeconds));
+    }
+
     private String messageKey(String messageId) {
         return KEY_MESSAGE + messageId;
     }
@@ -422,6 +493,14 @@ public class MessageCacheService {
 
     private String userReactionKey(String messageId, String userId) {
         return KEY_USER_REACTION + messageId + ":" + userId;
+    }
+
+    private String chatMutualFollowersKey(String userId) {
+        return KEY_CHAT_MUTUAL_FOLLOWERS + userId;
+    }
+
+    private String chatConversationsKey(String userId) {
+        return KEY_CHAT_CONVERSATIONS + userId;
     }
 
     private void safeDelete(String key) {

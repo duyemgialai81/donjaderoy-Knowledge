@@ -53,9 +53,13 @@ public class ChatService {
     private final MessageCacheService cacheService;
 
     public List<UserDTO> getMutualFollowers(String userId) {
-        return userRepository.findMutualFollowers(userId).stream()
-                .map(this::mapToUserDTO)
-                .collect(Collectors.toList());
+        return cacheService.getCachedMutualFollowers(userId).orElseGet(() -> {
+            List<UserDTO> users = userRepository.findMutualFollowers(userId).stream()
+                    .map(this::mapToUserDTO)
+                    .collect(Collectors.toList());
+            cacheService.cacheMutualFollowers(userId, users);
+            return users;
+        });
     }
 
     public List<UserDTO> searchUsersToChat(String currentUserId, String keyword) {
@@ -100,11 +104,16 @@ public class ChatService {
         Message savedMessage = cacheService.saveMessageWithCache(message);
         touchConversation(conversationId, now);
         markConversationAsRead(conversationId, senderId, now);
+        invalidateConversationListCaches(conversationId);
         return mapToMessageResponse(savedMessage, senderId);
     }
 
     public List<ChatDTO.ConversationItem> getConversations(String userId) {
-        return getConversationsPage(userId, 0, 50).getContent();
+        return cacheService.getCachedConversations(userId).orElseGet(() -> {
+            List<ChatDTO.ConversationItem> conversations = getConversationsPage(userId, 0, 50).getContent();
+            cacheService.cacheConversations(userId, conversations);
+            return conversations;
+        });
     }
 
     public PageableObject<ChatDTO.ConversationItem> getConversationsPage(String userId, int page, int size) {
@@ -202,6 +211,7 @@ public class ChatService {
             String conversationId = getOrCreateDirectConversation(creatorId, receiverId);
             ConversationParticipant participant = participantRepository.findById(new ConversationParticipantId(conversationId, creatorId))
                     .orElseThrow(() -> new IllegalArgumentException("User is not a participant of this conversation"));
+            invalidateConversationListCaches(conversationId);
             return buildConversationItem(creatorId, participant);
         }
 
@@ -238,6 +248,7 @@ public class ChatService {
                     .build());
         }
 
+        memberIds.forEach(cacheService::invalidateChatListCache);
         ConversationParticipant creatorParticipant = participantRepository.findById(new ConversationParticipantId(conversation.getId(), creatorId))
                 .orElseThrow(() -> new IllegalArgumentException("User is not a participant of this conversation"));
         return buildConversationItem(creatorId, creatorParticipant);
@@ -260,6 +271,7 @@ public class ChatService {
         Message saved = messageRepository.save(message);
         cacheService.cacheUpdatedMessage(saved);
         touchConversation(saved.getConversationId(), saved.getEditedAt());
+        invalidateConversationListCaches(saved.getConversationId());
         return mapToMessageResponse(saved, userId);
     }
 
@@ -276,6 +288,7 @@ public class ChatService {
         Message saved = messageRepository.save(message);
         cacheService.cacheUpdatedMessage(saved);
         touchConversation(saved.getConversationId(), now);
+        invalidateConversationListCaches(saved.getConversationId());
         return mapToMessageResponse(saved, userId);
     }
 
@@ -309,6 +322,7 @@ public class ChatService {
     @Transactional
     public void markConversationAsRead(String conversationId, String userId) {
         markConversationAsRead(conversationId, userId, LocalDateTime.now());
+        cacheService.invalidateChatListCache(userId);
     }
 
     @Transactional
@@ -329,6 +343,7 @@ public class ChatService {
         participant.setLastReadAt(LocalDateTime.now());
         participantRepository.save(participant);
         touchConversation(conversationId, LocalDateTime.now());
+        invalidateConversationListCaches(conversationId);
         return buildConversationItem(userId, participant);
     }
 
@@ -345,6 +360,7 @@ public class ChatService {
         participant.setStatus(ConversationParticipant.ParticipantStatus.blocked);
         participantRepository.save(participant);
         touchConversation(conversationId, LocalDateTime.now());
+        invalidateConversationListCaches(conversationId);
     }
 
     public Set<String> getParticipantIds(String conversationId) {
@@ -443,6 +459,10 @@ public class ChatService {
                 .orElseThrow(() -> new IllegalArgumentException("User is not a participant of this conversation"));
         participant.setLastReadAt(readAt);
         participantRepository.save(participant);
+    }
+
+    private void invalidateConversationListCaches(String conversationId) {
+        getParticipantIds(conversationId).forEach(cacheService::invalidateChatListCache);
     }
 
     private void assertParticipant(String conversationId, String userId) {
