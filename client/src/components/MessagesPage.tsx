@@ -39,7 +39,7 @@ import {
   Bell,
 } from "lucide-react";
 import { toast } from "sonner";
-import api, { normalizeAvatarUrl } from "../lib/api";
+import api, { normalizeAssetUrl, normalizeAvatarUrl } from "../lib/api";
 import { localStorage_service } from "../lib/localStorage";
 import { clearPendingCall, createSockJsConnection, INCOMING_CALL_EVENT, readPendingCall } from "../lib/realtime";
 
@@ -144,6 +144,32 @@ const iceServers = {
   ],
 };
 
+const CHAT_LIST_CACHE_TTL_MS = 45_000;
+const MESSAGE_HISTORY_CACHE_TTL_MS = 90_000;
+
+type ExpiringMemoryCache<T> = Map<string, { savedAt: number; value: T }>;
+
+const chatListMemoryCache: ExpiringMemoryCache<ConversationItem[]> = new Map();
+const messageHistoryMemoryCache: ExpiringMemoryCache<MessageItem[]> = new Map();
+
+function cloneCacheValue<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function readExpiringCache<T>(cache: ExpiringMemoryCache<T>, key: string, ttlMs: number): T | null {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.savedAt > ttlMs) {
+    cache.delete(key);
+    return null;
+  }
+  return cloneCacheValue(entry.value);
+}
+
+function writeExpiringCache<T>(cache: ExpiringMemoryCache<T>, key: string, value: T) {
+  cache.set(key, { savedAt: Date.now(), value: cloneCacheValue(value) });
+}
+
 export default function MessagesPage({ currentUser }: MessagesPageProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -209,6 +235,14 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   useEffect(() => { conversationsRef.current = conversations; }, [conversations]);
   useEffect(() => { callSessionRef.current = callSession; }, [callSession]);
   useEffect(() => { selectedChatIdRef.current = selectedChatId; }, [selectedChatId]);
+  useEffect(() => {
+    if (!currentUserId || conversations.length === 0) return;
+    writeExpiringCache(chatListMemoryCache, `chat-list:${currentUserId}`, conversations);
+  }, [conversations, currentUserId]);
+  useEffect(() => {
+    if (!currentUserId || !selectedChatId || selectedChatId.startsWith("new_") || messages.length === 0) return;
+    writeExpiringCache(messageHistoryMemoryCache, `messages:${currentUserId}:${selectedChatId}`, messages);
+  }, [messages, selectedChatId, currentUserId]);
 
   const dedupConversations = (list: ConversationItem[]) => {
     const map = new Map<string, ConversationItem>();
@@ -273,8 +307,9 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     ? getAvatarUrl(selectedChat.avatar, getConversationPeerId(selectedChat) || selectedChat.id)
     : "";
   const selectedChatBackground = CHAT_BACKGROUNDS.find((item) => item.id === chatBackgroundId) || CHAT_BACKGROUNDS[0];
-  const selectedChatBackgroundValue = customChatBackground
-    ? `linear-gradient(rgba(248,250,252,0.84), rgba(248,250,252,0.84)), url("${customChatBackground}") center/cover`
+  const normalizedCustomChatBackground = customChatBackground ? (normalizeAssetUrl(customChatBackground) || customChatBackground) : "";
+  const selectedChatBackgroundValue = normalizedCustomChatBackground
+    ? `linear-gradient(rgba(248,250,252,0.84), rgba(248,250,252,0.84)), url("${normalizedCustomChatBackground}") center/cover`
     : selectedChatBackground.value;
 
   const updateChatBackground = (id: string) => {
@@ -289,9 +324,10 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   };
 
   const updateCustomChatBackground = (url: string) => {
-    setCustomChatBackground(url);
+    const normalizedUrl = normalizeAssetUrl(url) || url;
+    setCustomChatBackground(normalizedUrl);
     try {
-      localStorage.setItem(CUSTOM_CHAT_BACKGROUND_STORAGE_KEY, url);
+      localStorage.setItem(CUSTOM_CHAT_BACKGROUND_STORAGE_KEY, normalizedUrl);
     } catch {
       // Ignore storage failures.
     }
@@ -335,8 +371,21 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   };
 
   // ==================== DATA LOADING ====================
-  const loadChatsAndFriends = async () => {
-    setIsLoadingChats(true);
+  const loadChatsAndFriends = async (options: { force?: boolean; silent?: boolean } = {}) => {
+    if (!currentUserId) {
+      setIsLoadingChats(false);
+      return;
+    }
+
+    const cacheKey = `chat-list:${currentUserId}`;
+    const cached = options.force ? null : readExpiringCache(chatListMemoryCache, cacheKey, CHAT_LIST_CACHE_TTL_MS);
+    if (cached) {
+      setConversations(cached);
+      setIsLoadingChats(false);
+      return;
+    }
+
+    if (!options.silent) setIsLoadingChats(true);
     try {
       let convs: ConversationItem[] = [];
       try {
@@ -362,8 +411,12 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
           final.push({ id: `new_${fId}`, targetUserId: fId, name: f.name || "Người dùng", avatar: f.avatar, lastMessage: "Sẵn sàng mở cuộc trò chuyện.", time: "", unread: 0, isOnline: Boolean(f.isOnline), status: "accepted" });
         }
       });
-      setConversations(dedupConversations(final));
-    } finally { setIsLoadingChats(false); }
+      const nextConversations = dedupConversations(final);
+      writeExpiringCache(chatListMemoryCache, cacheKey, nextConversations);
+      setConversations(nextConversations);
+    } finally {
+      if (!options.silent) setIsLoadingChats(false);
+    }
   };
 
   // ==================== ACCEPT / REJECT PENDING ====================
@@ -394,7 +447,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
       const res = await api.request("PUT", `/api/chat/conversations/${convId}/accept`);
       const accepted = res?.data || {};
       setConversations((prev) => prev.map((c) => c.id === selectedChat.id ? { ...c, ...accepted, id: convId, status: "accepted", unread: c.unread } : c));
-      await loadChatsAndFriends();
+      await loadChatsAndFriends({ force: true });
       toast.success("Đã chấp nhận tin nhắn");
     } catch (error: any) {
       toast.error(error?.message || "Không thể chấp nhận tin nhắn.");
@@ -699,7 +752,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
               }
               updated.splice(idx, 1); updated.unshift(conv); return dedupConversations(updated);
             }
-            loadChatsAndFriends(); return updated;
+            void loadChatsAndFriends({ force: true, silent: true }); return updated;
           });
           if (doesEventMatchSelectedChat(convId, senderId, receiverId)) {
             setMessages((prev) => {
@@ -843,10 +896,11 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   }, [currentUserId]);
 
   useEffect(() => {
+    if (!currentUserId) return;
     loadChatsAndFriends();
-    const refreshTimer = window.setInterval(loadChatsAndFriends, 60000);
+    const refreshTimer = window.setInterval(() => loadChatsAndFriends({ silent: true }), 60000);
     return () => window.clearInterval(refreshTimer);
-  }, []);
+  }, [currentUserId]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -905,12 +959,21 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   useEffect(() => {
     if (!selectedChatId) return;
     if (selectedChatId.startsWith("new_")) { setMessages([]); return; }
+    if (!currentUserId) return;
+    const cacheKey = `messages:${currentUserId}:${selectedChatId}`;
+    const hasUnread = Number(selectedChat?.unread || 0) > 0;
+    const cachedMessages = hasUnread ? null : readExpiringCache(messageHistoryMemoryCache, cacheKey, MESSAGE_HISTORY_CACHE_TTL_MS);
+    if (cachedMessages) {
+      setMessages(cachedMessages);
+      setIsLoadingMessages(false);
+      return;
+    }
     const fetchMessages = async () => {
       setIsLoadingMessages(true);
       try {
         const res = await api.request("GET", `/api/chat/messages/${selectedChatId}`);
         const list = Array.isArray(res) ? res : res?.data || [];
-        setMessages(list.map((m: any) => ({
+        const nextMessages = list.map((m: any) => ({
           id: toId(m.id) || Math.random().toString(),
           senderId: toId(m.senderId) === currentUserId ? "me" : toId(m.senderId),
           senderName: m.senderName,
@@ -925,12 +988,14 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
           attachmentSize: m.attachmentSize,
           messageType: m.messageType,
           reactions: m.reactions || {}, userReactions: m.userReactions || {},
-        })));
+        }));
+        writeExpiringCache(messageHistoryMemoryCache, cacheKey, nextMessages);
+        setMessages(nextMessages);
         setConversations((prev) => prev.map((c) => c.id === selectedChatId ? { ...c, unread: 0 } : c));
       } catch { setMessages([]); } finally { setIsLoadingMessages(false); }
     };
     fetchMessages();
-  }, [selectedChatId, currentUserId]);
+  }, [selectedChatId, currentUserId, selectedChat?.unread]);
 
   // ==================== SEND MESSAGE ====================
   const handleSendMessage = async (event: FormEvent) => {

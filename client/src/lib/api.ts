@@ -24,6 +24,15 @@ export function getWebSocketUrl() {
   return WS_BASE;
 }
 
+export function normalizeAssetUrl(value?: string) {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw) return '';
+  if (/^(https?:|data:|blob:)/i.test(raw)) return raw;
+
+  const normalizedPath = raw.startsWith('/') ? raw : `/${raw}`;
+  return `${API_BASE}${normalizedPath}`;
+}
+
 export function normalizeAvatarUrl(value?: string, seed?: string) {
   const raw = typeof value === 'string' ? value.trim() : '';
   const fallbackSeed = encodeURIComponent(seed || 'default');
@@ -33,8 +42,7 @@ export function normalizeAvatarUrl(value?: string, seed?: string) {
   if (/^(https?:|data:|blob:)/i.test(raw)) return raw;
   if (/^\/?avt\d+\.png$/i.test(raw)) return fallback;
 
-  const normalizedPath = raw.startsWith('/') ? raw : `/${raw}`;
-  return `${API_BASE}${normalizedPath}`;
+  return normalizeAssetUrl(raw) || fallback;
 }
 
 async function safeJson(res: Response) {
@@ -415,32 +423,48 @@ export async function uploadUserAvatar(userId: string, file: File, token?: strin
   const formData = new FormData();
   formData.append('file', file);
   const _token = token || localStorage_service.getAuthToken();
-  const res = await fetch(`${API_BASE}/api/users/me/avatar`, {
+  if (_token) {
+    formData.append('access_token', _token);
+    formData.append('token', _token);
+  }
+  const endpoint = _token
+    ? `${API_BASE}/api/users/me/avatar?access_token=${encodeURIComponent(_token)}`
+    : `${API_BASE}/api/users/me/avatar`;
+  const res = await fetch(endpoint, {
     method: 'POST',
-    headers: _token ? { Authorization: `Bearer ${_token}`, 'X-Auth-Token': _token } : undefined,
     body: formData,
   });
   const parsed = await safeJson(res);
   if (!res.ok || parsed?.isSuccess === false) {
     throw new Error(parsed?.message || `API error: ${res.status}`);
   }
-  return parsed?.data || parsed;
+  const data = parsed?.data || parsed;
+  if (data?.avatar) return { ...data, avatar: normalizeAssetUrl(data.avatar) || data.avatar };
+  return data;
 }
 
 export async function uploadFile(file: File, token?: string) {
   const formData = new FormData();
   formData.append('file', file);
   const _token = token || localStorage_service.getAuthToken();
-  const res = await fetch(`${API_BASE}/api/files`, {
+  if (_token) {
+    formData.append('access_token', _token);
+    formData.append('token', _token);
+  }
+  const endpoint = _token
+    ? `${API_BASE}/api/files?access_token=${encodeURIComponent(_token)}`
+    : `${API_BASE}/api/files`;
+  const res = await fetch(endpoint, {
     method: 'POST',
-    headers: _token ? { Authorization: `Bearer ${_token}`, 'X-Auth-Token': _token } : undefined,
     body: formData,
   });
   const parsed = await safeJson(res);
   if (!res.ok || parsed?.isSuccess === false) {
     throw new Error(parsed?.message || `API error: ${res.status}`);
   }
-  return parsed?.data || parsed;
+  const data = parsed?.data || parsed;
+  if (data?.url) return { ...data, url: normalizeAssetUrl(data.url) || data.url };
+  return data;
 }
 
 export async function searchUsers(keyword: string, page = 0, size = 10, token?: string) {
@@ -506,7 +530,6 @@ export async function updateCallStatus(callId: string, status: 'completed' | 'mi
  * Lấy danh sách những người bạn follow chéo (Mutual Followers) để bắt đầu nhắn tin
  */
 export async function getMutualFollowersForChat(token?: string) {
-  console.log(`[API] getMutualFollowersForChat()`);
   const res = await request('GET', '/api/chat/mutual-followers', undefined, token);
   const users = unwrapResponse(res);
   if (Array.isArray(users)) return users.map(normalizeUser);
@@ -517,7 +540,6 @@ export async function getMutualFollowersForChat(token?: string) {
  * Tìm kiếm người dùng để nhắn tin (loại trừ những người đã bị chặn)
  */
 export async function searchUsersToChat(keyword: string, token?: string) {
-  console.log(`[API] searchUsersToChat(keyword: ${keyword})`);
   const res = await request('GET', `/api/chat/search-users?keyword=${encodeURIComponent(keyword)}`, undefined, token);
   const users = unwrapResponse(res);
   if (Array.isArray(users)) return users.map(normalizeUser);
