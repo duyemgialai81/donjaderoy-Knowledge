@@ -224,6 +224,7 @@ function MainApp() {
           authorId: currentUser?.id,
           majorId: newPostData.major || newPostData.majorId,
           subjectId: newPostData.subject || newPostData.subjectId,
+          attachments: newPostData.attachments || [],
         };
         const created = await api.createPost(payload, token);
         const newPost = (created?.id ? created : created?.data) as Post | undefined;
@@ -320,7 +321,7 @@ function MainApp() {
   // 3. Messages View
   if (currentView === "messages") {
     return (
-      <div className="h-screen flex flex-col overflow-hidden bg-[#eef2f6]" style={{ height: "var(--app-visual-height, 100dvh)" }}>
+      <div className="messages-app-view h-screen flex flex-col overflow-hidden bg-[#eef2f6]" style={{ height: "var(--app-visual-height, 100dvh)" }}>
         <Header {...headerProps} />
         <div className="messages-page-frame flex-1 min-h-0 overflow-hidden bg-[#eef2f6] px-3 py-3">
           <div className="messages-page-inner mx-auto h-full min-h-0 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">

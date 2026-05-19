@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, FileText, Upload, Video, Tag, BookOpen, Zap, Settings2 } from "lucide-react";
+import { X, FileText, Upload, Video, Tag, BookOpen, Zap, Settings2, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
@@ -58,6 +58,8 @@ export function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePostModalPr
   const [videoUrl, setVideoUrl] = useState("");
   const [status, setStatus] = useState<"published" | "draft">("published");
   const [isDragOver, setIsDragOver] = useState(false);
+  const [attachments, setAttachments] = useState<any[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleMajorChange = (value: string) => {
     setMajor(value);
@@ -90,16 +92,38 @@ export function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePostModalPr
     }
   };
 
+  const uploadPostFiles = async (files: FileList | File[]) => {
+    const list = Array.from(files);
+    if (list.length === 0) return;
+    setIsUploading(true);
+    try {
+      const uploadedFiles = await Promise.all(list.map((file) => api.uploadFile(file, token || undefined)));
+      setAttachments((prev) => [
+        ...prev,
+        ...uploadedFiles.map((file: any) => ({
+          name: file.name,
+          type: file.type,
+          size: String(file.size || ""),
+          url: file.url,
+        })),
+      ]);
+    } catch (error: any) {
+      alert(error?.message || "Không thể tải file lên");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleSubmit = () => {
     if (!title.trim() || !content.trim() || !major || !subject) {
       alert("Vui lòng điền đầy đủ thông tin bắt buộc (tiêu đề, nội dung, ngành, môn học)");
       return;
     }
     const subjectName = availableSubjects.find((s) => s.id === subject)?.name || subject;
-    onSubmit({ title, content, major, subject, tags, videoUrl: videoUrl || undefined, status, topic: subjectName });
+    onSubmit({ title, content, major, subject, tags, videoUrl: videoUrl || undefined, status, topic: subjectName, attachments });
     // Reset
     setTitle(""); setContent(""); setMajor(""); setSubject("");
-    setAvailableSubjects([]); setTags([]); setVideoUrl(""); setStatus("published");
+    setAvailableSubjects([]); setTags([]); setVideoUrl(""); setStatus("published"); setAttachments([]);
     onClose();
   };
 
@@ -227,26 +251,52 @@ export function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePostModalPr
           {/* ── Section 2: Media & Files ── */}
           <SectionCard icon={Upload} title="Media & Tệp tin" iconColor="bg-blue-500">
             {/* File drop zone */}
-            <div
+            <label
               onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
               onDragLeave={() => setIsDragOver(false)}
-              onDrop={(e) => { e.preventDefault(); setIsDragOver(false); }}
+              onDrop={(e) => { e.preventDefault(); setIsDragOver(false); void uploadPostFiles(e.dataTransfer.files); }}
               className={`border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer ${
                 isDragOver
                   ? "border-[#F26B38] bg-[#FEF0E8]"
                   : "border-slate-200 hover:border-[#F26B38] hover:bg-slate-50"
               }`}
             >
+              <input
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files) void uploadPostFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
               <div className={`h-12 w-12 rounded-xl mx-auto mb-3 flex items-center justify-center transition-colors ${
                 isDragOver ? "bg-[#F26B38]" : "bg-slate-100"
               }`}>
-                <Upload className={`h-6 w-6 ${isDragOver ? "text-white" : "text-slate-400"}`} />
+                {isUploading ? <Loader2 className="h-6 w-6 animate-spin text-[#F26B38]" /> : <Upload className={`h-6 w-6 ${isDragOver ? "text-white" : "text-slate-400"}`} />}
               </div>
               <p className="text-sm font-medium text-slate-600">
-                {isDragOver ? "Thả file vào đây!" : "Kéo thả hoặc click để tải file"}
+                {isUploading ? "Đang tải file..." : isDragOver ? "Thả file vào đây!" : "Kéo thả hoặc click để tải file"}
               </p>
-              <p className="text-xs text-slate-400 mt-1">PDF, DOCX, PPTX – tối đa 10MB</p>
-            </div>
+              <p className="text-xs text-slate-400 mt-1">Ảnh, PDF, DOCX, PPTX - tối đa 25MB</p>
+            </label>
+
+            {attachments.length > 0 && (
+              <div className="space-y-2">
+                {attachments.map((file, index) => (
+                  <div key={`${file.url}-${index}`} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white px-3 py-2">
+                    <FileText className="h-4 w-4 text-[#F26B38]" />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold text-slate-700">{file.name}</div>
+                      <div className="truncate text-xs text-slate-400">{file.type}</div>
+                    </div>
+                    <button type="button" onClick={() => setAttachments((prev) => prev.filter((_, i) => i !== index))} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-red-500">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Video URL */}
             <div className="space-y-1.5">

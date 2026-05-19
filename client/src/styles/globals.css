@@ -538,6 +538,18 @@
   font-weight: 700 !important;
 }
 
+.message-action-row {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.message-bubble-group:hover .message-action-row,
+.message-action-row[data-active="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 @media (hover: none) and (pointer: coarse) {
   .card-premium:hover,
   .post-card-hover:hover,
@@ -679,6 +691,11 @@
 
   .messages-page-frame {
     padding: 0 !important;
+  }
+
+  .messages-app-view {
+    height: var(--app-visual-height, 100svh) !important;
+    max-height: var(--app-visual-height, 100svh) !important;
   }
 
   .messages-page-inner {

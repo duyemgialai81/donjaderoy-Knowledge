@@ -1348,7 +1348,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                                 {showAvatar ? <img src={selectedChatAvatar} alt="" style={{ width: 32, height: 32, borderRadius: 10, objectFit: "cover" }} /> : <div style={{ width: 32 }} />}
                               </div>
                             )}
-                            <div style={{ maxWidth: "68%", position: "relative" }}>
+                            <div className="message-bubble-group" style={{ maxWidth: "68%", position: "relative" }}>
                               {!isMe && isGroupChat && msg.senderName && (
                                 <div style={{ fontSize: 11, fontWeight: 700, color: "#475569", margin: "0 0 3px 4px" }}>
                                   {msg.senderName}
@@ -1396,7 +1396,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                               </div>
 
                               {!msg.isDeleted && (
-                                <div style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start", gap: 6, marginTop: 5 }}>
+                                <div className="message-action-row" data-active={activeMessageMenu === msg.id || showReactionPicker === msg.id ? "true" : "false"} style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start", gap: 6, marginTop: 5 }}>
                                   <button type="button" title="Copy" onClick={() => handleCopyMessage(msg)} style={{ width: 26, height: 26, borderRadius: 13, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Copy size={13} /></button>
                                   <button type="button" title="Trả lời" onClick={() => setReplyingTo(msg)} style={{ width: 26, height: 26, borderRadius: 13, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Reply size={13} /></button>
                                   <button type="button" title="React" onClick={() => setShowReactionPicker(showReactionPicker === msg.id ? null : msg.id)} style={{ width: 26, height: 26, borderRadius: 13, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Smile size={13} /></button>
