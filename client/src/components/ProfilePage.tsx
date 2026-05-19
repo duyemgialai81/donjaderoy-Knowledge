@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { User as UserType, Post } from "../lib/mockData";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -22,6 +22,7 @@ import { localStorage_service } from "../lib/localStorage";
 interface ProfilePageProps {
   user: UserType;
   posts: Post[];
+  currentUser?: any;
   isOwnProfile: boolean;
   onUpdateProfile?: (data: any) => void;
   onFollow?: () => void;
@@ -30,19 +31,84 @@ interface ProfilePageProps {
 }
 
 export function ProfilePage({
-  user, posts, isOwnProfile, onUpdateProfile, onFollow, onPostClick, onPostLike,
+  user, posts, currentUser, isOwnProfile, onUpdateProfile, onFollow, onPostClick, onPostLike,
 }: ProfilePageProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(user?.name || "");
-  const [editedBio, setEditedBio] = useState("");
+  const [editedBio, setEditedBio] = useState((user as any)?.bio || "");
+  const [editedAvatar, setEditedAvatar] = useState((user as any)?.avatar || "");
+  const [editedMajorId, setEditedMajorId] = useState((user as any)?.majorId || (user as any)?.major || "");
+  const [editedClassName, setEditedClassName] = useState((user as any)?.className || (user as any)?.class || "");
   const [activeTab, setActiveTab] = useState("posts");
   const [followModal, setFollowModal] = useState<"followers" | "following" | null>(null);
   const [followUsers, setFollowUsers] = useState<any[]>([]);
   const [isLoadingFollowUsers, setIsLoadingFollowUsers] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollowBusy, setIsFollowBusy] = useState(false);
+  const [followersCount, setFollowersCount] = useState(Number((user as any)?.followers || 0));
+
+  useEffect(() => {
+    setEditedName(user?.name || "");
+    setEditedBio((user as any)?.bio || "");
+    setEditedAvatar((user as any)?.avatar || "");
+    setEditedMajorId((user as any)?.majorId || (user as any)?.major || "");
+    setEditedClassName((user as any)?.className || (user as any)?.class || "");
+    setFollowersCount(Number((user as any)?.followers || 0));
+  }, [user?.id, user?.name, (user as any)?.bio, (user as any)?.avatar, (user as any)?.majorId, (user as any)?.major, (user as any)?.className, (user as any)?.class, (user as any)?.followers]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadFollowStatus = async () => {
+      if (isOwnProfile || !currentUser?.id || !user?.id) {
+        setIsFollowing(false);
+        return;
+      }
+      try {
+        const token = localStorage_service.getAuthToken() || undefined;
+        const status = await api.getFollowStatus(currentUser.id, user.id, token);
+        if (mounted) setIsFollowing(Boolean(status?.isFollowing));
+      } catch {
+        if (mounted) setIsFollowing(false);
+      }
+    };
+    loadFollowStatus();
+    return () => { mounted = false; };
+  }, [currentUser?.id, user?.id, isOwnProfile]);
 
   const handleSave = () => {
-    if (onUpdateProfile) onUpdateProfile({ name: editedName, bio: editedBio });
+    if (onUpdateProfile) {
+      onUpdateProfile({
+        name: editedName.trim(),
+        bio: editedBio.trim(),
+        avatar: editedAvatar.trim(),
+        majorId: editedMajorId.trim(),
+        className: editedClassName.trim(),
+      });
+    }
     setIsEditing(false);
+  };
+
+  const handleFollowToggle = async () => {
+    if (!currentUser?.id || !user?.id || isFollowBusy) {
+      onFollow?.();
+      return;
+    }
+    setIsFollowBusy(true);
+    try {
+      const token = localStorage_service.getAuthToken() || undefined;
+      if (isFollowing) {
+        await api.unfollowUser(currentUser.id, user.id, token);
+        setIsFollowing(false);
+        setFollowersCount((prev) => Math.max(0, prev - 1));
+      } else {
+        await api.followUser(currentUser.id, user.id, token);
+        setIsFollowing(true);
+        setFollowersCount((prev) => prev + 1);
+      }
+      onFollow?.();
+    } finally {
+      setIsFollowBusy(false);
+    }
   };
 
   const openFollowModal = async (type: "followers" | "following") => {
@@ -107,7 +173,7 @@ export function ProfilePage({
         <div className="absolute top-8 left-1/3 h-20 w-20 rounded-full bg-white/5" />
       </div>
 
-      <div className="container mx-auto px-4">
+      <div className="profile-content-layer container mx-auto px-4">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 -mt-28 pb-10">
 
           {/* ── Left – Profile Card ── */}
@@ -187,12 +253,34 @@ export function ProfilePage({
                 </div>
 
                 {isEditing && (
-                  <Textarea
+                  <div className="space-y-2 text-left">
+                    <Input
+                      value={editedAvatar}
+                      onChange={(e) => setEditedAvatar(e.target.value)}
+                      placeholder="URL anh dai dien"
+                      className="text-sm"
+                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <Input
+                        value={editedMajorId}
+                        onChange={(e) => setEditedMajorId(e.target.value)}
+                        placeholder="Nganh/Ma nganh"
+                        className="text-sm"
+                      />
+                      <Input
+                        value={editedClassName}
+                        onChange={(e) => setEditedClassName(e.target.value)}
+                        placeholder="Lop"
+                        className="text-sm"
+                      />
+                    </div>
+                    <Textarea
                     placeholder="Giới thiệu về bản thân..."
                     value={editedBio}
                     onChange={(e) => setEditedBio(e.target.value)}
-                    className="min-h-[80px] text-sm mb-3"
-                  />
+                      className="min-h-[80px] text-sm mb-3"
+                    />
+                  </div>
                 )}
               </div>
 
@@ -217,10 +305,14 @@ export function ProfilePage({
                   )
                 ) : (
                   <>
-                    <Button className="flex-1 h-9 text-sm btn-gradient-orange rounded-lg" onClick={onFollow}>
-                      <Users className="h-3.5 w-3.5 mr-1.5" /> Theo dõi
+                    <Button
+                      className={`flex-1 h-9 text-sm rounded-lg ${isFollowing ? "bg-slate-100 text-slate-700 hover:bg-slate-200" : "btn-gradient-orange"}`}
+                      onClick={handleFollowToggle}
+                      disabled={isFollowBusy}
+                    >
+                      <Users className="h-3.5 w-3.5 mr-1.5" /> {isFollowing ? "Bỏ theo dõi" : "Theo dõi"}
                     </Button>
-                    <Button variant="outline" className="flex-1 h-9 text-sm rounded-lg">
+                    <Button variant="outline" className="flex-1 h-9 text-sm rounded-lg border-orange-200 bg-orange-50 text-[#F26B38] hover:bg-orange-100 hover:text-[#D9541E]">
                       <MessageCircle className="h-3.5 w-3.5 mr-1.5" /> Nhắn tin
                     </Button>
                   </>
@@ -233,7 +325,7 @@ export function ProfilePage({
               <div className="grid grid-cols-3 gap-2 text-center">
                 {[
                   { value: user.postsCount || 0,   label: "Bài viết" },
-                  { value: user.followers || 0,    label: "Theo dõi" },
+                  { value: followersCount,    label: "Theo dõi" },
                   { value: user.following || 0,    label: "Đang theo" },
                 ].map(({ value, label }, index) => (
                   <button

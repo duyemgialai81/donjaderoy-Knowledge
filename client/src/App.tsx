@@ -261,12 +261,18 @@ function MainApp() {
     navigate(`/nguoi-dung/${id}`);
   };
 
-  const handleUpdateProfile = (data: any) => {
-    updateUser({
-      name: data.name || user?.name,
-      ...(data.bio ? { bio: data.bio } : {}),
-    } as any);
-    toast.success("Cập nhật hồ sơ thành công!");
+  const handleUpdateProfile = async (data: any) => {
+    if (!currentUser?.id) return;
+    try {
+      const token = localStorage_service.getAuthToken() || undefined;
+      const updated = await api.updateUserProfile(currentUser.id, data, token);
+      const nextUser = { ...currentUser, ...updated, ...data };
+      updateUser(nextUser as any);
+      setProfileUser(nextUser);
+      toast.success("Cập nhật hồ sơ thành công!");
+    } catch (error: any) {
+      toast.error(error?.message || "Không thể cập nhật hồ sơ.");
+    }
   };
 
   // ✅ CHUẨN BỊ PROP CHUNG CHO HEADER TRÁNH LẶP CODE NHIỀU LẦN

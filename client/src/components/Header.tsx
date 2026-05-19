@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Search, Plus, LogOut, User, Settings, Shield, Home, MessageCircle, Bell, Trophy } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -10,6 +12,8 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { NotificationCenter } from "./NotificationCenter";
+import api from "../lib/api";
+import { localStorage_service } from "../lib/localStorage";
 
 interface HeaderProps {
   currentUser: any;
@@ -38,6 +42,38 @@ export function Header({
   onViewMessages,
   isAdmin = false,
 }: Readonly<HeaderProps>) {
+  const navigate = useNavigate();
+  const [userResults, setUserResults] = useState<any[]>([]);
+  const [isUserSearchOpen, setIsUserSearchOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const keyword = searchQuery.trim();
+    if (keyword.length < 2) {
+      setUserResults([]);
+      return;
+    }
+    const timer = window.setTimeout(async () => {
+      try {
+        const token = localStorage_service.getAuthToken() || undefined;
+        const users = await api.searchUsers(keyword, 0, 5, token);
+        if (!cancelled) setUserResults(Array.isArray(users) ? users : []);
+      } catch {
+        if (!cancelled) setUserResults([]);
+      }
+    }, 220);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [searchQuery]);
+
+  const openUserProfile = (id: string) => {
+    if (!id) return;
+    setIsUserSearchOpen(false);
+    navigate(`/nguoi-dung/${id}`);
+  };
+
   return (
     <header className="header-glass app-header sticky top-0 z-50 w-full">
       <div className="app-header-inner container mx-auto flex h-16 items-center justify-between px-4 gap-3">
@@ -68,8 +104,36 @@ export function Header({
               focus:bg-white focus:border-[#F26B38] focus:ring-2 focus:ring-[#F26B38]/20
               transition-all placeholder:text-slate-400"
             value={searchQuery}
-            onChange={(e) => onSearch(e.target.value)}
+            onFocus={() => setIsUserSearchOpen(true)}
+            onChange={(e) => {
+              onSearch(e.target.value);
+              setIsUserSearchOpen(true);
+            }}
           />
+          {isUserSearchOpen && userResults.length > 0 && (
+            <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[70] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+              {userResults.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => openUserProfile(item.id)}
+                  className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-orange-50"
+                >
+                  <img
+                    src={item.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.id}`}
+                    alt={item.name || ""}
+                    className="h-9 w-9 rounded-xl object-cover"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-semibold text-slate-800">{item.name || "Người dùng"}</div>
+                    <div className="truncate text-xs text-slate-500">{item.email || item.role || ""}</div>
+                  </div>
+                  <span className="text-xs font-semibold text-[#F26B38]">Xem</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* ── Actions ── */}

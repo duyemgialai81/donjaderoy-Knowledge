@@ -305,6 +305,12 @@ export async function reportComment(commentId: string, reason: string, token?: s
   return res?.data || res;
 }
 
+export async function updateComment(commentId: string, content: string, token?: string) {
+  const res = await request('PUT', `/api/comments/${encodeURIComponent(commentId)}`, { content }, token);
+  const comment = res?.data || res;
+  return comment ? normalizeComment(comment) : comment;
+}
+
 export async function deleteComment(commentId: string, token?: string) {
   const res = await request('DELETE', `/api/comments/${encodeURIComponent(commentId)}`, undefined, token);
   return res?.data || res;
@@ -677,6 +683,7 @@ export default {
   getCommentsByPost,
   likeComment,
   reportComment,
+  updateComment,
   deleteComment,
   
   // Saved Posts

@@ -95,16 +95,17 @@ export function GlobalRealtime() {
           if (realtimeMessageIdsRef.current.size > 300) {
             realtimeMessageIdsRef.current = new Set(Array.from(realtimeMessageIdsRef.current).slice(-150));
           }
+          const senderName = message.senderName || message.senderFullName || message.sender?.name || "Tin nhắn mới";
           const description = message.content || "Bạn có tin nhắn mới.";
           emitRealtimeNotification({
             id,
             type: "message",
-            title: "Tin nhắn mới",
+            title: senderName,
             description,
             link: "/tin-nhan",
             payload: message,
           });
-          toast("Tin nhắn mới", {
+          toast(senderName, {
             description,
             duration: 3000,
             action: { label: "Mở", onClick: openMessages },
@@ -129,7 +130,7 @@ export function GlobalRealtime() {
 
           if (event.type === "start") {
             const next = mergePendingCall(event);
-            const fallbackName = senderId ? `Người dùng ${senderId}` : "Người gọi";
+            const fallbackName = event.senderName || "Người gọi";
 
             api.getUser(senderId, token).then((caller: any) => {
               if (!caller || pendingCallRef.current?.callId !== callId) return;
@@ -150,12 +151,12 @@ export function GlobalRealtime() {
                 id: callId,
                 type: "call",
                 title,
-                description: fallbackName,
+                description: event.senderName || fallbackName,
                 link: "/tin-nhan",
                 payload: next || event,
               });
               toast(title, {
-                description: `${fallbackName} đang gọi cho bạn`,
+                description: `${event.senderName || fallbackName} đang gọi cho bạn`,
                 duration: 15000,
                 action: { label: "Mở tin nhắn", onClick: openMessages },
               });

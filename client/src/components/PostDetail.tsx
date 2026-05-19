@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Heart, Share2, Bookmark, FileText, Download, Video, Flag, Eye, MessageCircle, ThumbsUp, Trash2 } from "lucide-react";
+import { X, Heart, Share2, Bookmark, FileText, Download, Video, Flag, Eye, MessageCircle, ThumbsUp, Trash2, Pencil } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Textarea } from "./ui/textarea";
@@ -63,6 +63,8 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
   
   const [postComments, setPostComments] = useState<Comment[]>([]);
   const [commentAuthors, setCommentAuthors] = useState<Record<string, any>>({});
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentContent, setEditingCommentContent] = useState("");
   const [isFollowing, setIsFollowing] = useState(false);
   const [isFollowingLoading, setIsFollowingLoading] = useState(false);
 
@@ -331,6 +333,21 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
     }
   };
 
+  const handleEditComment = async (commentId: string) => {
+    const content = editingCommentContent.trim();
+    if (!content) return;
+    try {
+      const token = localStorage.getItem('ksp_auth_token') || undefined;
+      const updated = await api.updateComment(commentId, content, token);
+      setPostComments(prev => prev.map(c => c.id === commentId ? { ...c, ...updated, content } : c));
+      setEditingCommentId(null);
+      setEditingCommentContent("");
+      toast.success('Đã sửa bình luận');
+    } catch (err) {
+      toast.error('Lỗi khi sửa bình luận');
+    }
+  };
+
   const handleDeleteComment = async (commentId: string) => {
     if (!window.confirm('Bạn có chắc chắn muốn xóa bình luận này không?')) return;
     try {
@@ -384,7 +401,26 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
                   <Badge className="bg-purple-100 text-purple-700 border-none px-1.5 py-0 text-[10px]">Giảng viên</Badge>
                 )}
               </div>
-              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap break-words">{comment.content}</p>
+              {editingCommentId === comment.id ? (
+                <div className="space-y-2">
+                  <Textarea
+                    value={editingCommentContent}
+                    onChange={(e) => setEditingCommentContent(e.target.value)}
+                    className="min-h-[70px] bg-white text-sm"
+                    autoFocus
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setEditingCommentId(null); setEditingCommentContent(""); }}>
+                      Hủy
+                    </Button>
+                    <Button type="button" size="sm" className="h-7 px-3 text-xs btn-gradient-orange" onClick={() => handleEditComment(comment.id)} disabled={!editingCommentContent.trim()}>
+                      Lưu
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap break-words">{comment.content}</p>
+              )}
             </div>
             <div className="flex items-center gap-4 mt-1.5 ml-2 text-xs font-semibold text-slate-500">
               <span className="text-slate-400 font-medium">{commentTime}</span>
@@ -399,9 +435,20 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
                 <Flag className="h-3.5 w-3.5" /> Báo cáo
               </button>
               {currentUser?.id === comment.authorId && (
-                <button className="hover:text-red-600 flex items-center gap-1 transition-colors opacity-0 group-hover:opacity-100 ml-auto" onClick={() => handleDeleteComment(comment.id)}>
-                  <Trash2 className="h-3.5 w-3.5" /> Xóa
-                </button>
+                <>
+                  <button
+                    className="hover:text-[#F26B38] flex items-center gap-1 transition-colors opacity-0 group-hover:opacity-100 ml-auto"
+                    onClick={() => {
+                      setEditingCommentId(comment.id);
+                      setEditingCommentContent(comment.content || "");
+                    }}
+                  >
+                    <Pencil className="h-3.5 w-3.5" /> Sửa
+                  </button>
+                  <button className="hover:text-red-600 flex items-center gap-1 transition-colors opacity-0 group-hover:opacity-100" onClick={() => handleDeleteComment(comment.id)}>
+                    <Trash2 className="h-3.5 w-3.5" /> Xóa
+                  </button>
+                </>
               )}
             </div>
           </div>

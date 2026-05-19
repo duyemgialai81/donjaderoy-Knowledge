@@ -45,6 +45,7 @@ interface MessagesPageProps {
 
 interface ConversationItem {
   id: string;
+  type?: "direct" | "group" | string;
   targetUserId?: string;
   name: string;
   avatar?: string;
@@ -53,6 +54,7 @@ interface ConversationItem {
   unread?: number;
   status?: "accepted" | "pending" | string;
   isOnline?: boolean;
+  memberCount?: number;
 }
 
 interface SearchUserItem {
@@ -65,8 +67,12 @@ interface SearchUserItem {
 interface MessageItem {
   id: string;
   senderId: string;
+  senderName?: string;
+  senderAvatar?: string;
   text: string;
   time: string;
+  isDeleted?: boolean;
+  isEdited?: boolean;
   reactions?: Record<string, number>;
   userReactions?: Record<string, boolean>;
 }
@@ -137,6 +143,9 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [showInfo, setShowInfo] = useState(false);
   const [infoTab, setInfoTab] = useState<"info" | "chat">("info");
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [groupName, setGroupName] = useState("");
+  const [groupMemberIds, setGroupMemberIds] = useState<string[]>([]);
   const [messageInput, setMessageInput] = useState("");
   const [isLoadingChats, setIsLoadingChats] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
@@ -295,11 +304,11 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
         const res = await api.request("GET", "/api/chat/conversations");
         const raw = res?.data || (Array.isArray(res) ? res : []);
         convs = raw.map((c: any) => ({
-          id: toId(c.id), targetUserId: toId(c.targetUserId) || undefined,
-          name: c.targetUserName || "Người dùng", avatar: c.targetUserAvatar,
+          id: toId(c.id), type: c.type || "direct", targetUserId: toId(c.targetUserId) || undefined,
+          name: c.type === "group" ? (c.groupName || "Nhóm chat") : (c.targetUserName || "Người dùng"), avatar: c.targetUserAvatar,
           lastMessage: c.lastMessage || "Bắt đầu cuộc trò chuyện mới.",
           time: c.lastMessageTime ? new Date(c.lastMessageTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
-          unread: c.unreadCount || 0, status: c.status || "accepted", isOnline: Boolean(c.targetIsOnline),
+          unread: c.unreadCount || 0, status: c.status || "accepted", isOnline: Boolean(c.targetIsOnline), memberCount: c.memberCount,
         }));
       } catch (e) { console.error(e); }
 
@@ -635,9 +644,35 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
             setMessages((prev) => {
               if (prev.some((m) => m.id === msg.id)) return prev;
               const clean = prev.filter((m) => !(m.id.startsWith("temp_") && m.text === msg.content));
-              return [...clean, { id: msg.id, senderId: senderId === currentUserId ? "me" : senderId, text: msg.content, time: new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }];
+              return [...clean, {
+                id: msg.id,
+                senderId: senderId === currentUserId ? "me" : senderId,
+                senderName: msg.senderName,
+                senderAvatar: msg.senderAvatar,
+                text: msg.content,
+                time: new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              }];
             });
           }
+        });
+
+        subscribeUserQueue("message-updates", (frame) => {
+          const msg = safe(frame.body); if (!msg) return;
+          setMessages((prev) => prev.map((item) => {
+            if (toId(item.id) !== toId(msg.id)) return item;
+            return {
+              ...item,
+              text: msg.isDeleted ? "Tin nhắn đã được thu hồi" : (msg.content || msg.text || item.text),
+              isDeleted: Boolean(msg.isDeleted),
+              isEdited: Boolean(msg.editedAt),
+              time: msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : item.time,
+            };
+          }));
+          setConversations((prev) => prev.map((c) => (
+            toId(c.id) === toId(msg.conversationId)
+              ? { ...c, lastMessage: msg.isDeleted ? "Tin nhắn đã được thu hồi" : (msg.content || c.lastMessage) }
+              : c
+          )));
         });
 
         subscribeUserQueue("typing", (frame) => {
@@ -779,8 +814,12 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
         setMessages(list.map((m: any) => ({
           id: toId(m.id) || Math.random().toString(),
           senderId: toId(m.senderId) === currentUserId ? "me" : toId(m.senderId),
-          text: m.content || m.text || "Tin nhắn không hợp lệ.",
+          senderName: m.senderName,
+          senderAvatar: m.senderAvatar,
+          text: m.isDeleted ? "Tin nhắn đã được thu hồi" : (m.content || m.text || "Tin nhắn không hợp lệ."),
           time: new Date(m.createdAt || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          isDeleted: Boolean(m.isDeleted),
+          isEdited: Boolean(m.editedAt),
           reactions: m.reactions || {}, userReactions: m.userReactions || {},
         })));
         setConversations((prev) => prev.map((c) => c.id === selectedChatId ? { ...c, unread: 0 } : c));
@@ -808,6 +847,32 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     if (stompClientRef.current?.connected) stompClientRef.current.publish({ destination: "/app/chat.typing", body: JSON.stringify({ ...payload, isTyping: false, typing: false }) });
   };
 
+  const handleEditMessage = async (message: MessageItem) => {
+    if (message.senderId !== "me" || message.isDeleted || message.id.startsWith("temp_")) return;
+    const content = window.prompt("Sửa tin nhắn", message.text);
+    if (content === null) return;
+    const nextContent = content.trim();
+    if (!nextContent) return;
+    try {
+      const res = await api.request("PUT", `/api/chat/messages/${encodeURIComponent(message.id)}`, { content: nextContent });
+      const updated = res?.data || res || {};
+      setMessages((prev) => prev.map((item) => item.id === message.id ? { ...item, text: updated.content || nextContent, isEdited: true } : item));
+    } catch (error: any) {
+      toast.error(error?.message || "Không thể sửa tin nhắn.");
+    }
+  };
+
+  const handleRecallMessage = async (message: MessageItem) => {
+    if (message.senderId !== "me" || message.isDeleted || message.id.startsWith("temp_")) return;
+    if (!window.confirm("Thu hồi tin nhắn này?")) return;
+    try {
+      await api.request("DELETE", `/api/chat/messages/${encodeURIComponent(message.id)}`);
+      setMessages((prev) => prev.map((item) => item.id === message.id ? { ...item, text: "Tin nhắn đã được thu hồi", isDeleted: true } : item));
+    } catch (error: any) {
+      toast.error(error?.message || "Không thể thu hồi tin nhắn.");
+    }
+  };
+
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     setMessageInput(e.target.value);
     if (stompClientRef.current?.connected && selectedChat) {
@@ -829,6 +894,40 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     const peerId = selectedChat ? getConversationPeerId(selectedChat) : "";
     if (!peerId) return;
     navigate(`/nguoi-dung/${peerId}`);
+  };
+
+  const handleCreateGroup = async () => {
+    const memberIds = Array.from(new Set(groupMemberIds.filter(Boolean)));
+    if (memberIds.length < 2) {
+      toast.error("Chọn ít nhất 2 người để tạo nhóm.");
+      return;
+    }
+    try {
+      const res = await api.request("POST", "/api/chat/conversations", {
+        type: "group",
+        groupName: groupName.trim() || "Nhóm chat",
+        memberIds,
+      });
+      const item = res?.data || res;
+      const nextChat: ConversationItem = {
+        id: toId(item.id),
+        type: "group",
+        name: item.groupName || groupName.trim() || "Nhóm chat",
+        lastMessage: item.lastMessage || "Bắt đầu cuộc trò chuyện nhóm.",
+        time: item.lastMessageTime ? new Date(item.lastMessageTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
+        unread: 0,
+        status: "accepted",
+        memberCount: item.memberCount,
+      };
+      setConversations((prev) => dedupConversations([nextChat, ...prev]));
+      setSelectedChatId(nextChat.id);
+      setShowCreateGroup(false);
+      setGroupName("");
+      setGroupMemberIds([]);
+      toast.success("Đã tạo nhóm chat.");
+    } catch (error: any) {
+      toast.error(error?.message || "Không thể tạo nhóm chat.");
+    }
   };
 
   useEffect(() => {
@@ -896,7 +995,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
             <h1 style={{ fontSize: 20, fontWeight: 700, color: "#1a1a1a", margin: 0 }}>Tin nhắn</h1>
             <div style={{ display: "flex", gap: 6 }}>
               {/* Plus button - orange */}
-              <button type="button" style={{
+              <button type="button" onClick={() => setShowCreateGroup(true)} style={{
                 width: 34, height: 34, borderRadius: 10,
                 border: "none", background: ORANGE, cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center", color: "#fff",
@@ -1074,6 +1173,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                       {messages.map((msg, idx) => {
                         const isMe = msg.senderId === "me";
                         const showAvatar = !isMe && (idx === messages.length - 1 || messages[idx + 1]?.senderId !== msg.senderId);
+                        const isGroupChat = selectedChat?.type === "group";
                         return (
                           <div key={msg.id}
                             style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start", alignItems: "flex-end", gap: 8, position: "relative" }}
@@ -1084,22 +1184,37 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                               </div>
                             )}
                             <div style={{ maxWidth: "68%", position: "relative" }}>
+                              {!isMe && isGroupChat && msg.senderName && (
+                                <div style={{ fontSize: 11, fontWeight: 700, color: "#475569", margin: "0 0 3px 4px" }}>
+                                  {msg.senderName}
+                                </div>
+                              )}
                               <div
                                 style={{
-                                  background: isMe ? `linear-gradient(135deg, ${ORANGE}, ${ORANGE_MID})` : "#fff",
-                                  color: isMe ? "#fff" : "#1a1a1a",
+                                  background: msg.isDeleted ? "#f8fafc" : isMe ? `linear-gradient(135deg, ${ORANGE}, ${ORANGE_MID})` : "#fff",
+                                  color: msg.isDeleted ? "#94a3b8" : isMe ? "#fff" : "#1a1a1a",
                                   borderRadius: isMe ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
                                   padding: "10px 14px", fontSize: 14, lineHeight: 1.5,
-                                  wordBreak: "break-word", cursor: "pointer",
+                                  wordBreak: "break-word", cursor: msg.isDeleted ? "default" : "pointer",
+                                  fontStyle: msg.isDeleted ? "italic" : "normal",
                                   boxShadow: isMe ? `0 2px 8px ${ORANGE}40` : "0 1px 4px rgba(0,0,0,0.06)",
                                 }}
-                                onMouseEnter={() => setShowReactionPicker(msg.id)}
+                                onMouseEnter={() => !msg.isDeleted && setShowReactionPicker(msg.id)}
                               >
                                 {msg.text}
                               </div>
-                              <div style={{ fontSize: 11, color: "#b0b0b0", marginTop: 3, textAlign: isMe ? "right" : "left" }}>{msg.time}</div>
+                              <div style={{ fontSize: 11, color: "#b0b0b0", marginTop: 3, textAlign: isMe ? "right" : "left" }}>
+                                {msg.time}{msg.isEdited && !msg.isDeleted ? " · đã sửa" : ""}
+                              </div>
 
-                              {showReactionPicker === msg.id && (
+                              {isMe && !msg.isDeleted && !msg.id.startsWith("temp_") && (
+                                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4, fontSize: 11 }}>
+                                  <button type="button" onClick={() => handleEditMessage(msg)} style={{ border: "none", background: "transparent", color: "#64748b", cursor: "pointer", padding: 0 }}>Sửa</button>
+                                  <button type="button" onClick={() => handleRecallMessage(msg)} style={{ border: "none", background: "transparent", color: "#ef4444", cursor: "pointer", padding: 0 }}>Thu hồi</button>
+                                </div>
+                              )}
+
+                              {showReactionPicker === msg.id && !msg.isDeleted && (
                                 <div style={{ position: "absolute", bottom: "100%", [isMe ? "right" : "left"]: 0, background: "#fff", borderRadius: 24, boxShadow: "0 4px 20px rgba(0,0,0,0.12)", border: "1px solid #f0f0f0", padding: "6px 10px", display: "flex", gap: 4, zIndex: 20, marginBottom: 4 }}>
                                   {REACTION_EMOJIS.map((emoji) => (
                                     <button key={emoji} type="button" onClick={() => handleToggleReaction(msg.id, emoji)}
@@ -1111,7 +1226,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                                 </div>
                               )}
 
-                              {msg.reactions && Object.entries(msg.reactions).some(([, c]) => c > 0) && (
+                              {!msg.isDeleted && msg.reactions && Object.entries(msg.reactions).some(([, c]) => c > 0) && (
                                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, justifyContent: isMe ? "flex-end" : "flex-start" }}>
                                   {Object.entries(msg.reactions).map(([emoji, count]) => count > 0 && (
                                     <button key={emoji} type="button" onClick={() => handleToggleReaction(msg.id, emoji)}
@@ -1299,9 +1414,9 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                           const isMe = msg.senderId === "me";
                           return (
                             <div key={msg.id} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                              <img src={isMe ? getAvatarUrl(currentUser?.avatar, currentUserId) : selectedChatAvatar} alt="" style={{ width: 26, height: 26, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
+                              <img src={isMe ? getAvatarUrl(currentUser?.avatar, currentUserId) : getAvatarUrl(msg.senderAvatar || selectedChat.avatar, msg.senderId)} alt="" style={{ width: 26, height: 26, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
                               <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: 11, color: "#b0b0b0", marginBottom: 2 }}>{isMe ? "Bạn" : selectedChat.name} · {msg.time}</div>
+                                <div style={{ fontSize: 11, color: "#b0b0b0", marginBottom: 2 }}>{isMe ? "Bạn" : (msg.senderName || selectedChat.name)} · {msg.time}</div>
                                 <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.4, wordBreak: "break-word" }}>{msg.text}</div>
                               </div>
                             </div>
@@ -1385,6 +1500,57 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreateGroup && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(15,23,42,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ width: "100%", maxWidth: 420, borderRadius: 18, background: "#fff", boxShadow: "0 24px 80px rgba(15,23,42,0.25)", overflow: "hidden" }}>
+            <div style={{ padding: 16, borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ fontWeight: 800, color: "#0f172a" }}>Tạo nhóm chat</div>
+              <button type="button" onClick={() => setShowCreateGroup(false)} style={{ width: 32, height: 32, borderRadius: 10, border: "1px solid #e2e8f0", background: "#fff", cursor: "pointer" }}>
+                <X size={16} />
+              </button>
+            </div>
+            <div style={{ padding: 16 }}>
+              <input
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                placeholder="Tên nhóm"
+                style={{ width: "100%", height: 40, borderRadius: 12, border: "1px solid #e2e8f0", padding: "0 12px", boxSizing: "border-box", fontSize: 14, marginBottom: 12 }}
+              />
+              <div style={{ maxHeight: 280, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
+                {dedupConversations([
+                  ...conversations.filter((c) => c.type !== "group" && getConversationPeerId(c)),
+                  ...searchResults.map((u) => ({ id: `new_${toId(u.id)}`, targetUserId: toId(u.id), name: u.name, avatar: u.avatar, status: "accepted" })),
+                ]).map((item) => {
+                  const peerId = getConversationPeerId(item);
+                  if (!peerId) return null;
+                  const checked = groupMemberIds.includes(peerId);
+                  return (
+                    <label key={peerId} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 12, cursor: "pointer", background: checked ? ORANGE_LIGHT : "#fff" }}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          setGroupMemberIds((prev) => e.target.checked ? [...prev, peerId] : prev.filter((id) => id !== peerId));
+                        }}
+                      />
+                      <img src={getAvatarUrl(item.avatar, peerId)} alt="" style={{ width: 36, height: 36, borderRadius: 10, objectFit: "cover" }} />
+                      <span style={{ fontSize: 14, fontWeight: 700, color: "#1e293b" }}>{item.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                onClick={handleCreateGroup}
+                style={{ width: "100%", height: 42, borderRadius: 12, border: "none", background: ORANGE, color: "#fff", fontWeight: 800, cursor: "pointer", marginTop: 14 }}
+              >
+                Tạo nhóm
+              </button>
             </div>
           </div>
         </div>
