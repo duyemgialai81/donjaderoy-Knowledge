@@ -366,7 +366,7 @@ function MainApp() {
 
   // 5. Default Main Feed View
   return (
-    <div className="min-h-screen" style={{ background: "#F7F9FC" }}>
+    <div className="app-page-shell min-h-screen" style={{ background: "#F7F9FC" }}>
       <Header {...headerProps} />
 
       <FilterPanel
@@ -376,11 +376,11 @@ function MainApp() {
         onToggle={() => setIsFilterOpen(!isFilterOpen)}
       />
 
-      <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      <div className="app-feed-container container mx-auto px-4 py-6">
+        <div className="app-feed-grid grid grid-cols-1 lg:grid-cols-12 gap-5">
 
           {/* ── Left Sidebar ── */}
-          <div className="hidden lg:block lg:col-span-3">
+          <div className="feed-side-panel hidden lg:block lg:col-span-3">
             <div className="sticky top-20 space-y-4">
               {/* Nav card */}
               <div className="card-premium p-3">
@@ -422,11 +422,11 @@ function MainApp() {
           </div>
 
           {/* ── Main Feed ── */}
-          <div className="col-span-1 lg:col-span-6">
+          <div className="feed-main-column col-span-1 lg:col-span-6">
             {/* Tab bar */}
-            <div className="card-premium mb-4 overflow-hidden">
+            <div className="feed-tabs-card card-premium mb-4 overflow-hidden">
               <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="flex w-full bg-transparent border-b border-slate-100 h-auto p-0 rounded-none gap-0">
+                <TabsList className="feed-tabs-list flex w-full bg-transparent border-b border-slate-100 h-auto p-0 rounded-none gap-0">
                   {[
                     { value: "all",       label: "Tất cả",    icon: BookOpen  },
                     { value: "following", label: "Theo dõi",  icon: UsersIcon },
@@ -436,7 +436,7 @@ function MainApp() {
                     <TabsTrigger
                       key={value}
                       value={value}
-                      className="flex-1 h-11 gap-1.5 text-xs font-medium rounded-none border-b-2 border-transparent
+                        className="feed-tab-trigger flex-1 h-11 gap-1.5 text-xs font-medium rounded-none border-b-2 border-transparent
                         data-[state=active]:border-[#F26B38] data-[state=active]:text-[#F26B38]
                         data-[state=active]:bg-transparent text-slate-500 hover:text-slate-700"
                     >
@@ -469,7 +469,7 @@ function MainApp() {
                   </div>
                 ))
               ) : (
-                <div className="card-premium text-center py-16">
+                <div className="feed-empty-state card-premium text-center py-16">
                   <div className="h-20 w-20 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
                     <BookOpen className="h-10 w-10 text-slate-300" />
                   </div>
@@ -487,7 +487,7 @@ function MainApp() {
           </div>
 
           {/* ── Right Sidebar ── */}
-          <div className="hidden xl:block lg:col-span-3">
+          <div className="feed-side-panel feed-right-panel hidden xl:block lg:col-span-3">
             <div className="sticky top-20 space-y-4">
               <Leaderboard />
               <SuggestedPosts />

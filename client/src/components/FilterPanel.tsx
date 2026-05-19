@@ -101,11 +101,11 @@ export function FilterPanel({ filters, onFilterChange, isOpen, onToggle }: Filte
     availableSubjects.find((s: any) => s.name === filters.subject);
 
   return (
-    <div className="bg-white border-b sticky top-16 z-40">
-      <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
+    <div className="filter-panel bg-white border-b sticky top-16 z-40">
+      <div className="filter-panel-inner container mx-auto px-3 sm:px-4 py-3 sm:py-4">
 
         {/* ── Filter Bar ── */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-3 lg:gap-4">
+        <div className="filter-panel-row flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-3 lg:gap-4">
 
           {/* Step 1: Ngành học */}
           <div className="flex-1 min-w-0">

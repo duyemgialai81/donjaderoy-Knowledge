@@ -39,8 +39,8 @@ export function Header({
   isAdmin = false,
 }: Readonly<HeaderProps>) {
   return (
-    <header className="header-glass sticky top-0 z-50 w-full">
-      <div className="container mx-auto flex h-16 items-center justify-between px-4 gap-3">
+    <header className="header-glass app-header sticky top-0 z-50 w-full">
+      <div className="app-header-inner container mx-auto flex h-16 items-center justify-between px-4 gap-3">
 
         {/* ── Logo ── */}
         <button
@@ -73,7 +73,7 @@ export function Header({
         </div>
 
         {/* ── Actions ── */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        <div className="app-header-actions flex items-center gap-1.5 sm:gap-2">
 
           {/* Mobile search icon */}
           <Button variant="ghost" size="icon" className="md:hidden h-9 w-9 rounded-xl text-slate-500 hover:bg-slate-100">
