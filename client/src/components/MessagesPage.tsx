@@ -30,10 +30,6 @@ import {
   VideoOff,
   Volume2,
   X,
-  MessageSquare,
-  PhoneCall,
-  Users,
-  BookOpen,
   Plus,
   Bell,
 } from "lucide-react";
@@ -105,6 +101,16 @@ const ORANGE_LIGHT = "#FFF0EB";
 const ORANGE_MID = "#FF8A5C";
 const ORANGE_DARK = "#E85520";
 
+const CHAT_BACKGROUNDS = [
+  { id: "soft", label: "Sáng", value: "linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%)" },
+  { id: "warm", label: "Ấm", value: "linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%)" },
+  { id: "mint", label: "Mint", value: "linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%)" },
+  { id: "sky", label: "Sky", value: "linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%)" },
+  { id: "slate", label: "Xám", value: "linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%)" },
+];
+
+const CHAT_BACKGROUND_STORAGE_KEY = "ksp_chat_background";
+
 const formatCallDuration = (seconds: number) => {
   const mins = Math.floor(seconds / 60).toString().padStart(2, "0");
   const secs = Math.floor(seconds % 60).toString().padStart(2, "0");
@@ -120,18 +126,8 @@ const iceServers = {
   ],
 };
 
-// ==================== SIDEBAR NAV ITEMS ====================
-const NAV_ITEMS = [
-  { icon: MessageSquare, label: "Tin nhắn", key: "messages" },
-  { icon: PhoneCall, label: "Cuộc gọi", key: "calls" },
-  { icon: Users, label: "Danh bạ", key: "contacts" },
-  { icon: Users, label: "Nhóm", key: "groups" },
-  { icon: BookOpen, label: "Lưu trữ", key: "saved" },
-];
-
 export default function MessagesPage({ currentUser }: MessagesPageProps) {
   const navigate = useNavigate();
-  const [activeNav] = useState("messages");
   const [chatFilter, setChatFilter] = useState<"all" | "unread" | "pending" | "favorite">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
@@ -148,6 +144,13 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   const [callSession, setCallSession] = useState<CallSession | null>(null);
   const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
   const [isAcceptingRequest, setIsAcceptingRequest] = useState(false);
+  const [chatBackgroundId, setChatBackgroundId] = useState(() => {
+    try {
+      return localStorage.getItem(CHAT_BACKGROUND_STORAGE_KEY) || "soft";
+    } catch {
+      return "soft";
+    }
+  });
 
   const stompClientRef = useRef<Client | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -235,6 +238,16 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   const selectedChatAvatar = selectedChat
     ? getAvatarUrl(selectedChat.avatar, getConversationPeerId(selectedChat) || selectedChat.id)
     : "";
+  const selectedChatBackground = CHAT_BACKGROUNDS.find((item) => item.id === chatBackgroundId) || CHAT_BACKGROUNDS[0];
+
+  const updateChatBackground = (id: string) => {
+    setChatBackgroundId(id);
+    try {
+      localStorage.setItem(CHAT_BACKGROUND_STORAGE_KEY, id);
+    } catch {
+      // Ignore storage failures.
+    }
+  };
 
   const applyIncomingCallEvent = (ev: any) => {
     if (!ev || !currentUserId) return;
@@ -868,54 +881,6 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
       className={`messages-shell${selectedChat ? " has-selected-chat" : ""}`}
       style={{ display: "flex", height: "100%", minHeight: 0, overflow: "hidden", background: "#f0f2f5", fontFamily: "'Segoe UI', system-ui, sans-serif" }}
     >
-
-      {/* ── LEFT SIDEBAR NAV ── */}
-      <nav className="messages-rail" style={{
-        width: 64, minWidth: 64, background: "#fff",
-        borderRight: "1px solid #f0f0f0",
-        display: "flex", flexDirection: "column", alignItems: "center",
-        paddingTop: 12, paddingBottom: 12, gap: 2, zIndex: 10,
-      }}>
-        {/* Logo */}
-        <div style={{
-          width: 44, height: 44, borderRadius: 14,
-          background: `linear-gradient(135deg, ${ORANGE}, ${ORANGE_MID})`,
-          display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16,
-          boxShadow: `0 4px 12px ${ORANGE}40`,
-        }}>
-          <MessageCircle size={20} color="#fff" />
-        </div>
-
-        {NAV_ITEMS.map((item) => (
-          <button
-            key={item.key}
-            type="button"
-            title={item.label}
-            style={{
-              width: 44, height: 44, borderRadius: 12, border: "none", cursor: "pointer",
-              background: activeNav === item.key ? ORANGE_LIGHT : "transparent",
-              color: activeNav === item.key ? ORANGE : "#b0b0b0",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              transition: "all 0.15s",
-            }}
-          >
-            <item.icon size={20} />
-          </button>
-        ))}
-
-        <div style={{ flex: 1 }} />
-
-        {/* User avatar at bottom */}
-        <div style={{ position: "relative" }}>
-          <img
-            src={getAvatarUrl(currentUser?.avatar, currentUserId)}
-            alt="Me"
-            style={{ width: 36, height: 36, borderRadius: 10, objectFit: "cover", border: `2px solid ${ORANGE}` }}
-          />
-          <span style={{ position: "absolute", bottom: 0, right: 0, width: 10, height: 10, borderRadius: "50%", background: "#22c55e", border: "2px solid #fff" }} />
-        </div>
-      </nav>
-
       {/* ── CHAT LIST PANEL ── */}
       <div
         className="chat-list-panel"
@@ -1092,7 +1057,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
 
             <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
               {/* Messages */}
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, background: "#f8f8f8" }}>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, background: selectedChatBackground.value }}>
                 <div className="messages-scroll-area" style={{ flex: 1, overflowY: "auto", padding: "16px 16px 0" }}>
                   {isLoadingMessages ? (
                     <div style={{ display: "flex", justifyContent: "center", padding: 32, color: ORANGE }}>
@@ -1267,6 +1232,28 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                         </div>
 
                         <div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#b0b0b0", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Nền hội thoại</div>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
+                            {CHAT_BACKGROUNDS.map((bg) => (
+                              <button
+                                key={bg.id}
+                                type="button"
+                                title={bg.label}
+                                onClick={() => updateChatBackground(bg.id)}
+                                style={{
+                                  height: 42,
+                                  borderRadius: 12,
+                                  border: chatBackgroundId === bg.id ? `2px solid ${ORANGE}` : "1px solid #e5e7eb",
+                                  background: bg.value,
+                                  cursor: "pointer",
+                                  boxShadow: chatBackgroundId === bg.id ? `0 0 0 3px ${ORANGE_LIGHT}` : "none",
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
                           <div style={{ fontSize: 11, fontWeight: 700, color: "#b0b0b0", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Hành động nhanh</div>
                           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                             {[
@@ -1422,23 +1409,14 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
         }
 
         @media (max-width: 768px) {
-          .messages-rail {
-            width: 56px !important;
-            min-width: 56px !important;
-            padding-top: 10px !important;
-            padding-bottom: max(10px, env(safe-area-inset-bottom)) !important;
-          }
           .chat-list-panel {
             position: static !important;
-            width: calc(100vw - 56px) !important;
+            width: 100vw !important;
             min-width: 0 !important;
             max-width: none !important;
             flex: 1 1 auto !important;
           }
           .messages-shell.has-selected-chat .chat-list-panel {
-            display: none !important;
-          }
-          .messages-shell.has-selected-chat .messages-rail {
             display: none !important;
           }
           .messages-shell:not(.has-selected-chat) .chat-thread-panel {

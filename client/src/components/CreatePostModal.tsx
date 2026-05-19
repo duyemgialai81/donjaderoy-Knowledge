@@ -29,6 +29,20 @@ interface CreatePostModalProps {
   onSubmit: (post: any) => void;
 }
 
+function SectionCard({ icon: Icon, title, iconColor, children }: any) {
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <div className={`h-7 w-7 rounded-lg flex items-center justify-center ${iconColor}`}>
+          <Icon className="h-4 w-4 text-white" />
+        </div>
+        <span className="text-sm font-semibold text-slate-700">{title}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 export function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePostModalProps) {
   const { user } = useAuth();
   const token = localStorage_service.getAuthToken();
@@ -88,18 +102,6 @@ export function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePostModalPr
     setAvailableSubjects([]); setTags([]); setVideoUrl(""); setStatus("published");
     onClose();
   };
-
-  const SectionCard = ({ icon: Icon, title, iconColor, children }: any) => (
-    <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        <div className={`h-7 w-7 rounded-lg flex items-center justify-center ${iconColor}`}>
-          <Icon className="h-4 w-4 text-white" />
-        </div>
-        <span className="text-sm font-semibold text-slate-700">{title}</span>
-      </div>
-      {children}
-    </div>
-  );
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

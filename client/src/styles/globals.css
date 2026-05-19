@@ -505,6 +505,10 @@
   white-space: nowrap;
 }
 
+.messages-page-inner {
+  max-width: 1512px;
+}
+
 @media (hover: none) and (pointer: coarse) {
   .card-premium:hover,
   .post-card-hover:hover,
@@ -642,6 +646,16 @@
 
   .post-card-hover {
     transform: none !important;
+  }
+
+  .messages-page-frame {
+    padding: 0 !important;
+  }
+
+  .messages-page-inner {
+    border-radius: 0 !important;
+    border: 0 !important;
+    max-width: 100%;
   }
 }
 
