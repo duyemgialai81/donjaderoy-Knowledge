@@ -90,6 +90,29 @@ public class CommentServiceImpl implements CommentService {
     }
 
     @Override
+    public ResponseObject updateComment(String commentId, String userId, String content) {
+        Optional<Comment> commentOpt = commentRepository.findById(commentId);
+        if (commentOpt.isEmpty()) return ResponseObject.error("Comment not found");
+
+        String nextContent = content == null ? "" : content.trim();
+        if (nextContent.isEmpty()) return ResponseObject.error("Content is required");
+
+        Comment comment = commentOpt.get();
+        if (!comment.getAuthorId().equals(userId)) {
+            return ResponseObject.error("You don't have permission to edit this comment");
+        }
+
+        comment.setContent(nextContent);
+        Comment updatedComment = commentRepository.save(comment);
+        try {
+            messagingTemplate.convertAndSend("/topic/post/" + updatedComment.getPostId() + "/update-comment", updatedComment);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return ResponseObject.success(updatedComment, "Comment updated successfully");
+    }
+
+    @Override
     public ResponseObject deleteComment(String commentId, String userId) {
         Optional<Comment> commentOpt = commentRepository.findById(commentId);
         if (commentOpt.isEmpty()) return ResponseObject.error("Comment not found");

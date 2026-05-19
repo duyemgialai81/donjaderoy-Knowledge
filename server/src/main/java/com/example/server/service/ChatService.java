@@ -192,6 +192,58 @@ public class ChatService {
     }
 
     @Transactional
+    public ChatDTO.ConversationItem createConversation(ChatDTO.ConversationCreateRequest request, String creatorId) {
+        if (request == null) {
+            throw new IllegalArgumentException("Conversation request is required");
+        }
+        if ("direct".equalsIgnoreCase(request.getType())) {
+            String receiverId = request.getReceiverId();
+            if (!hasText(receiverId)) throw new IllegalArgumentException("Receiver is required");
+            String conversationId = getOrCreateDirectConversation(creatorId, receiverId);
+            ConversationParticipant participant = participantRepository.findById(new ConversationParticipantId(conversationId, creatorId))
+                    .orElseThrow(() -> new IllegalArgumentException("User is not a participant of this conversation"));
+            return buildConversationItem(creatorId, participant);
+        }
+
+        LinkedHashSet<String> memberIds = new LinkedHashSet<>();
+        memberIds.add(creatorId);
+        if (request.getMemberIds() != null) {
+            request.getMemberIds().stream()
+                    .filter(this::hasText)
+                    .forEach(memberIds::add);
+        }
+        if (memberIds.size() < 3) {
+            throw new IllegalArgumentException("Group chat needs at least 3 members");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        Conversation conversation = Conversation.builder()
+                .id(UUID.randomUUID().toString())
+                .type(Conversation.ConversationType.group)
+                .name(hasText(request.getGroupName()) ? request.getGroupName().trim() : "Nhom chat")
+                .createdBy(creatorId)
+                .createdAt(now)
+                .updatedAt(now)
+                .build();
+        conversationRepository.save(conversation);
+
+        for (String memberId : memberIds) {
+            participantRepository.save(ConversationParticipant.builder()
+                    .conversationId(conversation.getId())
+                    .userId(memberId)
+                    .role(memberId.equals(creatorId) ? ConversationParticipant.ParticipantRole.admin : ConversationParticipant.ParticipantRole.member)
+                    .status(ConversationParticipant.ParticipantStatus.accepted)
+                    .lastReadAt(memberId.equals(creatorId) ? now : null)
+                    .joinedAt(now)
+                    .build());
+        }
+
+        ConversationParticipant creatorParticipant = participantRepository.findById(new ConversationParticipantId(conversation.getId(), creatorId))
+                .orElseThrow(() -> new IllegalArgumentException("User is not a participant of this conversation"));
+        return buildConversationItem(creatorId, creatorParticipant);
+    }
+
+    @Transactional
     public ChatDTO.MessageResponse editMessage(String messageId, String userId, String content) {
         if (!hasText(content)) {
             throw new IllegalArgumentException("Message content is required");

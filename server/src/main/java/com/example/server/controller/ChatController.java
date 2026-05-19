@@ -75,6 +75,18 @@ public class ChatController {
         return new ResponseObject<>(chatService.getConversationsPage(userId, page, size), "Lay trang doan chat thanh cong");
     }
 
+    @PostMapping("/conversations")
+    public ResponseObject createConversation(@RequestBody ChatDTO.ConversationCreateRequest request, Principal principal) {
+        if (principal == null) return ResponseObject.error("Unauthorized: User not authenticated.");
+        try {
+            ChatDTO.ConversationItem item = chatService.createConversation(request, principal.getName());
+            broadcastToConversation(item.getId(), "/queue/conversation-updates", item);
+            return new ResponseObject<>(item, "Da tao hoi thoai");
+        } catch (Exception e) {
+            return ResponseObject.error(e.getMessage());
+        }
+    }
+
     @GetMapping("/messages/{conversationId}")
     public ResponseObject getMessages(@PathVariable String conversationId, Principal principal) {
         if (principal == null) return ResponseObject.error("Unauthorized: User not authenticated.");

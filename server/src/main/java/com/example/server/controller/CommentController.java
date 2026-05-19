@@ -42,6 +42,12 @@ public class CommentController {
         return commentService.deleteComment(commentId, principal.getName());
     }
 
+    @PutMapping("/{commentId}")
+    public ResponseObject updateComment(@PathVariable String commentId, @RequestBody CommentDTO dto, Principal principal) {
+        if (principal == null) return ResponseObject.error("Unauthorized");
+        return commentService.updateComment(commentId, principal.getName(), dto.getContent());
+    }
+
     @PostMapping("/{commentId}/like")
     public ResponseObject likeComment(@PathVariable String commentId, Principal principal) {
         if (principal == null) return ResponseObject.error("Unauthorized");
