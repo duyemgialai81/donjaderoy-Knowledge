@@ -379,10 +379,10 @@ function MainApp() {
       />
 
       <div className="app-feed-container container mx-auto px-4 py-6">
-        <div className="app-feed-grid grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div className="app-feed-grid grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)_280px] xl:grid-cols-[300px_minmax(0,1fr)_300px] gap-5">
 
           {/* ── Left Sidebar ── */}
-          <div className="feed-side-panel hidden lg:block lg:col-span-3">
+          <div className="feed-side-panel hidden lg:block">
             <div className="sticky top-20 space-y-4">
               {/* Nav card */}
               <div className="card-premium p-3">
@@ -424,7 +424,7 @@ function MainApp() {
           </div>
 
           {/* ── Main Feed ── */}
-          <div className="feed-main-column col-span-1 lg:col-span-6">
+          <div className="feed-main-column col-span-1">
             {/* Tab bar */}
             <div className="feed-tabs-card card-premium mb-4 overflow-hidden">
               <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -489,7 +489,7 @@ function MainApp() {
           </div>
 
           {/* ── Right Sidebar ── */}
-          <div className="feed-side-panel feed-right-panel hidden xl:block lg:col-span-3">
+          <div className="feed-side-panel feed-right-panel hidden xl:block">
             <div className="sticky top-20 space-y-4">
               <Leaderboard />
               <SuggestedPosts />

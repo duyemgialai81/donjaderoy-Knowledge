@@ -486,7 +486,12 @@
 
 .app-feed-container {
   width: 100%;
-  max-width: 1180px;
+  max-width: 1512px;
+}
+
+.app-header-inner,
+.filter-panel-inner {
+  max-width: 1512px;
 }
 
 .app-feed-grid,
