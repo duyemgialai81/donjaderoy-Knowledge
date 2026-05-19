@@ -76,7 +76,7 @@ public class ChatService {
             assertNotBlocked(senderId, receiverId);
             conversationId = getOrCreateDirectConversation(senderId, receiverId);
         } else {
-            assertParticipant(conversationId, senderId);
+            assertAcceptedParticipant(conversationId, senderId);
             if (hasText(receiverId)) {
                 assertNotBlocked(senderId, receiverId);
             }
@@ -301,6 +301,19 @@ public class ChatService {
                 .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
+    public Set<String> getConversationPeerIds(String userId) {
+        List<String> conversationIds = participantRepository.findByUserId(userId).stream()
+                .map(ConversationParticipant::getConversationId)
+                .toList();
+        if (conversationIds.isEmpty()) {
+            return Set.of();
+        }
+        return participantRepository.findByConversationIdIn(conversationIds).stream()
+                .map(ConversationParticipant::getUserId)
+                .filter(participantId -> !participantId.equals(userId))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
     public void setUserOnline(String userId) {
         cacheService.setUserOnline(userId);
     }
@@ -333,6 +346,9 @@ public class ChatService {
         List<Message> latestMessages = cacheService.getMessagesByConversation(conversationId, 1);
         if (latestMessages.isEmpty()) {
             item.setLastMessage("Bat dau cuoc tro chuyen...");
+            if (conversation != null) {
+                item.setLastMessageTime(conversation.getUpdatedAt());
+            }
         } else {
             Message lastMessage = latestMessages.get(0);
             item.setLastMessage(lastMessage.getContent());
@@ -383,6 +399,14 @@ public class ChatService {
         }
     }
 
+    private void assertAcceptedParticipant(String conversationId, String userId) {
+        ConversationParticipant participant = participantRepository.findById(new ConversationParticipantId(conversationId, userId))
+                .orElseThrow(() -> new IllegalArgumentException("User is not a participant of this conversation"));
+        if (participant.getStatus() != ConversationParticipant.ParticipantStatus.accepted) {
+            throw new IllegalStateException("Hay chap nhan tin nhan truoc khi gui.");
+        }
+    }
+
     private void assertMessageOwner(Message message, String userId) {
         assertParticipant(message.getConversationId(), userId);
         if (!userId.equals(message.getSenderId())) {
@@ -398,6 +422,25 @@ public class ChatService {
     }
 
     private String getOrCreateDirectConversation(String senderId, String receiverId) {
+        List<Conversation> existingConversations = conversationRepository.findDirectConversationsBetween(senderId, receiverId);
+        if (!existingConversations.isEmpty()) {
+            Conversation existing = existingConversations.get(0);
+            List<ConversationParticipant> participants = participantRepository.findByConversationId(existing.getId());
+            boolean wasRejected = participants.stream()
+                    .anyMatch(participant -> participant.getStatus() == ConversationParticipant.ParticipantStatus.blocked);
+            if (wasRejected) {
+                throw new IllegalStateException("Khong the gui tin nhan. Hoi thoai da bi tu choi.");
+            }
+            ConversationParticipant senderParticipant = participants.stream()
+                    .filter(participant -> participant.getUserId().equals(senderId))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("User is not a participant of this conversation"));
+            if (senderParticipant.getStatus() != ConversationParticipant.ParticipantStatus.accepted) {
+                throw new IllegalStateException("Hay chap nhan tin nhan truoc khi gui.");
+            }
+            return existing.getId();
+        }
+
         Conversation conversation = Conversation.builder()
                 .id(UUID.randomUUID().toString())
                 .type(Conversation.ConversationType.direct)

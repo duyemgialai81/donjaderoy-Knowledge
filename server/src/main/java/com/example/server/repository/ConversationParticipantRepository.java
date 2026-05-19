@@ -14,6 +14,7 @@ import java.util.List;
 public interface ConversationParticipantRepository extends JpaRepository<ConversationParticipant, ConversationParticipantId> {
     List<ConversationParticipant> findByUserId(String userId);
     List<ConversationParticipant> findByConversationId(String conversationId);
+    List<ConversationParticipant> findByConversationIdIn(List<String> conversationIds);
 
     @Query("""
             SELECT cp FROM ConversationParticipant cp

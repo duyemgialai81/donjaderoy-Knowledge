@@ -22,7 +22,7 @@ public class Message {
     @Enumerated(EnumType.STRING)
     private MessageType messageType;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
     private String content;
 
     private String replyToMessageId;

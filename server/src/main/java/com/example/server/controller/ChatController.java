@@ -111,6 +111,20 @@ public class ChatController {
         }
     }
 
+    @PostMapping("/messages")
+    public ResponseObject sendMessage(@RequestBody ChatDTO.MessageRequest request, Principal principal) {
+        if (principal == null) return ResponseObject.error("Unauthorized: User not authenticated.");
+        String senderId = principal.getName();
+        try {
+            ChatDTO.MessageResponse savedMessage = chatService.processMessage(senderId, request);
+            broadcastToConversation(savedMessage.getConversationId(), "/queue/messages", savedMessage);
+            return new ResponseObject<>(savedMessage, "Da gui tin nhan");
+        } catch (Exception e) {
+            log.error("Error sending REST message from user {}", senderId, e);
+            return ResponseObject.error(e.getMessage());
+        }
+    }
+
     @RequestMapping(value = "/conversations/{conversationId}/accept", method = {RequestMethod.PUT, RequestMethod.POST})
     public ResponseObject acceptConversationRequest(@PathVariable String conversationId, Principal principal) {
         if (principal == null) return ResponseObject.error("Unauthorized: User not authenticated.");
@@ -173,6 +187,16 @@ public class ChatController {
             log.error("Error sending message from user {}", senderId, e);
             messagingTemplate.convertAndSendToUser(senderId, "/queue/errors", "Loi gui tin nhan: " + e.getMessage());
         }
+    }
+
+    @MessageMapping("/presence.ping")
+    public void pingPresence(Principal principal) {
+        if (principal == null) return;
+        String userId = principal.getName();
+        chatService.setUserOnline(userId);
+        Map<String, Object> payload = Map.of("userId", userId, "isOnline", true, "timestamp", LocalDateTime.now());
+        chatService.getConversationPeerIds(userId)
+                .forEach(peerId -> messagingTemplate.convertAndSendToUser(peerId, "/queue/online-status", payload));
     }
 
     @MessageMapping("/chat.typing")
