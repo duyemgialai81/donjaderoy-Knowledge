@@ -45,6 +45,8 @@ public class ChatDTO {
         private String id;
         private String conversationId;
         private String senderId;
+        private String senderName;
+        private String senderAvatar;
         private String content;
         private String messageType;     // "text", "image", "video", "call_log"
         private LocalDateTime createdAt;

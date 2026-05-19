@@ -298,6 +298,10 @@ public class ChatController {
     public void handleCallSignal(@Payload CallDTO callEvent, Principal principal) {
         if (principal == null) return;
         callEvent.setSenderId(principal.getName());
+        userRepository.findById(principal.getName()).ifPresent(sender -> {
+            callEvent.setSenderName(sender.getName());
+            callEvent.setSenderAvatar(sender.getAvatar());
+        });
         try {
             switch (callEvent.getType()) {
                 case "start" -> videoCallService.startCallHistory(callEvent);

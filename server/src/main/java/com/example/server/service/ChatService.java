@@ -553,6 +553,8 @@ public class ChatService {
                 .id(message.getId())
                 .conversationId(message.getConversationId())
                 .senderId(message.getSenderId())
+                .senderName(userRepository.findById(message.getSenderId()).map(User::getName).orElse(null))
+                .senderAvatar(userRepository.findById(message.getSenderId()).map(User::getAvatar).orElse(null))
                 .content(message.getContent())
                 .messageType(message.getMessageType() != null ? message.getMessageType().name() : "text")
                 .createdAt(message.getCreatedAt())
