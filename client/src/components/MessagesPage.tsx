@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { Client } from "@stomp/stompjs";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Archive,
   Camera,
   Check,
   ChevronLeft,
   Image as ImageIcon,
+  Copy,
+  FileText,
   Inbox,
   Info,
   Loader2,
@@ -25,6 +27,9 @@ import {
   Smile,
   SwitchCamera,
   ThumbsUp,
+  Reply,
+  Trash2,
+  Pencil,
   User as UserIcon,
   Video,
   VideoOff,
@@ -73,6 +78,11 @@ interface MessageItem {
   time: string;
   isDeleted?: boolean;
   isEdited?: boolean;
+  replyToMessageId?: string;
+  attachmentUrl?: string;
+  attachmentName?: string;
+  attachmentSize?: number;
+  messageType?: string;
   reactions?: Record<string, number>;
   userReactions?: Record<string, boolean>;
 }
@@ -115,6 +125,8 @@ const CHAT_BACKGROUNDS = [
   { id: "slate", label: "Xám", value: "linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%)" },
 ];
 
+const CUSTOM_CHAT_BACKGROUND_STORAGE_KEY = "ksp_chat_background_image";
+
 const CHAT_BACKGROUND_STORAGE_KEY = "ksp_chat_background";
 
 const formatCallDuration = (seconds: number) => {
@@ -134,6 +146,7 @@ const iceServers = {
 
 export default function MessagesPage({ currentUser }: MessagesPageProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [chatFilter, setChatFilter] = useState<"all" | "unread" | "pending" | "favorite">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
@@ -147,6 +160,16 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   const [groupName, setGroupName] = useState("");
   const [groupMemberIds, setGroupMemberIds] = useState<string[]>([]);
   const [messageInput, setMessageInput] = useState("");
+  const [replyingTo, setReplyingTo] = useState<MessageItem | null>(null);
+  const [activeMessageMenu, setActiveMessageMenu] = useState<string | null>(null);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+  const [customChatBackground, setCustomChatBackground] = useState(() => {
+    try {
+      return localStorage.getItem(CUSTOM_CHAT_BACKGROUND_STORAGE_KEY) || "";
+    } catch {
+      return "";
+    }
+  });
   const [isLoadingChats, setIsLoadingChats] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [typingUsers, setTypingUsers] = useState<Record<string, boolean>>({});
@@ -164,6 +187,8 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   const stompClientRef = useRef<Client | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
+  const chatBackgroundInputRef = useRef<HTMLInputElement>(null);
   const selectedChatIdRef = useRef<string | null>(null);
   const conversationsRef = useRef<ConversationItem[]>([]);
   const callSessionRef = useRef<CallSession | null>(null);
@@ -248,11 +273,25 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     ? getAvatarUrl(selectedChat.avatar, getConversationPeerId(selectedChat) || selectedChat.id)
     : "";
   const selectedChatBackground = CHAT_BACKGROUNDS.find((item) => item.id === chatBackgroundId) || CHAT_BACKGROUNDS[0];
+  const selectedChatBackgroundValue = customChatBackground
+    ? `linear-gradient(rgba(248,250,252,0.84), rgba(248,250,252,0.84)), url("${customChatBackground}") center/cover`
+    : selectedChatBackground.value;
 
   const updateChatBackground = (id: string) => {
     setChatBackgroundId(id);
+    setCustomChatBackground("");
     try {
       localStorage.setItem(CHAT_BACKGROUND_STORAGE_KEY, id);
+      localStorage.removeItem(CUSTOM_CHAT_BACKGROUND_STORAGE_KEY);
+    } catch {
+      // Ignore storage failures.
+    }
+  };
+
+  const updateCustomChatBackground = (url: string) => {
+    setCustomChatBackground(url);
+    try {
+      localStorage.setItem(CUSTOM_CHAT_BACKGROUND_STORAGE_KEY, url);
     } catch {
       // Ignore storage failures.
     }
@@ -454,7 +493,10 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   const stopScreenShare = async () => {
     const s = callSessionRef.current;
     if (!s || s.mode !== "video" || !s.isScreenSharing) return;
-    screenStreamRef.current?.getTracks().forEach((track) => track.stop());
+    screenStreamRef.current?.getVideoTracks().forEach((track) => {
+      track.onended = null;
+      track.stop();
+    });
     screenStreamRef.current = null;
     try {
       const cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: s.cameraFacing }, audio: false });
@@ -488,6 +530,23 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     setCallSession(null);
   };
 
+  const getCallMediaStream = async (mode: CallMode) => {
+    if (mode === "audio") return navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    try {
+      return await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
+      });
+    } catch {
+      const audioOnly = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        video: false,
+      });
+      toast.warning("Không mở được camera trên máy này, cuộc gọi vẫn tiếp tục bằng micro.");
+      return audioOnly;
+    }
+  };
+
   const startCall = async (mode: CallMode) => {
     if (!selectedChat) { toast.error("Hãy chọn một cuộc trò chuyện trước."); return; }
     if (selectedChat.status === "pending") { toast.error("Không thể gọi khi hội thoại đang chờ phê duyệt."); return; }
@@ -498,16 +557,16 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     callSessionRef.current = newSession; setCallSession(newSession);
     try {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error("Trình duyệt không hỗ trợ media devices.");
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: mode === "video" });
+      const stream = await getCallMediaStream(mode);
       localStreamRef.current = stream;
-      if (mode === "video") cameraStreamRef.current = stream.clone();
+      if (mode === "video" && stream.getVideoTracks().length > 0) cameraStreamRef.current = stream.clone();
       if (localVideoRef.current) { localVideoRef.current.srcObject = stream; localVideoRef.current.play().catch(() => {}); }
       const pc = createPeerConnection(targetId, callId, mode);
       const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
       sendCallSignal("start", null, targetId, callId, mode);
       sendCallSignal("offer", { type: offer.type, sdp: offer.sdp }, targetId, callId, mode);
     } catch (err: any) {
-      toast.error("Không thể truy cập camera và micro.");
+      toast.error("Không thể truy cập micro/camera.");
       closeCall(true);
     }
   };
@@ -515,9 +574,9 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   const acceptCall = async () => {
     const s = callSessionRef.current; if (!s) return;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: s.mode === "video" });
+      const stream = await getCallMediaStream(s.mode);
       localStreamRef.current = stream;
-      if (s.mode === "video") cameraStreamRef.current = stream.clone();
+      if (s.mode === "video" && stream.getVideoTracks().length > 0) cameraStreamRef.current = stream.clone();
       if (localVideoRef.current) { localVideoRef.current.srcObject = stream; localVideoRef.current.play().catch(() => {}); }
       const pc = createPeerConnection(s.peerId, s.id, s.mode);
       const next = { ...s, status: "active" as CallStatus, startedAt: Date.now() };
@@ -553,7 +612,9 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
       screenStreamRef.current = screenStream;
       const [screenTrack] = screenStream.getVideoTracks();
       if (!screenTrack) throw new Error("Không có màn hình được chọn.");
-      screenTrack.onended = () => { void stopScreenShare(); };
+      screenTrack.onended = () => {
+        if (callSessionRef.current?.isScreenSharing) void stopScreenShare();
+      };
       replaceLocalVideoTrack(screenTrack);
       setCallSession((prev) => prev ? { ...prev, isScreenSharing: true, isCameraOff: false } : prev);
     } catch (error: any) {
@@ -651,6 +712,11 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                 senderAvatar: msg.senderAvatar,
                 text: msg.content,
                 time: new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                replyToMessageId: msg.replyToMessageId,
+                attachmentUrl: msg.attachmentUrl,
+                attachmentName: msg.attachmentName,
+                attachmentSize: msg.attachmentSize,
+                messageType: msg.messageType,
               }];
             });
           }
@@ -781,6 +847,39 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     const refreshTimer = window.setInterval(loadChatsAndFriends, 60000);
     return () => window.clearInterval(refreshTimer);
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const userId = params.get("user");
+    if (!userId || isLoadingChats) return;
+
+    const existing = conversations.find((chat) => getConversationPeerId(chat) === userId || chat.id === userId);
+    if (existing) {
+      setSelectedChatId(existing.id);
+      return;
+    }
+
+    let cancelled = false;
+    const openNewConversation = async () => {
+      try {
+        const user = await api.getUser(userId);
+        if (cancelled || !user?.id) return;
+        const item: SearchUserItem = {
+          id: toId(user.id),
+          name: user.name || "Người dùng",
+          avatar: user.avatar,
+          isOnline: Boolean(user.isOnline),
+        };
+        setSearchResults((prev) => prev.some((u) => toId(u.id) === toId(item.id)) ? prev : [item, ...prev]);
+        setSelectedChatId(`new_${toId(item.id)}`);
+      } catch {
+        toast.error("Không thể mở hội thoại với người dùng này.");
+      }
+    };
+    openNewConversation();
+    return () => { cancelled = true; };
+  }, [location.search, isLoadingChats, conversations]);
+
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, typingUsers]);
 
   useEffect(() => {
@@ -820,6 +919,11 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
           time: new Date(m.createdAt || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           isDeleted: Boolean(m.isDeleted),
           isEdited: Boolean(m.editedAt),
+          replyToMessageId: m.replyToMessageId,
+          attachmentUrl: m.attachmentUrl,
+          attachmentName: m.attachmentName,
+          attachmentSize: m.attachmentSize,
+          messageType: m.messageType,
           reactions: m.reactions || {}, userReactions: m.userReactions || {},
         })));
         setConversations((prev) => prev.map((c) => c.id === selectedChatId ? { ...c, unread: 0 } : c));
@@ -833,7 +937,9 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     event.preventDefault();
     if (!messageInput.trim() || !selectedChat) return;
     const content = messageInput.trim(); setMessageInput("");
-    const opt: MessageItem = { id: `temp_${Date.now()}`, senderId: "me", text: content, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) };
+    const currentReply = replyingTo;
+    setReplyingTo(null);
+    const opt: MessageItem = { id: `temp_${Date.now()}`, senderId: "me", text: content, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), replyToMessageId: currentReply?.id };
     setMessages((prev) => [...prev, opt]);
     setConversations((prev) => {
       const updated = [...prev];
@@ -841,7 +947,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
       if (idx > -1) { const conv = { ...updated[idx], lastMessage: `Bạn: ${content}`, time: opt.time }; updated.splice(idx, 1); updated.unshift(conv); }
       return dedupConversations(updated);
     });
-    const payload = { conversationId: selectedChat.id.startsWith("new_") ? "" : selectedChat.id, receiverId: getConversationPeerId(selectedChat), content, messageType: "text" };
+    const payload = { conversationId: selectedChat.id.startsWith("new_") ? "" : selectedChat.id, receiverId: getConversationPeerId(selectedChat), content, messageType: "text", replyToMessageId: currentReply?.id };
     if (stompClientRef.current?.connected) stompClientRef.current.publish({ destination: "/app/chat.sendMessage", body: JSON.stringify(payload) });
     else { try { await api.request("POST", "/api/chat/messages", payload); } catch { toast.error("Không thể gửi tin nhắn."); } }
     if (stompClientRef.current?.connected) stompClientRef.current.publish({ destination: "/app/chat.typing", body: JSON.stringify({ ...payload, isTyping: false, typing: false }) });
@@ -870,6 +976,64 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
       setMessages((prev) => prev.map((item) => item.id === message.id ? { ...item, text: "Tin nhắn đã được thu hồi", isDeleted: true } : item));
     } catch (error: any) {
       toast.error(error?.message || "Không thể thu hồi tin nhắn.");
+    }
+  };
+
+  const handleCopyMessage = async (message: MessageItem) => {
+    try {
+      await navigator.clipboard.writeText(message.text || message.attachmentUrl || "");
+      toast.success("Đã copy tin nhắn.");
+    } catch {
+      toast.error("Không thể copy tin nhắn.");
+    }
+  };
+
+  const sendAttachmentMessage = async (file: File) => {
+    if (!selectedChat) return;
+    setIsUploadingAttachment(true);
+    try {
+      const uploaded = await api.uploadFile(file);
+      const isImage = String(uploaded.type || file.type).startsWith("image/");
+      const payload = {
+        conversationId: selectedChat.id.startsWith("new_") ? "" : selectedChat.id,
+        receiverId: getConversationPeerId(selectedChat),
+        content: isImage ? "Đã gửi một hình ảnh" : `Đã gửi tệp: ${uploaded.name || file.name}`,
+        messageType: isImage ? "image" : "file",
+        attachmentUrl: uploaded.url,
+        attachmentName: uploaded.name || file.name,
+        attachmentSize: uploaded.size || file.size,
+      };
+      if (stompClientRef.current?.connected) {
+        stompClientRef.current.publish({ destination: "/app/chat.sendMessage", body: JSON.stringify(payload) });
+      } else {
+        await api.request("POST", "/api/chat/messages", payload);
+      }
+    } catch (error: any) {
+      toast.error(error?.message || "Không thể gửi file.");
+    } finally {
+      setIsUploadingAttachment(false);
+    }
+  };
+
+  const handleAttachmentChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (file) void sendAttachmentMessage(file);
+  };
+
+  const handleChatBackgroundChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Chỉ chọn ảnh làm nền hội thoại.");
+      return;
+    }
+    try {
+      const uploaded = await api.uploadFile(file);
+      if (uploaded?.url) updateCustomChatBackground(uploaded.url);
+    } catch (error: any) {
+      toast.error(error?.message || "Không thể tải ảnh nền.");
     }
   };
 
@@ -1156,7 +1320,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
 
             <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
               {/* Messages */}
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, background: selectedChatBackground.value }}>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, background: selectedChatBackgroundValue }}>
                 <div className="messages-scroll-area" style={{ flex: 1, overflowY: "auto", padding: "16px 16px 0" }}>
                   {isLoadingMessages ? (
                     <div style={{ display: "flex", justifyContent: "center", padding: 32, color: ORANGE }}>
@@ -1174,6 +1338,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                         const isMe = msg.senderId === "me";
                         const showAvatar = !isMe && (idx === messages.length - 1 || messages[idx + 1]?.senderId !== msg.senderId);
                         const isGroupChat = selectedChat?.type === "group";
+                        const repliedMessage = msg.replyToMessageId ? messages.find((item) => item.id === msg.replyToMessageId) : null;
                         return (
                           <div key={msg.id}
                             style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start", alignItems: "flex-end", gap: 8, position: "relative" }}
@@ -1196,18 +1361,59 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                                   borderRadius: isMe ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
                                   padding: "10px 14px", fontSize: 14, lineHeight: 1.5,
                                   wordBreak: "break-word", cursor: msg.isDeleted ? "default" : "pointer",
+                                  userSelect: "none",
+                                  WebkitUserSelect: "none",
+                                  touchAction: "manipulation",
                                   fontStyle: msg.isDeleted ? "italic" : "normal",
                                   boxShadow: isMe ? `0 2px 8px ${ORANGE}40` : "0 1px 4px rgba(0,0,0,0.06)",
                                 }}
                                 onMouseEnter={() => !msg.isDeleted && setShowReactionPicker(msg.id)}
+                                onContextMenu={(event) => {
+                                  event.preventDefault();
+                                  if (!msg.isDeleted) setActiveMessageMenu(activeMessageMenu === msg.id ? null : msg.id);
+                                }}
                               >
+                                {repliedMessage && (
+                                  <div style={{ borderLeft: `3px solid ${isMe ? "#fff" : ORANGE}`, background: isMe ? "rgba(255,255,255,0.16)" : "#f8fafc", borderRadius: 8, padding: "5px 7px", marginBottom: 7, fontSize: 12 }}>
+                                    <div style={{ fontWeight: 700 }}>{repliedMessage.senderId === "me" ? "Bạn" : (repliedMessage.senderName || selectedChat.name)}</div>
+                                    <div style={{ opacity: 0.78, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 220 }}>{repliedMessage.text}</div>
+                                  </div>
+                                )}
+                                {msg.attachmentUrl && !msg.isDeleted && (
+                                  String(msg.messageType).toLowerCase() === "image" ? (
+                                    <img src={normalizeAvatarUrl(msg.attachmentUrl, msg.id)} alt={msg.attachmentName || ""} style={{ display: "block", maxWidth: 260, maxHeight: 260, borderRadius: 12, objectFit: "cover", marginBottom: msg.text ? 8 : 0 }} />
+                                  ) : (
+                                    <a href={normalizeAvatarUrl(msg.attachmentUrl, msg.id)} target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", gap: 8, color: "inherit", textDecoration: "none", marginBottom: msg.text ? 8 : 0 }}>
+                                      <FileText size={18} />
+                                      <span style={{ fontWeight: 700 }}>{msg.attachmentName || "Tệp đính kèm"}</span>
+                                    </a>
+                                  )
+                                )}
                                 {msg.text}
                               </div>
                               <div style={{ fontSize: 11, color: "#b0b0b0", marginTop: 3, textAlign: isMe ? "right" : "left" }}>
                                 {msg.time}{msg.isEdited && !msg.isDeleted ? " · đã sửa" : ""}
                               </div>
 
-                              {isMe && !msg.isDeleted && !msg.id.startsWith("temp_") && (
+                              {!msg.isDeleted && (
+                                <div style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start", gap: 6, marginTop: 5 }}>
+                                  <button type="button" title="Copy" onClick={() => handleCopyMessage(msg)} style={{ width: 26, height: 26, borderRadius: 13, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Copy size={13} /></button>
+                                  <button type="button" title="Trả lời" onClick={() => setReplyingTo(msg)} style={{ width: 26, height: 26, borderRadius: 13, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Reply size={13} /></button>
+                                  <button type="button" title="React" onClick={() => setShowReactionPicker(showReactionPicker === msg.id ? null : msg.id)} style={{ width: 26, height: 26, borderRadius: 13, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Smile size={13} /></button>
+                                  {isMe && !msg.id.startsWith("temp_") && (
+                                    <button type="button" title="Thêm" onClick={() => setActiveMessageMenu(activeMessageMenu === msg.id ? null : msg.id)} style={{ width: 26, height: 26, borderRadius: 13, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><MoreHorizontal size={14} /></button>
+                                  )}
+                                </div>
+                              )}
+
+                              {activeMessageMenu === msg.id && isMe && !msg.isDeleted && !msg.id.startsWith("temp_") && (
+                                <div style={{ position: "absolute", top: "100%", right: 0, marginTop: 4, zIndex: 25, minWidth: 132, overflow: "hidden", borderRadius: 12, border: "1px solid #e2e8f0", background: "#fff", boxShadow: "0 12px 28px rgba(15,23,42,0.16)" }}>
+                                  <button type="button" onClick={() => { setActiveMessageMenu(null); handleEditMessage(msg); }} style={{ width: "100%", border: 0, background: "#fff", padding: "9px 11px", display: "flex", gap: 8, alignItems: "center", cursor: "pointer", fontSize: 13 }}><Pencil size={14} /> Sửa</button>
+                                  <button type="button" onClick={() => { setActiveMessageMenu(null); handleRecallMessage(msg); }} style={{ width: "100%", border: 0, background: "#fff", padding: "9px 11px", display: "flex", gap: 8, alignItems: "center", cursor: "pointer", fontSize: 13, color: "#ef4444" }}><Trash2 size={14} /> Thu hồi</button>
+                                </div>
+                              )}
+
+                              {false && isMe && !msg.isDeleted && !msg.id.startsWith("temp_") && (
                                 <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4, fontSize: 11 }}>
                                   <button type="button" onClick={() => handleEditMessage(msg)} style={{ border: "none", background: "transparent", color: "#64748b", cursor: "pointer", padding: 0 }}>Sửa</button>
                                   <button type="button" onClick={() => handleRecallMessage(msg)} style={{ border: "none", background: "transparent", color: "#ef4444", cursor: "pointer", padding: 0 }}>Thu hồi</button>
@@ -1281,8 +1487,21 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                   </div>
                 ) : (
                   <div className="message-composer" style={{ padding: "10px 14px", background: "#fff", borderTop: "1px solid #f0f0f0", flexShrink: 0 }}>
+                    {replyingTo && (
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8, padding: "8px 10px", borderRadius: 12, background: ORANGE_LIGHT, color: "#334155" }}>
+                        <div style={{ minWidth: 0, fontSize: 12 }}>
+                          <div style={{ fontWeight: 800, color: ORANGE }}>Đang trả lời {replyingTo.senderId === "me" ? "Bạn" : (replyingTo.senderName || selectedChat.name)}</div>
+                          <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{replyingTo.text}</div>
+                        </div>
+                        <button type="button" onClick={() => setReplyingTo(null)} style={{ border: 0, background: "transparent", cursor: "pointer", color: "#64748b" }}><X size={16} /></button>
+                      </div>
+                    )}
+                    <input ref={attachmentInputRef} type="file" className="hidden" onChange={handleAttachmentChange} />
                     <form className="message-composer-form" onSubmit={handleSendMessage} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <button type="button" style={{ width: 38, height: 38, borderRadius: 10, border: "1px solid #f0f0f0", background: "#f8f8f8", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#b0b0b0", flexShrink: 0 }}><ImageIcon size={17} /></button>
+                      <button type="button" onClick={() => attachmentInputRef.current?.click()} disabled={isUploadingAttachment} style={{ width: 38, height: 38, borderRadius: 10, border: "1px solid #f0f0f0", background: "#f8f8f8", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: ORANGE, flexShrink: 0 }}>
+                        {isUploadingAttachment ? <Loader2 size={17} style={{ animation: "spin 1s linear infinite" }} /> : <ImageIcon size={17} />}
+                      </button>
+                      <button type="button" title="Live" onClick={() => startCall("video")} style={{ width: 38, height: 38, borderRadius: 10, border: "1px solid #fed7aa", background: "#fff7ed", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: ORANGE, flexShrink: 0 }}><Video size={17} /></button>
                       <div className="message-composer-input" style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", background: "#f8f8f8", borderRadius: 20, border: "1px solid #f0f0f0", padding: "0 12px" }}>
                         <input
                           type="text"
@@ -1348,6 +1567,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
 
                         <div>
                           <div style={{ fontSize: 11, fontWeight: 700, color: "#b0b0b0", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Nền hội thoại</div>
+                          <input ref={chatBackgroundInputRef} type="file" accept="image/*" className="hidden" onChange={handleChatBackgroundChange} />
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
                             {CHAT_BACKGROUNDS.map((bg) => (
                               <button
@@ -1366,6 +1586,9 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                               />
                             ))}
                           </div>
+                          <button type="button" onClick={() => chatBackgroundInputRef.current?.click()} style={{ marginTop: 8, width: "100%", height: 34, borderRadius: 10, border: "1px solid #fed7aa", background: "#fff7ed", color: ORANGE, cursor: "pointer", fontSize: 12, fontWeight: 800 }}>
+                            Tải ảnh nền lên
+                          </button>
                         </div>
 
                         <div>

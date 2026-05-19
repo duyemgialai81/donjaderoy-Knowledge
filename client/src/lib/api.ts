@@ -404,6 +404,38 @@ export async function updateUserProfile(userId: string, data: any, token?: strin
   return res?.data || res;
 }
 
+export async function uploadUserAvatar(userId: string, file: File, token?: string) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const _token = token || localStorage_service.getAuthToken();
+  const res = await fetch(`${API_BASE}/api/users/${encodeURIComponent(userId)}/avatar`, {
+    method: 'POST',
+    headers: _token ? { Authorization: `Bearer ${_token}` } : undefined,
+    body: formData,
+  });
+  const parsed = await safeJson(res);
+  if (!res.ok || parsed?.isSuccess === false) {
+    throw new Error(parsed?.message || `API error: ${res.status}`);
+  }
+  return parsed?.data || parsed;
+}
+
+export async function uploadFile(file: File, token?: string) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const _token = token || localStorage_service.getAuthToken();
+  const res = await fetch(`${API_BASE}/api/files`, {
+    method: 'POST',
+    headers: _token ? { Authorization: `Bearer ${_token}` } : undefined,
+    body: formData,
+  });
+  const parsed = await safeJson(res);
+  if (!res.ok || parsed?.isSuccess === false) {
+    throw new Error(parsed?.message || `API error: ${res.status}`);
+  }
+  return parsed?.data || parsed;
+}
+
 export async function searchUsers(keyword: string, page = 0, size = 10, token?: string) {
   const res = await request('GET', `/api/users/search?keyword=${encodeURIComponent(keyword)}&page=${page}&size=${size}`, undefined, token);
   const users = unwrapResponse(res);
@@ -702,6 +734,8 @@ export default {
   getFollowing,
   getFollowStatus,
   updateUserProfile,
+  uploadUserAvatar,
+  uploadFile,
   searchUsers,
   getUserStats,
 

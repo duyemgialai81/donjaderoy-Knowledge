@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ChangeEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import type { User as UserType, Post } from "../lib/mockData";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -33,6 +35,8 @@ interface ProfilePageProps {
 export function ProfilePage({
   user, posts, currentUser, isOwnProfile, onUpdateProfile, onFollow, onPostClick, onPostLike,
 }: ProfilePageProps) {
+  const navigate = useNavigate();
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(user?.name || "");
   const [editedBio, setEditedBio] = useState((user as any)?.bio || "");
@@ -45,6 +49,7 @@ export function ProfilePage({
   const [isLoadingFollowUsers, setIsLoadingFollowUsers] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isFollowBusy, setIsFollowBusy] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [followersCount, setFollowersCount] = useState(Number((user as any)?.followers || 0));
 
   useEffect(() => {
@@ -111,6 +116,32 @@ export function ProfilePage({
     }
   };
 
+  const handleAvatarFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !currentUser?.id) return;
+    if (!file.type.startsWith("image/")) return;
+    const previousAvatar = editedAvatar;
+    const previewUrl = URL.createObjectURL(file);
+    setEditedAvatar(previewUrl);
+    setIsUploadingAvatar(true);
+    try {
+      const token = localStorage_service.getAuthToken() || undefined;
+      const uploaded = await api.uploadUserAvatar(currentUser.id, file, token);
+      if (uploaded?.avatar) setEditedAvatar(uploaded.avatar);
+    } catch {
+      setEditedAvatar(previousAvatar);
+    } finally {
+      setIsUploadingAvatar(false);
+      event.target.value = "";
+      URL.revokeObjectURL(previewUrl);
+    }
+  };
+
+  const openMessageThread = () => {
+    if (!user?.id) return;
+    navigate(`/tin-nhan?user=${encodeURIComponent(user.id)}`);
+  };
+
   const openFollowModal = async (type: "followers" | "following") => {
     if (!user?.id) return;
     setFollowModal(type);
@@ -151,8 +182,9 @@ export function ProfilePage({
 
   if (!user) return <div className="py-20 text-center text-slate-500">Đang tải hồ sơ...</div>;
 
-  const avatarUrl = user?.avatar && typeof user.avatar === "string" && user.avatar.trim()
-    ? user.avatar
+  const avatarSource = isEditing ? editedAvatar : user?.avatar;
+  const avatarUrl = avatarSource && typeof avatarSource === "string" && avatarSource.trim()
+    ? avatarSource
     : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id || "default"}`;
 
   const activityStats = [
@@ -191,6 +223,25 @@ export function ProfilePage({
                       (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`;
                     }}
                   />
+                  {isOwnProfile && isEditing && (
+                    <>
+                      <input
+                        ref={avatarInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleAvatarFileChange}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => avatarInputRef.current?.click()}
+                        disabled={isUploadingAvatar}
+                        className="absolute inset-x-1 bottom-1 rounded-lg bg-black/55 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-sm"
+                      >
+                        {isUploadingAvatar ? "Đang tải..." : "Đổi ảnh"}
+                      </button>
+                    </>
+                  )}
                   {userBadges.length > 0 && (
                     <div className="absolute -bottom-2 -right-2 flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-md text-xl border border-orange-100">
                       {userBadges[userBadges.length - 1]?.icon}
@@ -234,12 +285,12 @@ export function ProfilePage({
                 <div className="space-y-1.5 text-xs text-slate-500 mb-4">
                   <div className="flex items-center justify-center gap-1.5">
                     <BookOpen className="h-3.5 w-3.5" />
-                    <span>{user.major}</span>
+                    <span>{(user as any).major || (user as any).majorId || "Chưa cập nhật ngành"}</span>
                   </div>
-                  {user.class && (
+                  {((user as any).class || (user as any).className) && (
                     <div className="flex items-center justify-center gap-1.5">
                       <Users className="h-3.5 w-3.5" />
-                      <span>Lớp {user.class}</span>
+                      <span>Lớp {(user as any).class || (user as any).className}</span>
                     </div>
                   )}
                   <div className="flex items-center justify-center gap-1.5">
@@ -254,26 +305,39 @@ export function ProfilePage({
 
                 {isEditing && (
                   <div className="space-y-2 text-left">
-                    <Input
-                      value={editedAvatar}
-                      onChange={(e) => setEditedAvatar(e.target.value)}
-                      placeholder="URL anh dai dien"
-                      className="text-sm"
-                    />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <Input
-                        value={editedMajorId}
-                        onChange={(e) => setEditedMajorId(e.target.value)}
-                        placeholder="Nganh/Ma nganh"
-                        className="text-sm"
-                      />
-                      <Input
-                        value={editedClassName}
-                        onChange={(e) => setEditedClassName(e.target.value)}
-                        placeholder="Lop"
-                        className="text-sm"
-                      />
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-slate-500">Ảnh đại diện</label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-9 w-full rounded-xl border-orange-200 bg-orange-50 text-sm font-semibold text-[#F26B38] hover:bg-orange-100"
+                        onClick={() => avatarInputRef.current?.click()}
+                        disabled={isUploadingAvatar}
+                      >
+                        {isUploadingAvatar ? "Đang tải ảnh..." : "Tải ảnh lên"}
+                      </Button>
                     </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold text-slate-500">Ngành học</label>
+                        <Input
+                          value={editedMajorId}
+                          onChange={(e) => setEditedMajorId(e.target.value)}
+                          placeholder="Ví dụ: CNTT"
+                          className="text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold text-slate-500">Lớp</label>
+                        <Input
+                          value={editedClassName}
+                          onChange={(e) => setEditedClassName(e.target.value)}
+                          placeholder="Ví dụ: SD19301"
+                          className="text-sm"
+                        />
+                      </div>
+                    </div>
+                    <label className="block text-xs font-semibold text-slate-500">Giới thiệu</label>
                     <Textarea
                     placeholder="Giới thiệu về bản thân..."
                     value={editedBio}
@@ -312,7 +376,7 @@ export function ProfilePage({
                     >
                       <Users className="h-3.5 w-3.5 mr-1.5" /> {isFollowing ? "Bỏ theo dõi" : "Theo dõi"}
                     </Button>
-                    <Button variant="outline" className="flex-1 h-9 text-sm rounded-lg border-orange-200 bg-orange-50 text-[#F26B38] hover:bg-orange-100 hover:text-[#D9541E]">
+                    <Button variant="outline" className="flex-1 h-9 text-sm rounded-lg border-orange-200 bg-orange-50 text-[#F26B38] hover:bg-orange-100 hover:text-[#D9541E]" onClick={openMessageThread}>
                       <MessageCircle className="h-3.5 w-3.5 mr-1.5" /> Nhắn tin
                     </Button>
                   </>
