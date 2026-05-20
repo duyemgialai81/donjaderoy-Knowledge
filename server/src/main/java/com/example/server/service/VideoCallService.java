@@ -23,20 +23,22 @@ public class VideoCallService {
 
     @Transactional
     public void startCallHistory(CallDTO callDTO) {
-        // 1. Lưu vào bảng video_calls với status là ongoing
         VideoCall call = VideoCall.builder()
                 .id(callDTO.getCallId())
                 .conversationId(callDTO.getConversationId())
                 .callerId(callDTO.getSenderId())
-                .status(VideoCall.CallStatus.ongoing) // 👈 Dùng Enum từ Entity
+                .status(VideoCall.CallStatus.ongoing)
                 .startedAt(LocalDateTime.now())
                 .build();
         videoCallRepository.save(call);
 
-        // 2. Tạo tin nhắn hệ thống báo cuộc gọi bắt đầu
-        String content = callDTO.getCallType().equalsIgnoreCase("video")
-                ? "Bắt đầu cuộc gọi video"
-                : "Bắt đầu cuộc gọi thoại";
+        if (callDTO.getConversationId() == null || callDTO.getConversationId().isBlank()) {
+            return;
+        }
+
+        String content = "video".equalsIgnoreCase(callDTO.getCallType())
+                ? "Bat dau cuoc goi video"
+                : "Bat dau cuoc goi thoai";
 
         Message msg = Message.builder()
                 .id(UUID.randomUUID().toString())

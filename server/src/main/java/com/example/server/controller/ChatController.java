@@ -305,6 +305,12 @@ public class ChatController {
             callEvent.setSenderName(sender.getName());
             callEvent.setSenderAvatar(sender.getAvatar());
         });
+
+        if (callEvent.getReceiverId() == null || callEvent.getReceiverId().isBlank()) {
+            messagingTemplate.convertAndSendToUser(callEvent.getSenderId(), "/queue/errors", "Loi cuoc goi: Thieu nguoi nhan");
+            return;
+        }
+
         try {
             switch (callEvent.getType()) {
                 case "start" -> videoCallService.startCallHistory(callEvent);
@@ -313,6 +319,11 @@ public class ChatController {
                 default -> {
                 }
             }
+        } catch (Exception e) {
+            log.warn("Call history update failed for call {} type {}", callEvent.getCallId(), callEvent.getType(), e);
+        }
+
+        try {
             messagingTemplate.convertAndSendToUser(callEvent.getReceiverId(), "/queue/call", callEvent);
             if ("reject".equals(callEvent.getType()) || "end".equals(callEvent.getType())) {
                 messagingTemplate.convertAndSendToUser(callEvent.getSenderId(), "/queue/call", callEvent);
