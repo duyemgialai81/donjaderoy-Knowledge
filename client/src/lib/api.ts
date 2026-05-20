@@ -295,7 +295,7 @@ export async function addComment(data: any, token?: string) {
 }
 
 export async function getCommentsByPost(postId: string, token?: string) {
-  const res = await request('GET', `/api/comments/post/${postId}`, undefined, token);
+  const res = await request('GET', `/api/comments/post/${postId}?page=0&size=100`, undefined, token);
   const comments = unwrapResponse(res);
   if (Array.isArray(comments)) return comments.map(normalizeComment);
   return comments;

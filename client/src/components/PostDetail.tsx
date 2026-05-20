@@ -57,6 +57,35 @@ function readLikeCountPayload(payload: any) {
   return Number.isFinite(count) ? count : null;
 }
 
+function removeCommentTree(comments: Comment[], rootId: string) {
+  const idsToRemove = new Set<string>([rootId]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    comments.forEach((comment) => {
+      if (comment.parentId && idsToRemove.has(comment.parentId) && !idsToRemove.has(comment.id)) {
+        idsToRemove.add(comment.id);
+        changed = true;
+      }
+    });
+  }
+  return comments.filter((comment) => !idsToRemove.has(comment.id));
+}
+
+function readDeletedCommentPayload(payload: any) {
+  if (typeof payload === "string") {
+    try {
+      payload = JSON.parse(payload);
+    } catch {
+      return { id: payload, deletedCount: 1 };
+    }
+  }
+  return {
+    id: String(payload?.id || payload?.commentId || payload || ""),
+    deletedCount: Math.max(1, Number(payload?.deletedCount || 1)),
+  };
+}
+
 export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: PostDetailProps) {
   const [newComment, setNewComment] = useState("");
   const [replyTo, setReplyTo] = useState<string | null>(null);
@@ -72,6 +101,7 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
   const [currentLikesCount, setCurrentLikesCount] = useState(post.likes || 0);
   const [isLiked, setIsLiked] = useState(post.isLiked || false);
   const [isLiking, setIsLiking] = useState(false);
+  const [commentsCount, setCommentsCount] = useState(post.commentsCount || 0);
   
   const { user: currentUser } = useAuth();
   const stompClientRef = useRef<Client | null>(null);
@@ -86,6 +116,10 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
     setIsLiked(Boolean(liked));
     return { count, liked: Boolean(liked) };
   };
+
+  useEffect(() => {
+    setCommentsCount(post.commentsCount || 0);
+  }, [post.id, post.commentsCount]);
 
   // ==========================================
   // 1. TẢI DỮ LIỆU BAN ĐẦU
@@ -114,11 +148,13 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
     api.getCommentsByPost(post.id, token).then(async (res) => {
       if (!mounted) return;
       const rootList = Array.isArray(res) ? res : (res?.data || res) || [];
-      const replyLists = await Promise.all(
-        (Array.isArray(rootList) ? rootList : []).map((comment: any) => api.getCommentReplies(comment.id, token).catch(() => []))
+      const baseList = Array.isArray(rootList) ? rootList : [];
+      const hasFlatReplies = baseList.some((comment: any) => comment?.parentId);
+      const replyLists = hasFlatReplies ? [] : await Promise.all(
+        baseList.map((comment: any) => api.getCommentReplies(comment.id, token).catch(() => []))
       );
       if (!mounted) return;
-      const list = (Array.isArray(rootList) ? rootList : []).map((comment: any, index: number) => ({
+      const list = hasFlatReplies ? baseList : baseList.map((comment: any, index: number) => ({
         ...comment,
         replies: Array.isArray(replyLists[index]) ? replyLists[index] : [],
       }));
@@ -139,6 +175,7 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
       
       const uniqueComments = Array.from(new Map(flatList.map(c => [c.id, c])).values());
       setPostComments(uniqueComments);
+      setCommentsCount(uniqueComments.length);
       
       Promise.all(Array.from(authorIds).map(id => api.getUser(id, token).catch(() => null))).then(results => {
         if (!mounted) return;
@@ -179,15 +216,21 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
                 tempCommentIdsRef.current.delete(newComment.content);
             }
             if (cleanList.some(c => c.id === newComment.id)) return cleanList;
-            return [...cleanList, newComment];
+            const next = [...cleanList, newComment];
+            setCommentsCount(next.length);
+            return next;
           });
           api.getUser(newComment.authorId, token).then(u => {
             if (u) setCommentAuthors(old => ({ ...old, [u.id]: u }));
           });
         });
         client.subscribe(`/topic/post/${post.id}/delete-comment`, (message) => {
-            const deletedId = message.body;
-            setPostComments(prev => prev.filter(c => c.id !== deletedId && c.parentId !== deletedId));
+            const { id: deletedId } = readDeletedCommentPayload(message.body);
+            setPostComments(prev => {
+              const next = removeCommentTree(prev, deletedId);
+              setCommentsCount(next.length);
+              return next;
+            });
         });
         client.subscribe(`/topic/post/${post.id}/update-comment`, (message) => {
             const updatedComment = JSON.parse(message.body);
@@ -288,7 +331,11 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
       isReported: false,
     };
 
-    setPostComments(prev => [...prev, optimisticComment]);
+    setPostComments(prev => {
+      const next = [...prev, optimisticComment];
+      setCommentsCount(next.length);
+      return next;
+    });
 
     if (!commentAuthors[currentUser.id]) {
       setCommentAuthors(prev => ({ ...prev, [currentUser.id]: currentUser }));
@@ -308,7 +355,11 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
         if (onUserUpdate) onUserUpdate();
       }
     } catch (e) {
-      setPostComments(prev => prev.filter(c => c.id !== tempId));
+      setPostComments(prev => {
+        const next = prev.filter(c => c.id !== tempId);
+        setCommentsCount(next.length);
+        return next;
+      });
       tempCommentIdsRef.current.delete(content);
       toast.error('Lỗi khi thêm bình luận');
       setNewComment(content); 
@@ -361,7 +412,11 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
     try {
       const token = localStorage.getItem('ksp_auth_token') || undefined;
       await api.deleteComment(commentId, token);
-      setPostComments(prev => prev.filter(c => c.id !== commentId && c.parentId !== commentId));
+      setPostComments(prev => {
+        const next = removeCommentTree(prev, commentId);
+        setCommentsCount(next.length);
+        return next;
+      });
       toast.success('Đã xóa bình luận');
       if (onUserUpdate) onUserUpdate();
     } catch (err) {
@@ -626,7 +681,7 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
               </div>
               <div className="flex items-center gap-1.5">
                 <MessageCircle className="h-4 w-4 text-slate-400" />
-                <span>{postComments.length} <span className="hidden sm:inline">bình luận</span></span>
+                <span>{commentsCount} <span className="hidden sm:inline">bình luận</span></span>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -655,7 +710,7 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
 
           {/* ── Comments Section ── */}
           <div className="mt-8">
-            <h3 className="text-lg font-bold text-slate-800 mb-5">Bình luận ({postComments.length})</h3>
+            <h3 className="text-lg font-bold text-slate-800 mb-5">Bình luận ({commentsCount})</h3>
 
             {/* Comment Input Box */}
             <div className="mb-8 p-4 rounded-2xl border border-slate-200 bg-slate-50 focus-within:border-[#F26B38] focus-within:ring-2 focus-within:ring-[#F26B38]/20 transition-all">

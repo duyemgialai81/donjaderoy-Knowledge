@@ -539,9 +539,20 @@
 }
 
 .message-action-row {
+  position: absolute;
+  top: calc(100% + 2px);
   opacity: 0;
   pointer-events: none;
+  z-index: 18;
   transition: opacity 120ms ease;
+}
+
+.message-action-row[data-side="right"] {
+  right: 0;
+}
+
+.message-action-row[data-side="left"] {
+  left: 0;
 }
 
 .message-bubble-group:hover .message-action-row,

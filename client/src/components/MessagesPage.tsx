@@ -232,6 +232,9 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   const iceCandidateQueueRef = useRef<RTCIceCandidateInit[]>([]);
   const acceptCallTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const toId = (value: unknown) => (value === undefined || value === null ? "" : String(value));
+  const currentUserId = toId(currentUser?.id);
+
   useEffect(() => { conversationsRef.current = conversations; }, [conversations]);
   useEffect(() => { callSessionRef.current = callSession; }, [callSession]);
   useEffect(() => { selectedChatIdRef.current = selectedChatId; }, [selectedChatId]);
@@ -257,8 +260,6 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     return normalizeAvatarUrl(url, id || "default");
   };
 
-  const toId = (value: unknown) => (value === undefined || value === null ? "" : String(value));
-  const currentUserId = toId(currentUser?.id);
   const parseRealtimePayload = (data: any) => {
     if (!data) return null;
     if (typeof data === "object") return data;
@@ -1398,15 +1399,16 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                       <div style={{ fontSize: 13, color: "#b0b0b0", maxWidth: 280 }}>Hãy nhắn tin trước để bắt đầu!</div>
                     </div>
                   ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4, maxWidth: 720, margin: "0 auto" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2, maxWidth: 720, width: "100%", margin: "0 auto" }}>
                       {messages.map((msg, idx) => {
                         const isMe = msg.senderId === "me";
                         const showAvatar = !isMe && (idx === messages.length - 1 || messages[idx + 1]?.senderId !== msg.senderId);
                         const isGroupChat = selectedChat?.type === "group";
                         const repliedMessage = msg.replyToMessageId ? messages.find((item) => item.id === msg.replyToMessageId) : null;
+                        const previousSameSender = idx > 0 && messages[idx - 1]?.senderId === msg.senderId;
                         return (
                           <div key={msg.id}
-                            style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start", alignItems: "flex-end", gap: 8, position: "relative" }}
+                            style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start", alignItems: "flex-end", gap: 8, position: "relative", marginTop: previousSameSender ? 1 : 7 }}
                             onMouseLeave={() => setShowReactionPicker(null)}>
                             {!isMe && (
                               <div style={{ width: 32, flexShrink: 0 }}>
@@ -1461,7 +1463,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                               </div>
 
                               {!msg.isDeleted && (
-                                <div className="message-action-row" data-active={activeMessageMenu === msg.id || showReactionPicker === msg.id ? "true" : "false"} style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start", gap: 6, marginTop: 5 }}>
+                                <div className="message-action-row" data-side={isMe ? "right" : "left"} data-active={activeMessageMenu === msg.id || showReactionPicker === msg.id ? "true" : "false"} style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start", gap: 6 }}>
                                   <button type="button" title="Copy" onClick={() => handleCopyMessage(msg)} style={{ width: 26, height: 26, borderRadius: 13, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Copy size={13} /></button>
                                   <button type="button" title="Trả lời" onClick={() => setReplyingTo(msg)} style={{ width: 26, height: 26, borderRadius: 13, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Reply size={13} /></button>
                                   <button type="button" title="React" onClick={() => setShowReactionPicker(showReactionPicker === msg.id ? null : msg.id)} style={{ width: 26, height: 26, borderRadius: 13, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Smile size={13} /></button>

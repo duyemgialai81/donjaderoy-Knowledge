@@ -45,6 +45,17 @@ function readLikeCountPayload(payload: any) {
   return Number.isFinite(count) ? count : null;
 }
 
+function readDeletedCommentPayload(payload: any) {
+  if (typeof payload === "string") {
+    try {
+      payload = JSON.parse(payload);
+    } catch {
+      return { deletedCount: 1 };
+    }
+  }
+  return { deletedCount: Math.max(1, Number(payload?.deletedCount || 1)) };
+}
+
 export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps) {
   const { user: currentUser } = useAuth();
   const [author, setAuthor] = useState<User | null>(null);
@@ -120,8 +131,9 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
         client.subscribe(`/topic/post/${post.id}/new-comment`, () => {
           setCommentsCount(prev => prev + 1);
         });
-        client.subscribe(`/topic/post/${post.id}/delete-comment`, () => {
-          setCommentsCount(prev => Math.max(0, prev - 1));
+        client.subscribe(`/topic/post/${post.id}/delete-comment`, (message) => {
+          const { deletedCount } = readDeletedCommentPayload(message.body);
+          setCommentsCount(prev => Math.max(0, prev - deletedCount));
         });
         client.subscribe(`/topic/post/${post.id}/views`, (message) => {
           setViewsCount(Number(message.body));
