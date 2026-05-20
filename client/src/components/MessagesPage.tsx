@@ -61,6 +61,8 @@ interface ConversationItem {
   status?: "accepted" | "pending" | string;
   isOnline?: boolean;
   memberCount?: number;
+  backgroundId?: string;
+  backgroundUrl?: string;
 }
 
 interface SearchUserItem {
@@ -194,6 +196,9 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   const [searchResults, setSearchResults] = useState<SearchUserItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [messages, setMessages] = useState<MessageItem[]>([]);
+  const [oldestMessageCursor, setOldestMessageCursor] = useState<string | null>(null);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [showInfo, setShowInfo] = useState(false);
   const [infoTab, setInfoTab] = useState<"info" | "chat">("info");
@@ -272,6 +277,32 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     return normalizeAvatarUrl(url, id || "default");
   };
 
+  const normalizeConversationItem = (c: any): ConversationItem => ({
+    id: toId(c.id),
+    type: c.type || "direct",
+    targetUserId: toId(c.targetUserId) || undefined,
+    name: c.type === "group" ? (c.groupName || c.name || "Nhóm chat") : (c.targetUserName || c.name || "Người dùng"),
+    avatar: c.targetUserAvatar || c.avatar,
+    lastMessage: c.lastMessage || "Bắt đầu cuộc trò chuyện mới.",
+    time: c.lastMessageTime ? formatVietnamTime(c.lastMessageTime) : (c.time || ""),
+    unread: c.unreadCount ?? c.unread ?? 0,
+    status: c.status || "accepted",
+    isOnline: Boolean(c.targetIsOnline ?? c.isOnline),
+    memberCount: c.memberCount,
+    backgroundId: c.backgroundId || undefined,
+    backgroundUrl: c.backgroundUrl || undefined,
+  });
+
+  const mergeConversationUpdate = (list: ConversationItem[], incoming: Partial<ConversationItem> & { id?: string }) => {
+    const incomingId = toId(incoming.id);
+    if (!incomingId) return list;
+    const idx = list.findIndex((c) => toId(c.id) === incomingId);
+    if (idx === -1) return dedupConversations([normalizeConversationItem(incoming), ...list]);
+    const next = [...list];
+    next[idx] = { ...next[idx], ...incoming, id: incomingId };
+    return dedupConversations(next);
+  };
+
   const setConversationMessages = (
     conversationId: string | null,
     value: MessageItem[] | ((prev: MessageItem[]) => MessageItem[]),
@@ -279,6 +310,24 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     messagesConversationIdRef.current = conversationId;
     setMessages(value);
   };
+
+  const mapMessageItem = (m: any): MessageItem => ({
+    id: toId(m.id) || Math.random().toString(),
+    senderId: toId(m.senderId) === currentUserId ? "me" : toId(m.senderId),
+    senderName: m.senderName,
+    senderAvatar: m.senderAvatar,
+    text: m.isDeleted ? "Tin nhắn đã được thu hồi" : (m.content || m.text || "Tin nhắn không hợp lệ."),
+    time: formatVietnamTime(m.createdAt || Date.now()),
+    isDeleted: Boolean(m.isDeleted),
+    isEdited: Boolean(m.editedAt),
+    replyToMessageId: m.replyToMessageId,
+    attachmentUrl: m.attachmentUrl,
+    attachmentName: m.attachmentName,
+    attachmentSize: m.attachmentSize,
+    messageType: m.messageType,
+    reactions: m.reactions || {},
+    userReactions: m.userReactions || {},
+  });
 
   const parseRealtimePayload = (data: any) => {
     if (!data) return null;
@@ -348,15 +397,31 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   const selectedChatAvatar = selectedChat
     ? getAvatarUrl(selectedChat.avatar, getConversationPeerId(selectedChat) || selectedChat.id)
     : "";
-  const selectedChatBackground = CHAT_BACKGROUNDS.find((item) => item.id === chatBackgroundId) || CHAT_BACKGROUNDS[0];
-  const normalizedCustomChatBackground = customChatBackground ? (normalizeAssetUrl(customChatBackground) || customChatBackground) : "";
+  const hasPersistedSelectedChat = Boolean(selectedChat && !selectedChat.id.startsWith("new_"));
+  const effectiveChatBackgroundId = hasPersistedSelectedChat ? (selectedChat?.backgroundId || "soft") : (chatBackgroundId || "soft");
+  const effectiveCustomChatBackground = hasPersistedSelectedChat ? (selectedChat?.backgroundUrl || "") : customChatBackground;
+  const selectedChatBackground = CHAT_BACKGROUNDS.find((item) => item.id === effectiveChatBackgroundId) || CHAT_BACKGROUNDS[0];
+  const normalizedCustomChatBackground = effectiveCustomChatBackground ? (normalizeAssetUrl(effectiveCustomChatBackground) || effectiveCustomChatBackground) : "";
   const selectedChatBackgroundValue = normalizedCustomChatBackground
     ? `linear-gradient(rgba(248,250,252,0.84), rgba(248,250,252,0.84)), url("${normalizedCustomChatBackground}") center/cover`
     : selectedChatBackground.value;
 
-  const updateChatBackground = (id: string) => {
+  const updateChatBackground = async (id: string) => {
     setChatBackgroundId(id);
     setCustomChatBackground("");
+    const conversationId = selectedChat && !selectedChat.id.startsWith("new_") ? selectedChat.id : "";
+    if (conversationId) {
+      setConversations((prev) => mergeConversationUpdate(prev, { id: conversationId, backgroundId: id, backgroundUrl: "" }));
+      try {
+        const res = await api.request("PUT", `/api/chat/conversations/${conversationId}/background`, { backgroundId: id, backgroundUrl: "" });
+        const updated = normalizeConversationItem(res?.data || res);
+        setConversations((prev) => mergeConversationUpdate(prev, updated));
+      } catch (error: any) {
+        toast.error(error?.message || "Không thể đổi nền hội thoại.");
+        void loadChatsAndFriends({ force: true, silent: true });
+      }
+      return;
+    }
     try {
       localStorage.setItem(CHAT_BACKGROUND_STORAGE_KEY, id);
       localStorage.removeItem(CUSTOM_CHAT_BACKGROUND_STORAGE_KEY);
@@ -365,9 +430,22 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     }
   };
 
-  const updateCustomChatBackground = (url: string) => {
+  const updateCustomChatBackground = async (url: string) => {
     const normalizedUrl = normalizeAssetUrl(url) || url;
     setCustomChatBackground(normalizedUrl);
+    const conversationId = selectedChat && !selectedChat.id.startsWith("new_") ? selectedChat.id : "";
+    if (conversationId) {
+      setConversations((prev) => mergeConversationUpdate(prev, { id: conversationId, backgroundId: "custom", backgroundUrl: normalizedUrl }));
+      try {
+        const res = await api.request("PUT", `/api/chat/conversations/${conversationId}/background`, { backgroundId: "custom", backgroundUrl: normalizedUrl });
+        const updated = normalizeConversationItem(res?.data || res);
+        setConversations((prev) => mergeConversationUpdate(prev, updated));
+      } catch (error: any) {
+        toast.error(error?.message || "Không thể đổi nền hội thoại.");
+        void loadChatsAndFriends({ force: true, silent: true });
+      }
+      return;
+    }
     try {
       localStorage.setItem(CUSTOM_CHAT_BACKGROUND_STORAGE_KEY, normalizedUrl);
     } catch {
@@ -442,6 +520,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
           lastMessage: c.lastMessage || "Bắt đầu cuộc trò chuyện mới.",
           time: c.lastMessageTime ? formatVietnamTime(c.lastMessageTime) : "",
           unread: c.unreadCount || 0, status: c.status || "accepted", isOnline: Boolean(c.targetIsOnline), memberCount: c.memberCount,
+          backgroundId: c.backgroundId || undefined, backgroundUrl: c.backgroundUrl || undefined,
         }));
       } catch (e) { console.error(e); }
 
@@ -940,6 +1019,22 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
           setTypingUsers((prev) => { const next = { ...prev }; if (convKey) next[convKey] = isTyping; if (peerId) next[`new_${peerId}`] = isTyping; return next; });
         });
 
+        subscribeUserQueue("conversation-updates", (frame) => {
+          const update = safe(frame.body); if (!update?.id) return;
+          const partial: Partial<ConversationItem> & { id: string } = { id: toId(update.id) };
+          if ("backgroundId" in update) partial.backgroundId = update.backgroundId || undefined;
+          if ("backgroundUrl" in update) partial.backgroundUrl = update.backgroundUrl || undefined;
+          if ("status" in update) partial.status = update.status || "accepted";
+          if ("lastMessage" in update) partial.lastMessage = update.lastMessage || "";
+          if ("lastMessageTime" in update) partial.time = update.lastMessageTime ? formatVietnamTime(update.lastMessageTime) : "";
+          if ("targetIsOnline" in update) partial.isOnline = Boolean(update.targetIsOnline);
+          if ("targetUserName" in update) partial.name = update.targetUserName || partial.name;
+          if ("targetUserAvatar" in update) partial.avatar = update.targetUserAvatar || partial.avatar;
+          if ("groupName" in update) partial.name = update.groupName || partial.name;
+          if ("memberCount" in update) partial.memberCount = update.memberCount;
+          setConversations((prev) => mergeConversationUpdate(prev, partial));
+        });
+
         subscribeUserQueue("call", (frame) => {
           const ev = safe(frame.body); if (!ev) return;
           const { type, callId, callType, senderId, signalData } = ev;
@@ -1116,16 +1211,24 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   useEffect(() => {
     if (!selectedChatId) return;
     const conversationId = selectedChatId;
-    if (conversationId.startsWith("new_")) { setConversationMessages(conversationId, []); return; }
+    if (conversationId.startsWith("new_")) {
+      setOldestMessageCursor(null);
+      setHasMoreMessages(false);
+      setConversationMessages(conversationId, []);
+      return;
+    }
     if (!currentUserId) return;
     let cancelled = false;
     setConversationMessages(conversationId, []);
+    setOldestMessageCursor(null);
+    setHasMoreMessages(false);
     const fetchMessages = async () => {
       setIsLoadingMessages(true);
       try {
-        const res = await api.request("GET", `/api/chat/messages/${conversationId}`);
+        const res = await api.request("GET", `/api/chat/messages/${conversationId}/page?limit=100`);
         if (cancelled || selectedChatIdRef.current !== conversationId) return;
-        const list = Array.isArray(res) ? res : res?.data || [];
+        const payload = res?.data || res;
+        const list = Array.isArray(payload) ? payload : payload?.messages || [];
         const nextMessages = list.map((m: any) => ({
           id: toId(m.id) || Math.random().toString(),
           senderId: toId(m.senderId) === currentUserId ? "me" : toId(m.senderId),
@@ -1142,6 +1245,8 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
           messageType: m.messageType,
           reactions: m.reactions || {}, userReactions: m.userReactions || {},
         }));
+        setOldestMessageCursor(Array.isArray(payload) ? null : (payload?.nextBeforeMessageId || null));
+        setHasMoreMessages(Boolean(!Array.isArray(payload) && payload?.hasMore));
         setConversationMessages(conversationId, nextMessages);
         setConversations((prev) => prev.map((c) => c.id === conversationId ? { ...c, unread: 0 } : c));
         void api.request("POST", `/api/chat/conversations/${conversationId}/read`).catch(() => {});
@@ -1157,7 +1262,31 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     };
     fetchMessages();
     return () => { cancelled = true; };
-  }, [selectedChatId, currentUserId, selectedChat?.unread]);
+  }, [selectedChatId, currentUserId]);
+
+  const loadOlderMessages = async () => {
+    const conversationId = toId(selectedChatIdRef.current);
+    if (!conversationId || conversationId.startsWith("new_") || !oldestMessageCursor || isLoadingOlderMessages) return;
+
+    setIsLoadingOlderMessages(true);
+    try {
+      const res = await api.request("GET", `/api/chat/messages/${conversationId}/page?limit=100&beforeMessageId=${encodeURIComponent(oldestMessageCursor)}`);
+      if (toId(selectedChatIdRef.current) !== conversationId) return;
+      const payload = res?.data || res;
+      const list = payload?.messages || [];
+      const olderMessages = list.map(mapMessageItem);
+      setOldestMessageCursor(payload?.nextBeforeMessageId || null);
+      setHasMoreMessages(Boolean(payload?.hasMore));
+      setConversationMessages(conversationId, (prev) => {
+        const existingIds = new Set(prev.map((item) => item.id));
+        return [...olderMessages.filter((item: MessageItem) => !existingIds.has(item.id)), ...prev];
+      });
+    } catch (error: any) {
+      toast.error(error?.message || "Không thể tải tin nhắn cũ.");
+    } finally {
+      setIsLoadingOlderMessages(false);
+    }
+  };
 
   // ==================== SEND MESSAGE ====================
   const handleSendMessage = async (event: FormEvent) => {
@@ -1258,7 +1387,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     }
     try {
       const uploaded = await api.uploadFile(file);
-      if (uploaded?.url) updateCustomChatBackground(uploaded.url);
+      if (uploaded?.url) await updateCustomChatBackground(uploaded.url);
     } catch (error: any) {
       toast.error(error?.message || "Không thể tải ảnh nền.");
     }
@@ -1309,6 +1438,8 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
         unread: 0,
         status: "accepted",
         memberCount: item.memberCount,
+        backgroundId: item.backgroundId || undefined,
+        backgroundUrl: item.backgroundUrl || undefined,
       };
       setConversations((prev) => dedupConversations([nextChat, ...prev]));
       setConversationMessages(nextChat.id, []);
@@ -1320,6 +1451,16 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     } catch (error: any) {
       toast.error(error?.message || "Không thể tạo nhóm chat.");
     }
+  };
+
+  const handleSelectChat = (chat: ConversationItem) => {
+    const nextId = toId(chat.id);
+    if (!nextId) return;
+    if (toId(selectedChatIdRef.current) !== nextId) {
+      setConversationMessages(nextId, []);
+    }
+    setSelectedChatId(nextId);
+    setShowInfo(false);
   };
 
   useEffect(() => {
@@ -1477,7 +1618,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                 <button
                   key={chat.id}
                   type="button"
-                  onClick={() => { setConversationMessages(chat.id, []); setSelectedChatId(chat.id); setShowInfo(false); }}
+                  onClick={() => handleSelectChat(chat)}
                   style={{
                     width: "100%", display: "flex", alignItems: "center", gap: 10,
                     padding: "9px 10px", borderRadius: 12, border: "none", cursor: "pointer", textAlign: "left",
@@ -1562,6 +1703,14 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                     </div>
                   ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: 2, maxWidth: 720, width: "100%", margin: "0 auto" }}>
+                      {hasMoreMessages && (
+                        <div style={{ display: "flex", justifyContent: "center", padding: "2px 0 10px" }}>
+                          <button type="button" onClick={loadOlderMessages} disabled={isLoadingOlderMessages} style={{ height: 32, padding: "0 14px", borderRadius: 16, border: "1px solid #e2e8f0", background: "#fff", color: ORANGE, fontSize: 12, fontWeight: 800, cursor: isLoadingOlderMessages ? "wait" : "pointer", boxShadow: "0 2px 8px rgba(15,23,42,0.06)", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            {isLoadingOlderMessages && <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} />}
+                            Tải tin nhắn cũ hơn
+                          </button>
+                        </div>
+                      )}
                       {messages.map((msg, idx) => {
                         const isMe = msg.senderId === "me";
                         const showAvatar = !isMe && (idx === messages.length - 1 || messages[idx + 1]?.senderId !== msg.senderId);
@@ -1802,14 +1951,14 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                                 key={bg.id}
                                 type="button"
                                 title={bg.label}
-                                onClick={() => updateChatBackground(bg.id)}
+                                onClick={() => void updateChatBackground(bg.id)}
                                 style={{
                                   height: 42,
                                   borderRadius: 12,
-                                  border: chatBackgroundId === bg.id ? `2px solid ${ORANGE}` : "1px solid #e5e7eb",
+                                  border: effectiveChatBackgroundId === bg.id && !normalizedCustomChatBackground ? `2px solid ${ORANGE}` : "1px solid #e5e7eb",
                                   background: bg.value,
                                   cursor: "pointer",
-                                  boxShadow: chatBackgroundId === bg.id ? `0 0 0 3px ${ORANGE_LIGHT}` : "none",
+                                  boxShadow: effectiveChatBackgroundId === bg.id && !normalizedCustomChatBackground ? `0 0 0 3px ${ORANGE_LIGHT}` : "none",
                                 }}
                               />
                             ))}

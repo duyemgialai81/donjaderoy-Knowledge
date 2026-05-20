@@ -1,8 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Client } from "@stomp/stompjs";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import api from "../lib/api";
+import api, { normalizeAvatarUrl } from "../lib/api";
 import { useAuth } from "../lib/authContext";
 import { localStorage_service } from "../lib/localStorage";
 import {
@@ -38,6 +38,44 @@ export function GlobalRealtime() {
   const notifiedCallIdsRef = useRef<Set<string>>(new Set());
   const realtimeMessageIdsRef = useRef<Set<string>>(new Set());
   const processedCallSignalsRef = useRef<Set<string>>(new Set());
+  const locationPathRef = useRef(location.pathname);
+  const [incomingCall, setIncomingCall] = useState<any | null>(null);
+
+  useEffect(() => {
+    locationPathRef.current = location.pathname;
+    if (location.pathname === "/tin-nhan") {
+      setIncomingCall(null);
+    }
+  }, [location.pathname]);
+
+  const answerIncomingCall = () => {
+    if (incomingCall) {
+      pendingCallRef.current = incomingCall;
+      savePendingCall(incomingCall);
+    }
+    setIncomingCall(null);
+    navigate("/tin-nhan");
+  };
+
+  const rejectIncomingCall = () => {
+    const call = incomingCall || pendingCallRef.current;
+    if (call?.callId && call?.senderId && stompRef.current?.connected) {
+      stompRef.current.publish({
+        destination: "/app/chat.call",
+        body: JSON.stringify({
+          callId: call.callId,
+          conversationId: call.conversationId || "",
+          receiverId: call.senderId,
+          type: "reject",
+          callType: call.callType || "video",
+          signalData: null,
+        }),
+      });
+    }
+    pendingCallRef.current = null;
+    clearPendingCall();
+    setIncomingCall(null);
+  };
 
   useEffect(() => {
     const currentUserId = toId(user?.id);
@@ -69,6 +107,9 @@ export function GlobalRealtime() {
       pendingCallRef.current = next;
       savePendingCall(next);
       emitIncomingCall(next);
+      if (locationPathRef.current !== "/tin-nhan") {
+        setIncomingCall(next);
+      }
       return next;
     };
 
@@ -129,10 +170,11 @@ export function GlobalRealtime() {
             processedCallSignalsRef.current = new Set(Array.from(processedCallSignalsRef.current).slice(-250));
           }
 
-          if (location.pathname === "/tin-nhan") {
+          if (locationPathRef.current === "/tin-nhan") {
             if (event.type === "accept" || event.type === "answer" || event.type === "reject" || event.type === "end") {
               if (pendingCallRef.current?.callId === callId) pendingCallRef.current = null;
               clearPendingCall();
+              setIncomingCall((prev) => toId(prev?.callId) === callId ? null : prev);
             }
             return;
           }
@@ -150,6 +192,9 @@ export function GlobalRealtime() {
               };
               savePendingCall(pendingCallRef.current);
               emitIncomingCall(pendingCallRef.current);
+              if (locationPathRef.current !== "/tin-nhan") {
+                setIncomingCall(pendingCallRef.current);
+              }
             }).catch(() => {});
 
             if (!notifiedCallIdsRef.current.has(callId)) {
@@ -181,12 +226,14 @@ export function GlobalRealtime() {
           if (event.type === "accept" || event.type === "answer") {
             if (pendingCallRef.current?.callId === callId) pendingCallRef.current = null;
             clearPendingCall();
+            setIncomingCall((prev) => toId(prev?.callId) === callId ? null : prev);
             return;
           }
 
           if (event.type === "reject" || event.type === "end") {
             if (pendingCallRef.current?.callId === callId) pendingCallRef.current = null;
             clearPendingCall();
+            setIncomingCall((prev) => toId(prev?.callId) === callId ? null : prev);
             toast.info(event.type === "reject" ? "Cuộc gọi đã bị từ chối" : "Cuộc gọi đã kết thúc", {
               duration: 3000,
             });
@@ -239,7 +286,28 @@ export function GlobalRealtime() {
       if (presenceTimer) window.clearInterval(presenceTimer);
       if (client.active) client.deactivate();
     };
-  }, [location.pathname, navigate, user?.id]);
+  }, [navigate, user?.id]);
 
-  return null;
+  if (!incomingCall || location.pathname === "/tin-nhan") {
+    return null;
+  }
+
+  const callerName = incomingCall.senderName || "Người gọi";
+  const callerAvatar = normalizeAvatarUrl(incomingCall.senderAvatar, incomingCall.senderId || callerName);
+  const isVideo = incomingCall.callType !== "audio";
+
+  return (
+    <div role="dialog" aria-modal="true" aria-label="Cuộc gọi đến" style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(15,23,42,0.52)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div style={{ width: "min(420px, 100%)", borderRadius: 24, background: "linear-gradient(180deg,#111827 0%,#0f172a 100%)", color: "#fff", boxShadow: "0 30px 90px rgba(15,23,42,0.45)", padding: 24, textAlign: "center" }}>
+        <img src={callerAvatar} alt="" style={{ width: 76, height: 76, margin: "0 auto 14px", borderRadius: 24, objectFit: "cover", background: "#f97316", display: "block" }} />
+        <div style={{ fontSize: 13, color: "#fb923c", fontWeight: 700, marginBottom: 6 }}>{isVideo ? "Cuộc gọi video đến" : "Cuộc gọi đến"}</div>
+        <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>{callerName}</div>
+        <div style={{ fontSize: 13, color: "#cbd5e1", marginBottom: 22 }}>Đang gọi cho bạn</div>
+        <div style={{ display: "flex", gap: 12 }}>
+          <button type="button" onClick={rejectIncomingCall} style={{ flex: 1, height: 46, borderRadius: 14, border: "none", background: "#ef4444", color: "#fff", fontWeight: 800, cursor: "pointer" }}>Từ chối</button>
+          <button type="button" onClick={answerIncomingCall} style={{ flex: 1, height: 46, borderRadius: 14, border: "none", background: "#f97316", color: "#fff", fontWeight: 800, cursor: "pointer" }}>Trả lời</button>
+        </div>
+      </div>
+    </div>
+  );
 }
