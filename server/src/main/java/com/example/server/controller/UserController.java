@@ -3,9 +3,7 @@ package com.example.server.controller;
 import com.example.server.model.dto.PrivacySettingsDTO;
 import com.example.server.model.dto.UserDTO;
 import com.example.server.model.response.ResponseObject;
-import com.example.server.security.JwtTokenProvider;
 import com.example.server.service.UserService;
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -24,9 +22,6 @@ public class UserController {
 
     @Autowired
     private UserService userService;
-
-    @Autowired
-    private JwtTokenProvider jwtTokenProvider;
 
     // ==========================================
     // API QUẢN LÝ THÔNG TIN CÁ NHÂN & TÌM KIẾM
@@ -52,23 +47,46 @@ public class UserController {
     public ResponseObject uploadAvatar(
             @PathVariable String userId,
             @RequestParam("file") MultipartFile file,
-            Principal principal,
-            HttpServletRequest request) {
-        String authenticatedUserId = resolveUserId(request, principal);
-        if (authenticatedUserId == null || !authenticatedUserId.equals(userId)) {
+            Principal principal) {
+        if (principal == null || !principal.getName().equals(userId)) {
             return ResponseObject.error("Forbidden");
         }
-        return saveAvatar(userId, file);
+        if (file == null || file.isEmpty()) {
+            return ResponseObject.error("File is required");
+        }
+        String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
+        if (!contentType.startsWith("image/")) {
+            return ResponseObject.error("Only image files are allowed");
+        }
+        if (file.getSize() > 5 * 1024 * 1024) {
+            return ResponseObject.error("Avatar must be smaller than 5MB");
+        }
+        try {
+            String original = file.getOriginalFilename() == null ? "" : file.getOriginalFilename();
+            String ext = ".jpg";
+            int dot = original.lastIndexOf('.');
+            if (dot >= 0 && dot < original.length() - 1) {
+                ext = original.substring(dot).replaceAll("[^A-Za-z0-9.]", "").toLowerCase(Locale.ROOT);
+            }
+            Path dir = Paths.get("uploads", "avatars").toAbsolutePath().normalize();
+            Files.createDirectories(dir);
+            String fileName = userId + "-" + UUID.randomUUID() + ext;
+            Path target = dir.resolve(fileName).normalize();
+            file.transferTo(target.toFile());
+            String avatarUrl = "/uploads/avatars/" + fileName;
+            UserDTO dto = new UserDTO();
+            dto.setAvatar(avatarUrl);
+            userService.updateProfile(userId, dto);
+            return ResponseObject.success(Map.of("avatar", avatarUrl), "Avatar uploaded");
+        } catch (Exception e) {
+            return ResponseObject.error("Upload failed: " + e.getMessage());
+        }
     }
 
     @PostMapping("/me/avatar")
-    public ResponseObject uploadMyAvatar(
-            @RequestParam("file") MultipartFile file,
-            Principal principal,
-            HttpServletRequest request) {
-        String userId = resolveUserId(request, principal);
-        if (userId == null) return ResponseObject.error("Unauthorized");
-        return saveAvatar(userId, file);
+    public ResponseObject uploadMyAvatar(@RequestParam("file") MultipartFile file, Principal principal) {
+        if (principal == null) return ResponseObject.error("Unauthorized");
+        return saveAvatar(principal.getName(), file);
     }
 
     private ResponseObject saveAvatar(String userId, MultipartFile file) {
@@ -102,38 +120,6 @@ public class UserController {
         } catch (Exception e) {
             return ResponseObject.error("Upload failed: " + e.getMessage());
         }
-    }
-
-    private String resolveUserId(HttpServletRequest request, Principal principal) {
-        if (principal != null && hasText(principal.getName())) {
-            return principal.getName();
-        }
-        String token = resolveToken(request);
-        if (!hasText(token) || !jwtTokenProvider.validateToken(token)) {
-            return null;
-        }
-        return jwtTokenProvider.getUserIdFromToken(token);
-    }
-
-    private String resolveToken(HttpServletRequest request) {
-        String bearer = request.getHeader("Authorization");
-        if (hasText(bearer) && bearer.startsWith("Bearer ")) {
-            return bearer.substring(7);
-        }
-        String headerToken = request.getHeader("X-Auth-Token");
-        if (hasText(headerToken)) {
-            return headerToken;
-        }
-        String queryToken = request.getParameter("access_token");
-        if (hasText(queryToken)) {
-            return queryToken;
-        }
-        String formToken = request.getParameter("token");
-        return hasText(formToken) ? formToken : null;
-    }
-
-    private boolean hasText(String value) {
-        return value != null && !value.trim().isEmpty();
     }
 
     @GetMapping("/search")
