@@ -160,6 +160,73 @@ const iceServers = {
 const CHAT_LIST_CACHE_TTL_MS = 45_000;
 const MESSAGE_HISTORY_CACHE_TTL_MS = 90_000;
 
+
+// Thêm state này ở đầu component
+const [hasMoreMessages, setHasMoreMessages] = useState(true);
+const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+
+// Thêm function này
+const loadOlderMessages = async () => {
+  if (!selectedChatId || selectedChatId.startsWith("new_") || !hasMoreMessages || isLoadingOlder) {
+    return;
+  }
+
+  setIsLoadingOlder(true);
+  
+  try {
+    const oldestMessage = messages[0]; // Tin nhắn cũ nhất hiện tại
+    const beforeId = oldestMessage?.id;
+
+    const res = await api.request("GET", `/api/chat/messages/${selectedChatId}`, {
+      params: { limit: 30, before: beforeId }
+    });
+
+    const list = Array.isArray(res) ? res : res?.data || [];
+    
+    if (list.length === 0) {
+      setHasMoreMessages(false);
+      return;
+    }
+
+    const olderMessages = list.map((m: any) => ({
+      id: toId(m.id),
+      senderId: toId(m.senderId) === currentUserId ? "me" : toId(m.senderId),
+      senderName: m.senderName,
+      senderAvatar: m.senderAvatar,
+      text: m.isDeleted ? "Tin nhắn đã được thu hồi" : (m.content || m.text || ""),
+      time: m.createdAt 
+        ? new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+        : "",
+      createdAt: m.createdAt,
+      isDeleted: Boolean(m.isDeleted),
+      isEdited: Boolean(m.editedAt),
+      replyToMessageId: m.replyToMessageId,
+      attachmentUrl: m.attachmentUrl,
+      attachmentName: m.attachmentName,
+      attachmentSize: m.attachmentSize,
+      messageType: m.messageType || "text",
+      reactions: m.reactions || {},
+      userReactions: m.userReactions || {},
+    }));
+
+    // ✅ Prepend older messages (giữ nguyên thứ tự)
+    setMessages((prev) => [...olderMessages, ...prev]);
+    
+  } catch (error) {
+    console.error("Failed to load older messages:", error);
+  } finally {
+    setIsLoadingOlder(false);
+  }
+};
+
+// Gắn vào scroll handler của messages-scroll-area
+const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+  const target = e.currentTarget;
+  // Khi scroll lên gần đỉnh (100px)
+  if (target.scrollTop < 100) {
+    void loadOlderMessages();
+  }
+};
 type ExpiringMemoryCache<T> = Map<string, { savedAt: number; value: T }>;
 
 const chatListMemoryCache: ExpiringMemoryCache<ConversationItem[]> = new Map();
@@ -1015,45 +1082,145 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   }, [searchQuery]);
 
   useEffect(() => {
-    if (!selectedChatId) return;
-    if (selectedChatId.startsWith("new_")) { setMessages([]); return; }
-    if (!currentUserId) return;
-    const cacheKey = `messages:${currentUserId}:${selectedChatId}`;
-    const hasUnread = Number(selectedChat?.unread || 0) > 0;
-    const cachedMessages = hasUnread ? null : readExpiringCache(messageHistoryMemoryCache, cacheKey, MESSAGE_HISTORY_CACHE_TTL_MS);
-    if (cachedMessages) {
-      setMessages(cachedMessages);
-      setIsLoadingMessages(false);
-      return;
-    }
-    const fetchMessages = async () => {
-      setIsLoadingMessages(true);
-      try {
-        const res = await api.request("GET", `/api/chat/messages/${selectedChatId}`);
-        const list = Array.isArray(res) ? res : res?.data || [];
-        const nextMessages = list.map((m: any) => ({
-          id: toId(m.id) || Math.random().toString(),
+  let isMounted = true;
+  let abortController: AbortController | null = null;
+
+  // ✅ 1. CLEAR NGAY LẬP TỨC KHI CHUYỂN HỘI THOẠI (Facebook pattern)
+  if (!selectedChatId) {
+    setMessages([]);
+    setIsLoadingMessages(false);
+    return;
+  }
+
+  if (selectedChatId.startsWith("new_")) {
+    setMessages([]);
+    setIsLoadingMessages(false);
+    return;
+  }
+
+  if (!currentUserId) return;
+
+  // ✅ 2. CLEAR UI + SHOW LOADING STATE
+  setMessages([]);
+  setIsLoadingMessages(true);
+
+  const cacheKey = `messages:${currentUserId}:${selectedChatId}`;
+  const hasUnread = Number(selectedChat?.unread || 0) > 0;
+
+  // ✅ 3. OPTIMISTIC CACHE: Chỉ dùng cache nếu KHÔNG có unread
+  // Facebook: Không cache khi có tin mới chưa đọc để đảm bảo data fresh
+  const cachedMessages = hasUnread 
+    ? null 
+    : readExpiringCache(messageHistoryMemoryCache, cacheKey, MESSAGE_HISTORY_CACHE_TTL_MS);
+
+  if (cachedMessages && isMounted) {
+    console.log('📦 Cache hit:', cacheKey);
+    setMessages(cachedMessages);
+    setIsLoadingMessages(false);
+    return;
+  }
+
+  // ✅ 4. FETCH TỪ API VỚI ABORT CONTROLLER (chống memory leak)
+  const fetchMessages = async () => {
+    abortController = new AbortController();
+    
+    try {
+      console.log('🔄 Fetching from API:', cacheKey);
+      
+      const res = await api.request("GET", `/api/chat/messages/${selectedChatId}`, {
+        signal: abortController.signal,
+        params: { limit: 50, before: null } // Facebook: load 50 tin nhắn đầu
+      });
+
+      if (!isMounted) return;
+
+      const list = Array.isArray(res) ? res : res?.data || [];
+      
+      // ✅ 5. MAP DATA VỚI VALIDATION CHẶT CHẼ
+      const nextMessages = list
+        .filter((m: any) => m?.id) // Lọc record invalid
+        .map((m: any) => ({
+          id: toId(m.id),
           senderId: toId(m.senderId) === currentUserId ? "me" : toId(m.senderId),
           senderName: m.senderName,
           senderAvatar: m.senderAvatar,
-          text: m.isDeleted ? "Tin nhắn đã được thu hồi" : (m.content || m.text || "Tin nhắn không hợp lệ."),
-          time: new Date(m.createdAt || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          text: m.isDeleted 
+            ? "Tin nhắn đã được thu hồi" 
+            : (m.content || m.text || ""),
+          time: m.createdAt 
+            ? new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            : "",
+          createdAt: m.createdAt, // ✅ Giữ timestamp gốc để sort/pagination
           isDeleted: Boolean(m.isDeleted),
           isEdited: Boolean(m.editedAt),
           replyToMessageId: m.replyToMessageId,
           attachmentUrl: m.attachmentUrl,
           attachmentName: m.attachmentName,
           attachmentSize: m.attachmentSize,
-          messageType: m.messageType,
-          reactions: m.reactions || {}, userReactions: m.userReactions || {},
-        }));
+          messageType: m.messageType || "text",
+          reactions: m.reactions || {},
+          userReactions: m.userReactions || {},
+        }))
+        .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()); // ✅ Sort theo thời gian
+
+      // ✅ 6. WRITE CACHE CHỈ KHI KHÔNG CÓ UNREAD
+      if (!hasUnread && isMounted) {
         writeExpiringCache(messageHistoryMemoryCache, cacheKey, nextMessages);
-        setMessages(nextMessages);
-        setConversations((prev) => prev.map((c) => c.id === selectedChatId ? { ...c, unread: 0 } : c));
-      } catch { setMessages([]); } finally { setIsLoadingMessages(false); }
-    };
-    fetchMessages();
-  }, [selectedChatId, currentUserId, selectedChat?.unread]);
+      }
+
+      // ✅ 7. UPDATE STATE
+      setMessages(nextMessages);
+      
+      // ✅ 8. MARK AS READ (Facebook: xem là đọc)
+      setConversations((prev) => 
+        prev.map((c) => 
+          c.id === selectedChatId ? { ...c, unread: 0 } : c
+        )
+      );
+
+      // ✅ 9. GỬI SIGNAL ĐẾN SERVER RẰNG ĐÃ XEM (optional)
+      if (stompClientRef.current?.connected) {
+        stompClientRef.current.publish({
+          destination: "/app/chat.markRead",
+          body: JSON.stringify({ conversationId: selectedChatId })
+        });
+      }
+
+    } catch (error: any) {
+      if (!isMounted) return;
+      
+      // ✅ 10. ERROR HANDLING THÔNG MINH
+      if (error?.name === "AbortError") {
+        console.log('🚫 Fetch aborted for', cacheKey);
+        return;
+      }
+      
+      console.error('❌ Failed to load messages:', error);
+      
+      // Hiển thị toast chỉ khi lỗi thực sự (không phải abort)
+      if (error?.message && !error?.message?.includes("aborted")) {
+        toast.error("Không thể tải tin nhắn. Vui lòng thử lại.");
+      }
+      
+      setMessages([]);
+    } finally {
+      if (isMounted) {
+        setIsLoadingMessages(false);
+      }
+    }
+  };
+
+  fetchMessages();
+
+  // ✅ 11. CLEANUP FUNCTION (CHỐNG MEMORY LEAK + ABORT FETCH)
+  return () => {
+    isMounted = false;
+    if (abortController) {
+      abortController.abort();
+    }
+  };
+
+}, [selectedChatId, currentUserId, selectedChat?.unread])
 
   // ==================== SEND MESSAGE ====================
   const handleSendMessage = async (event: FormEvent) => {
