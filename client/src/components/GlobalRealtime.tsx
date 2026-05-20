@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Client } from "@stomp/stompjs";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import api from "../lib/api";
 import { useAuth } from "../lib/authContext";
@@ -32,6 +32,7 @@ function toId(value: unknown) {
 export function GlobalRealtime() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const stompRef = useRef<Client | null>(null);
   const pendingCallRef = useRef<any | null>(null);
   const notifiedCallIdsRef = useRef<Set<string>>(new Set());
@@ -128,6 +129,14 @@ export function GlobalRealtime() {
             processedCallSignalsRef.current = new Set(Array.from(processedCallSignalsRef.current).slice(-250));
           }
 
+          if (location.pathname === "/tin-nhan") {
+            if (event.type === "accept" || event.type === "answer" || event.type === "reject" || event.type === "end") {
+              if (pendingCallRef.current?.callId === callId) pendingCallRef.current = null;
+              clearPendingCall();
+            }
+            return;
+          }
+
           if (event.type === "start") {
             const next = mergePendingCall(event);
             const fallbackName = event.senderName || "Người gọi";
@@ -166,6 +175,12 @@ export function GlobalRealtime() {
 
           if (event.type === "offer" || event.type === "ice-candidate" || event.type === "ice") {
             mergePendingCall(event);
+            return;
+          }
+
+          if (event.type === "accept" || event.type === "answer") {
+            if (pendingCallRef.current?.callId === callId) pendingCallRef.current = null;
+            clearPendingCall();
             return;
           }
 
@@ -224,7 +239,7 @@ export function GlobalRealtime() {
       if (presenceTimer) window.clearInterval(presenceTimer);
       if (client.active) client.deactivate();
     };
-  }, [navigate, user?.id]);
+  }, [location.pathname, navigate, user?.id]);
 
   return null;
 }

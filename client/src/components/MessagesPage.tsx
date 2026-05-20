@@ -95,6 +95,7 @@ interface CallSession {
   id: string;
   mode: CallMode;
   status: CallStatus;
+  conversationId?: string;
   startedAt: number | null;
   elapsedSeconds: number;
   isMuted: boolean;
@@ -159,6 +160,8 @@ const iceServers = {
 };
 
 const CHAT_LIST_CACHE_TTL_MS = 45_000;
+const CALL_CONNECT_TIMEOUT_MS = 45_000;
+const CALL_DISCONNECT_GRACE_MS = 12_000;
 
 type ExpiringMemoryCache<T> = Map<string, { savedAt: number; value: T }>;
 
@@ -244,6 +247,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   const incomingOfferRef = useRef<RTCSessionDescriptionInit | null>(null);
   const iceCandidateQueueRef = useRef<RTCIceCandidateInit[]>([]);
   const acceptCallTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const callDisconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const toId = (value: unknown) => (value === undefined || value === null ? "" : String(value));
   const currentUserId = toId(currentUser?.id);
@@ -282,6 +286,27 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     const s = String(data).trim();
     if (!s || s === "undefined" || s === "null") return null;
     try { return JSON.parse(s); } catch { return null; }
+  };
+
+  const clearCallTimers = () => {
+    if (acceptCallTimeoutRef.current) {
+      clearTimeout(acceptCallTimeoutRef.current);
+      acceptCallTimeoutRef.current = null;
+    }
+    if (callDisconnectTimeoutRef.current) {
+      clearTimeout(callDisconnectTimeoutRef.current);
+      callDisconnectTimeoutRef.current = null;
+    }
+  };
+
+  const markCallActive = (callId: string) => {
+    clearCallTimers();
+    setCallSession((prev) => {
+      if (!prev || prev.id !== callId) return prev;
+      const next = { ...prev, status: "active" as CallStatus, startedAt: prev.startedAt || Date.now(), error: null };
+      callSessionRef.current = next;
+      return next;
+    });
   };
 
   const getConversationPeerId = (conversation?: Pick<ConversationItem, "id" | "targetUserId"> | null) => {
@@ -355,6 +380,8 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     const callId = toId(ev.callId);
     const senderId = toId(ev.senderId);
     if (!callId || !senderId || senderId === currentUserId) return;
+    const activeCall = callSessionRef.current;
+    if (activeCall && activeCall.id !== callId) return;
 
     const parsedOffer = parseRealtimePayload(ev.offer || (ev.type === "offer" ? ev.signalData : null));
     if (parsedOffer) incomingOfferRef.current = parsedOffer;
@@ -363,12 +390,13 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     if (storedCandidates.length > 0) iceCandidateQueueRef.current = storedCandidates;
     if (parsedCandidate) iceCandidateQueueRef.current.push(parsedCandidate);
 
-    if (callSessionRef.current?.id === callId) return;
+    if (activeCall?.id === callId) return;
     const mode: CallMode = ev.callType === "audio" ? "audio" : "video";
     const caller = conversationsRef.current.find((c) => getConversationPeerId(c) === senderId);
     const incoming: CallSession = {
       id: callId,
       mode,
+      conversationId: toId(ev.conversationId),
       status: "incoming",
       startedAt: null,
       elapsedSeconds: 0,
@@ -497,7 +525,10 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   // ==================== CALL SIGNALING ====================
   const sendCallSignal = (type: string, signalData: any = null, targetId: string, callId: string, callMode: CallMode) => {
     if (!stompClientRef.current?.connected) return;
-    let convId = selectedChatIdRef.current?.startsWith("new_") ? "" : selectedChatIdRef.current || "";
+    const sessionConvId = callSessionRef.current?.id === callId ? callSessionRef.current.conversationId : undefined;
+    let convId = sessionConvId !== undefined
+      ? sessionConvId
+      : selectedChatIdRef.current?.startsWith("new_") ? "" : selectedChatIdRef.current || "";
     if (!convId && (type === "end" || type === "reject")) {
       const found = conversationsRef.current.find((c) => getConversationPeerId(c) === targetId);
       if (found && !found.id.startsWith("new_")) convId = found.id;
@@ -506,6 +537,16 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
       destination: "/app/chat.call",
       body: JSON.stringify({ callId, conversationId: convId, receiverId: targetId, type, callType: callMode, signalData }),
     });
+  };
+
+  const scheduleCallConnectTimeout = (callId: string) => {
+    if (acceptCallTimeoutRef.current) clearTimeout(acceptCallTimeoutRef.current);
+    acceptCallTimeoutRef.current = setTimeout(() => {
+      const session = callSessionRef.current;
+      if (!session || session.id !== callId || session.status !== "connecting") return;
+      toast.error("Khong ket noi duoc cuoc goi. Vui long thu lai.");
+      closeCall(true);
+    }, CALL_CONNECT_TIMEOUT_MS);
   };
 
   const logCallStatusToChat = (session: CallSession, reason: "ended" | "missed" | "rejected") => {
@@ -541,6 +582,33 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     pc.oniceconnectionstatechange = () => {
       if (pc.iceConnectionState === "failed") { toast.error("Kết nối thất bại"); closeCall(true); }
     };
+    const handleConnectionState = () => {
+      const state = pc.connectionState;
+      const iceState = pc.iceConnectionState;
+      if (state === "connected" || iceState === "connected" || iceState === "completed") {
+        markCallActive(callId);
+        return;
+      }
+      if (state === "failed" || iceState === "failed" || state === "disconnected" || iceState === "disconnected") {
+        if (callDisconnectTimeoutRef.current) clearTimeout(callDisconnectTimeoutRef.current);
+        callDisconnectTimeoutRef.current = setTimeout(() => {
+          if (peerConnectionRef.current !== pc) return;
+          const currentState = pc.connectionState;
+          const currentIceState = pc.iceConnectionState;
+          if (currentState === "failed" || currentIceState === "failed" || currentState === "disconnected" || currentIceState === "disconnected") {
+            toast.error("Ket noi cuoc goi bi gian doan.");
+            closeCall(true);
+          }
+        }, CALL_DISCONNECT_GRACE_MS);
+        return;
+      }
+      if (callDisconnectTimeoutRef.current) {
+        clearTimeout(callDisconnectTimeoutRef.current);
+        callDisconnectTimeoutRef.current = null;
+      }
+    };
+    pc.oniceconnectionstatechange = handleConnectionState;
+    pc.onconnectionstatechange = handleConnectionState;
     localStreamRef.current?.getTracks().forEach((t) => pc.addTrack(t, localStreamRef.current!));
     peerConnectionRef.current = pc;
     return pc;
@@ -583,7 +651,8 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   };
 
   const closeCall = (isLocal = true, isReject = false) => {
-    if (acceptCallTimeoutRef.current) clearTimeout(acceptCallTimeoutRef.current);
+    clearCallTimers();
+    clearPendingCall();
     const s = callSessionRef.current;
     if (s && isLocal) {
       if (isReject) { logCallStatusToChat(s, "rejected"); sendCallSignal("reject", null, s.peerId, s.id, s.mode); }
@@ -622,9 +691,12 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     if (!selectedChat) { toast.error("Hãy chọn một cuộc trò chuyện trước."); return; }
     if (selectedChat.status === "pending") { toast.error("Không thể gọi khi hội thoại đang chờ phê duyệt."); return; }
     closeCall(false);
+    clearPendingCall();
     const callId = `call_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
     const targetId = getConversationPeerId(selectedChat);
-    const newSession: CallSession = { id: callId, mode, status: "connecting", startedAt: null, elapsedSeconds: 0, isMuted: false, isCameraOff: mode === "audio", isScreenSharing: false, cameraFacing: "user", isSpeakerOn: true, peerId: targetId, peerName: selectedChat.name, peerAvatar: selectedChatAvatar, hasMediaPermission: true, error: null };
+    if (!targetId) { toast.error("Khong tim thay nguoi nhan cuoc goi."); return; }
+    const conversationId = selectedChat.id.startsWith("new_") ? "" : selectedChat.id;
+    const newSession: CallSession = { id: callId, mode, conversationId, status: "connecting", startedAt: null, elapsedSeconds: 0, isMuted: false, isCameraOff: mode === "audio", isScreenSharing: false, cameraFacing: "user", isSpeakerOn: true, peerId: targetId, peerName: selectedChat.name, peerAvatar: selectedChatAvatar, hasMediaPermission: true, error: null };
     callSessionRef.current = newSession; setCallSession(newSession);
     try {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error("Trình duyệt không hỗ trợ media devices.");
@@ -636,6 +708,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
       const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
       sendCallSignal("start", null, targetId, callId, mode);
       sendCallSignal("offer", { type: offer.type, sdp: offer.sdp }, targetId, callId, mode);
+      scheduleCallConnectTimeout(callId);
     } catch (err: any) {
       toast.error("Không thể truy cập micro/camera.");
       closeCall(true);
@@ -645,6 +718,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   const acceptCall = async () => {
     const s = callSessionRef.current; if (!s) return;
     try {
+      clearPendingCall();
       const stream = await getCallMediaStream(s.mode);
       localStreamRef.current = stream;
       if (s.mode === "video" && stream.getVideoTracks().length > 0) cameraStreamRef.current = stream.clone();
@@ -660,6 +734,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
         iceCandidateQueueRef.current = [];
         const answer = await pc.createAnswer(); await pc.setLocalDescription(answer);
         sendCallSignal("answer", { type: answer.type, sdp: answer.sdp }, s.peerId, s.id, s.mode);
+        markCallActive(s.id);
       }
     } catch (err: any) { toast.error(`Lỗi thiết bị: ${err.message}`); closeCall(true, true); }
   };
@@ -869,11 +944,24 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
           const ev = safe(frame.body); if (!ev) return;
           const { type, callId, callType, senderId, signalData } = ev;
           const parsed = safe(signalData);
+          const normalizedCallId = toId(callId);
+          const normalizedSenderId = toId(senderId);
+          const mode: CallMode = callType === "audio" ? "audio" : "video";
+          const activeCall = callSessionRef.current;
+          if (type !== "start" && activeCall && activeCall.id !== normalizedCallId) return;
           if (type === "start") {
+            if (activeCall && activeCall.id !== normalizedCallId) return;
+            clearPendingCall();
             const caller = conversationsRef.current.find((c) => getConversationPeerId(c) === toId(senderId));
             const incoming: CallSession = { id: callId, mode: callType, status: "incoming", startedAt: null, elapsedSeconds: 0, isMuted: false, isCameraOff: callType === "audio", isScreenSharing: false, cameraFacing: "user", isSpeakerOn: true, peerId: toId(senderId), peerName: caller?.name || "Người gọi", peerAvatar: caller?.avatar || getAvatarUrl("", senderId), hasMediaPermission: true, error: null };
             callSessionRef.current = incoming; setCallSession(incoming);
           } else if (type === "offer" && parsed) {
+            if (!callSessionRef.current) {
+              clearPendingCall();
+              const caller = conversationsRef.current.find((c) => getConversationPeerId(c) === normalizedSenderId);
+              const incoming: CallSession = { id: normalizedCallId, mode, conversationId: toId(ev.conversationId), status: "incoming", startedAt: null, elapsedSeconds: 0, isMuted: false, isCameraOff: mode === "audio", isScreenSharing: false, cameraFacing: "user", isSpeakerOn: true, peerId: normalizedSenderId, peerName: ev.senderName || caller?.name || "Nguoi goi", peerAvatar: ev.senderAvatar || caller?.avatar || getAvatarUrl("", senderId), hasMediaPermission: true, error: null };
+              callSessionRef.current = incoming; setCallSession(incoming);
+            }
             incomingOfferRef.current = parsed;
             const pc = peerConnectionRef.current;
             if (pc && !pc.remoteDescription) {
@@ -886,13 +974,13 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
               }).catch(console.error);
             }
           } else if (type === "answer" && parsed && peerConnectionRef.current) {
-            if (acceptCallTimeoutRef.current) clearTimeout(acceptCallTimeoutRef.current);
+            clearPendingCall();
+            if (acceptCallTimeoutRef.current) { clearTimeout(acceptCallTimeoutRef.current); acceptCallTimeoutRef.current = null; }
             peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(parsed)).then(() => {
               iceCandidateQueueRef.current.forEach((c) => peerConnectionRef.current?.addIceCandidate(new RTCIceCandidate(c)).catch(() => {}));
               iceCandidateQueueRef.current = [];
             }).catch(console.error);
-            const next = callSessionRef.current ? { ...callSessionRef.current, status: "active" as CallStatus, startedAt: Date.now() } : null;
-            if (next) { callSessionRef.current = next; setCallSession(next); }
+            markCallActive(normalizedCallId);
           } else if ((type === "ice-candidate" || type === "ice") && parsed) {
             if (peerConnectionRef.current?.remoteDescription) peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(parsed)).catch(() => {});
             else iceCandidateQueueRef.current.push(parsed);
