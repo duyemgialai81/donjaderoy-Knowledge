@@ -182,7 +182,7 @@ export function GlobalRealtime() {
           const notification = safeParse(frame.body);
           if (!notification?.title) return;
 
-          const type = ["like", "comment", "follow", "badge", "mention"].includes(notification.type)
+          const type = ["like", "comment", "follow", "badge", "mention", "report"].includes(notification.type)
             ? notification.type
             : "system";
           const link = notification.postId ? `/?post=${encodeURIComponent(notification.postId)}` : undefined;

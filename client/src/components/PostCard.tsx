@@ -6,11 +6,10 @@ import type { Post, User } from "../lib/mockData";
 import api from "../lib/api";
 import { useAuth } from "../lib/authContext";
 import { useEffect, useState, useRef } from "react";
-import { formatDistanceToNow } from "date-fns";
-import { vi } from "date-fns/locale";
 import { toast } from "sonner";
 import { Client } from '@stomp/stompjs';
 import { createSockJsConnection } from "../lib/realtime";
+import { formatVietnamDistance } from "../lib/time";
 
 interface PostCardProps {
   post: Post;
@@ -76,10 +75,14 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
   const [isLoading, setIsLoading] = useState(false);
 
   // States quản lý dữ liệu Realtime
+  const safeNumber = (value: unknown) => {
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? numberValue : 0;
+  };
   const [isLiked, setIsLiked] = useState(post.isLiked || false);
-  const [likesCount, setLikesCount] = useState(post.likes || 0);
-  const [commentsCount, setCommentsCount] = useState(post.commentsCount || 0);
-  const [viewsCount, setViewsCount] = useState(post.views || 0);
+  const [likesCount, setLikesCount] = useState(safeNumber((post as any).likes ?? (post as any).likesCount));
+  const [commentsCount, setCommentsCount] = useState(safeNumber(post.commentsCount));
+  const [viewsCount, setViewsCount] = useState(safeNumber(post.views));
 
   const stompClientRef = useRef<Client | null>(null);
 
@@ -95,9 +98,9 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
 
   // Đồng bộ lại State nếu component cha truyền props mới xuống
   useEffect(() => {
-    setCommentsCount(post.commentsCount || 0);
-    setViewsCount(post.views || 0);
-    setLikesCount(post.likes || 0);
+    setCommentsCount(safeNumber(post.commentsCount));
+    setViewsCount(safeNumber(post.views));
+    setLikesCount(safeNumber((post as any).likes ?? (post as any).likesCount));
     setIsLiked(Boolean(post.isLiked));
   }, [post.id, post.commentsCount, post.views, post.likes, post.isLiked]);
 
@@ -277,7 +280,7 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
     }
   };
 
-  const timeAgo = formatDistanceToNow(new Date(post.createdAt), { addSuffix: true, locale: vi });
+  const timeAgo = formatVietnamDistance(post.createdAt);
   const tags = Array.isArray(post.tags) ? post.tags : (post.tags ? String(post.tags).split(',').map(t => t.trim()).filter(Boolean) : []);
 
   return (

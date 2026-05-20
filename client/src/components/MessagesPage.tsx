@@ -42,6 +42,7 @@ import { toast } from "sonner";
 import api, { normalizeAssetUrl, normalizeAvatarUrl } from "../lib/api";
 import { localStorage_service } from "../lib/localStorage";
 import { clearPendingCall, createSockJsConnection, INCOMING_CALL_EVENT, readPendingCall } from "../lib/realtime";
+import { formatVietnamTime } from "../lib/time";
 
 // ==================== INTERFACES ====================
 interface MessagesPageProps {
@@ -411,7 +412,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
           id: toId(c.id), type: c.type || "direct", targetUserId: toId(c.targetUserId) || undefined,
           name: c.type === "group" ? (c.groupName || "Nhóm chat") : (c.targetUserName || "Người dùng"), avatar: c.targetUserAvatar,
           lastMessage: c.lastMessage || "Bắt đầu cuộc trò chuyện mới.",
-          time: c.lastMessageTime ? new Date(c.lastMessageTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
+          time: c.lastMessageTime ? formatVietnamTime(c.lastMessageTime) : "",
           unread: c.unreadCount || 0, status: c.status || "accepted", isOnline: Boolean(c.targetIsOnline), memberCount: c.memberCount,
         }));
       } catch (e) { console.error(e); }
@@ -783,7 +784,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     if (idx > -1) {
       const conv = { ...updated[idx] };
       conv.lastMessage = msg.content;
-      conv.time = new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      conv.time = formatVietnamTime(msg.createdAt);
       
       // Chỉ tăng unread nếu:
       // 1. Tin nhắn KHÔNG phải của mình
@@ -826,7 +827,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
         senderName: msg.senderName,
         senderAvatar: msg.senderAvatar,
         text: msg.content,
-        time: new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        time: formatVietnamTime(msg.createdAt),
         replyToMessageId: msg.replyToMessageId,
         attachmentUrl: msg.attachmentUrl,
         attachmentName: msg.attachmentName,
@@ -847,7 +848,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
               text: msg.isDeleted ? "Tin nhắn đã được thu hồi" : (msg.content || msg.text || item.text),
               isDeleted: Boolean(msg.isDeleted),
               isEdited: Boolean(msg.editedAt),
-              time: msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : item.time,
+              time: msg.createdAt ? formatVietnamTime(msg.createdAt) : item.time,
             };
           }));
           setConversations((prev) => prev.map((c) => (
@@ -1043,7 +1044,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
           senderName: m.senderName,
           senderAvatar: m.senderAvatar,
           text: m.isDeleted ? "Tin nhắn đã được thu hồi" : (m.content || m.text || "Tin nhắn không hợp lệ."),
-          time: new Date(m.createdAt || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          time: formatVietnamTime(m.createdAt || Date.now()),
           isDeleted: Boolean(m.isDeleted),
           isEdited: Boolean(m.editedAt),
           replyToMessageId: m.replyToMessageId,
@@ -1077,7 +1078,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     const content = messageInput.trim(); setMessageInput("");
     const currentReply = replyingTo;
     setReplyingTo(null);
-    const opt: MessageItem = { id: `temp_${Date.now()}`, senderId: "me", text: content, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), replyToMessageId: currentReply?.id };
+    const opt: MessageItem = { id: `temp_${Date.now()}`, senderId: "me", text: content, time: formatVietnamTime(Date.now()), replyToMessageId: currentReply?.id };
     setConversationMessages(selectedChat.id, (prev) => [...prev, opt]);
     setConversations((prev) => {
       const updated = [...prev];
@@ -1216,7 +1217,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
         type: "group",
         name: item.groupName || groupName.trim() || "Nhóm chat",
         lastMessage: item.lastMessage || "Bắt đầu cuộc trò chuyện nhóm.",
-        time: item.lastMessageTime ? new Date(item.lastMessageTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
+        time: item.lastMessageTime ? formatVietnamTime(item.lastMessageTime) : "",
         unread: 0,
         status: "accepted",
         memberCount: item.memberCount,

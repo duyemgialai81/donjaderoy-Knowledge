@@ -12,6 +12,10 @@ export function SuggestedPosts({ currentPost }: SuggestedPostsProps) {
   const [suggested, setSuggested] = useState<Post[]>([]);
   const [trending, setTrending] = useState<Post[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const safeNumber = (value: unknown) => {
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? numberValue : 0;
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -20,7 +24,7 @@ export function SuggestedPosts({ currentPost }: SuggestedPostsProps) {
       if (!mounted) return;
       if (Array.isArray(list)) {
         setSuggested(list.slice(0, 5));
-        setTrending([...list].sort((a: any, b: any) => b.views - a.views).slice(0, 5));
+        setTrending([...list].sort((a: any, b: any) => safeNumber(b.views) - safeNumber(a.views)).slice(0, 5));
       }
     }).catch(() => {});
     api.getUsers(0, 10).then((res) => {
@@ -60,7 +64,7 @@ export function SuggestedPosts({ currentPost }: SuggestedPostsProps) {
                   <span>•</span>
                   <span className="truncate max-w-[80px]">{subjectName || majorName || "Chưa phân loại"}</span>
                   <span>•</span>
-                  <span>{post.views || 0} lượt xem</span>
+                  <span>{safeNumber(post.views)} lượt xem</span>
                 </div>
                 {post.tags && post.tags.length > 0 && (
                   <div className="flex gap-1.5 mt-2">
@@ -104,7 +108,7 @@ export function SuggestedPosts({ currentPost }: SuggestedPostsProps) {
                     {post.title}
                   </h4>
                   <div className="text-[10px] font-medium text-slate-400">
-                    {(post.views || 0).toLocaleString()} lượt xem
+                    {safeNumber(post.views).toLocaleString()} lượt xem
                   </div>
                 </div>
               </div>

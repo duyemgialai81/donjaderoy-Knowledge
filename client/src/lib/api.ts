@@ -232,6 +232,11 @@ function normalizePost(post: any) {
     tags: normalizedTags,
     major: post.major || post.majorId,
     subject: post.subject || post.subjectId,
+    views: toFiniteNumber(post.views, 0),
+    likes: toFiniteNumber(post.likes ?? post.likesCount, 0),
+    likesCount: toFiniteNumber(post.likesCount ?? post.likes, 0),
+    commentsCount: toFiniteNumber(post.commentsCount, 0),
+    points: toFiniteNumber(post.points, 0),
   };
   return normalized;
 }
@@ -239,7 +244,17 @@ function normalizePost(post: any) {
 function normalizeUser(user: any) {
   if (!user) return user;
   const avatar = normalizeAvatarUrl(user.avatar, user.id || user.email || 'default');
-  return { ...user, avatar: avatar };
+  return {
+    ...user,
+    avatar,
+    major: user.major || user.majorId || '',
+    class: user.class || user.className || '',
+    points: toFiniteNumber(user.points, 0),
+    followers: toFiniteNumber(user.followers, 0),
+    following: toFiniteNumber(user.following, 0),
+    postsCount: toFiniteNumber(user.postsCount, 0),
+    joinedDate: user.joinedDate || user.createdAt,
+  };
 }
 
 function normalizeComment(comment: any) {

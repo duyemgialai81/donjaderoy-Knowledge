@@ -14,6 +14,10 @@ interface UserSidebarProps {
 export function UserSidebar({ user, onViewProfile }: UserSidebarProps) {
   const [allBadges, setAllBadges] = useState<any[]>([]);
   const [stats, setStats] = useState<any | null>(null);
+  const safeNumber = (value: unknown) => {
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? numberValue : 0;
+  };
 
   const sortedBadges = [...allBadges].sort((a, b) => (a.requiredPoints || 0) - (b.requiredPoints || 0));
   const achievedBadges = sortedBadges.filter((b) => (user?.points || 0) >= (b.requiredPoints || 0));
@@ -59,11 +63,11 @@ export function UserSidebar({ user, onViewProfile }: UserSidebarProps) {
     );
   }
 
-  const totalPosts = Number(stats?.totalPosts ?? user.postsCount ?? 0);
-  const totalViews = Number(stats?.totalViews ?? 0);
-  const totalLikes = Number(stats?.totalLikes ?? 0);
-  const totalComments = Number(stats?.totalComments ?? 0);
-  const totalPoints = Number(stats?.totalPoints ?? user.points ?? 0);
+  const totalPosts = safeNumber(stats?.totalPosts ?? user.postsCount);
+  const totalViews = safeNumber(stats?.totalViews);
+  const totalLikes = safeNumber(stats?.totalLikes);
+  const totalComments = safeNumber(stats?.totalComments);
+  const totalPoints = safeNumber(stats?.totalPoints ?? user.points);
 
   const weekStats = [
     { label: "Lượt xem", value: "+234", icon: Eye, colorClass: "stat-card-blue", iconColor: "text-blue-500" },

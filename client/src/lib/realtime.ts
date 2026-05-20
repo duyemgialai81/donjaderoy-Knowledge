@@ -5,7 +5,7 @@ export const REALTIME_NOTIFICATION_EVENT = "ksp:realtime-notification";
 export const INCOMING_CALL_EVENT = "ksp:incoming-call";
 export const PENDING_CALL_STORAGE_KEY = "ksp_pending_call";
 
-type RealtimeNotificationType = "message" | "call" | "mention" | "system" | "like" | "comment" | "follow" | "badge";
+type RealtimeNotificationType = "message" | "call" | "mention" | "system" | "like" | "comment" | "follow" | "badge" | "report";
 
 export interface RealtimeNotificationDetail {
   id?: string;

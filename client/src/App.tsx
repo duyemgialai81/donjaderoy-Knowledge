@@ -18,6 +18,7 @@ import MessagesPage from "./components/MessagesPage";
 import { Button } from "./components/ui/button";
 import type { Post } from "./lib/mockData";
 import api from "./lib/api";
+import { parseAppDate } from "./lib/time";
 import { BookOpen, TrendingUp, Users as UsersIcon, Clock, Shield, MessageCircle, Home, User, Settings, Plus } from "lucide-react";
 import { toast } from "sonner";
 
@@ -54,6 +55,11 @@ function MainApp() {
   const [profileUser, setProfileUser] = useState<any | null>(null);
 
   const currentUser = user || undefined as any;
+
+  const safeNumber = (value: unknown) => {
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? numberValue : 0;
+  };
 
   // Hàm refresh user data từ server
   const refreshUserData = async () => {
@@ -166,20 +172,20 @@ function MainApp() {
 
     switch (filters.sortBy) {
       case 'popular':
-        filtered.sort((a, b) => (b.likes + b.commentsCount) - (a.likes + a.commentsCount));
+        filtered.sort((a, b) => (safeNumber(b.likes) + safeNumber(b.commentsCount)) - (safeNumber(a.likes) + safeNumber(a.commentsCount)));
         break;
       case 'mostLiked':
-        filtered.sort((a, b) => b.likes - a.likes);
+        filtered.sort((a, b) => safeNumber(b.likes) - safeNumber(a.likes));
         break;
       case 'mostCommented':
-        filtered.sort((a, b) => b.commentsCount - a.commentsCount);
+        filtered.sort((a, b) => safeNumber(b.commentsCount) - safeNumber(a.commentsCount));
         break;
       case 'mostViewed':
-        filtered.sort((a, b) => b.views - a.views);
+        filtered.sort((a, b) => safeNumber(b.views) - safeNumber(a.views));
         break;
       case 'newest':
       default:
-        filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        filtered.sort((a, b) => parseAppDate(b.createdAt).getTime() - parseAppDate(a.createdAt).getTime());
         break;
     }
 
@@ -208,6 +214,18 @@ function MainApp() {
     }
 
     await refreshUserData();
+  };
+
+  const handleOpenPost = async (post: Post) => {
+    setSelectedPost(post);
+    try {
+      const freshPost = await api.getPost(post.id);
+      if (!freshPost?.id) return;
+      setPosts(prev => prev.map(item => item.id === freshPost.id ? { ...item, ...freshPost } : item));
+      setSelectedPost(prev => prev?.id === freshPost.id ? { ...prev, ...freshPost } : freshPost);
+    } catch (error) {
+      console.error("[POST VIEW] Error loading post detail:", error);
+    }
   };
 
   const handleCreatePost = async (newPostData: any) => {
@@ -352,7 +370,7 @@ function MainApp() {
             currentUser={currentUser} 
             isOwnProfile={_profileUser.id === currentUser?.id}
             onUpdateProfile={handleUpdateProfile}
-            onPostClick={(post) => setSelectedPost(post)}
+            onPostClick={(post) => void handleOpenPost(post)}
             onPostLike={handleLikePost}
           />
         </div>
@@ -471,7 +489,7 @@ function MainApp() {
                   <div key={post.id} className="post-card-hover">
                     <PostCard
                       post={post}
-                      onClick={() => setSelectedPost(post)}
+                      onClick={() => void handleOpenPost(post)}
                       onLike={() => handleLikePost(post.id)}
                       onUserUpdate={refreshUserData}
                     />

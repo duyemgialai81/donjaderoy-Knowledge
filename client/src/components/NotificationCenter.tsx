@@ -12,15 +12,14 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "./ui/sheet";
-import { formatDistanceToNow } from "date-fns";
-import { vi } from "date-fns/locale";
 import api from "../lib/api";
 import { useAuth } from "../lib/authContext";
 import { REALTIME_NOTIFICATION_EVENT, type RealtimeNotificationDetail } from "../lib/realtime";
+import { formatVietnamDistance } from "../lib/time";
 
 interface Notification {
   id: string;
-  type: "like" | "comment" | "follow" | "badge" | "mention" | "message" | "call";
+  type: "like" | "comment" | "follow" | "badge" | "mention" | "message" | "call" | "report";
   title: string;
   description?: string;
   createdAt: string;
@@ -62,6 +61,9 @@ export function NotificationCenter() {
           } else if (n.type === 'badge') {
             icon = '🏆';
             type = 'badge';
+          } else if (n.type === 'report') {
+            icon = '🚩';
+            type = 'report';
           }
 
           return {
@@ -98,12 +100,12 @@ export function NotificationCenter() {
       if (!detail?.title) return;
 
       const id = detail.id || `realtime_${Date.now()}`;
-      const allowedTypes: Notification["type"][] = ["like", "comment", "follow", "badge", "mention", "message", "call"];
+      const allowedTypes: Notification["type"][] = ["like", "comment", "follow", "badge", "mention", "message", "call", "report"];
       const type: Notification["type"] = allowedTypes.includes(detail.type as Notification["type"])
         ? detail.type as Notification["type"]
         : "mention";
 
-      const iconMap: Record<Notification["type"], string> = {
+      const iconMap: Partial<Record<Notification["type"], string>> = {
         like: "❤️",
         comment: "💬",
         follow: "👤",
@@ -112,7 +114,7 @@ export function NotificationCenter() {
         message: "💬",
         call: "📞",
       };
-      const icon = iconMap[type];
+      const icon = iconMap[type] || "📢";
       const item: Notification = {
         id,
         type,
@@ -181,6 +183,7 @@ export function NotificationCenter() {
       case "badge": return "bg-amber-100 text-amber-500";
       case "message": return "bg-sky-100 text-sky-500";
       case "call": return "bg-orange-100 text-orange-500";
+      case "report": return "bg-red-100 text-red-500";
       case "mention": return "bg-purple-100 text-purple-500";
       default: return "bg-slate-100 text-slate-500";
     }
@@ -275,10 +278,7 @@ export function NotificationCenter() {
                         </p>
                       )}
                       <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wider">
-                        {formatDistanceToNow(new Date(notification.createdAt), {
-                          addSuffix: true,
-                          locale: vi,
-                        })}
+                        {formatVietnamDistance(notification.createdAt)}
                       </p>
                     </div>
 

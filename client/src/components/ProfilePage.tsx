@@ -15,11 +15,10 @@ import {
   Users, BookOpen, Heart, MessageCircle, Eye, Trophy, Star,
   GraduationCap, User
 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
-import { vi } from "date-fns/locale";
 import { PostCard } from "./PostCard";
 import api, { normalizeAvatarUrl } from "../lib/api";
 import { localStorage_service } from "../lib/localStorage";
+import { formatVietnamDistance } from "../lib/time";
 
 interface ProfilePageProps {
   user: UserType;
@@ -194,10 +193,14 @@ export function ProfilePage({
     }
   };
 
+  const safeNumber = (value: unknown) => {
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? numberValue : 0;
+  };
   const userPosts    = posts?.filter((p) => p.authorId === user?.id) || [];
-  const totalLikes   = userPosts.reduce((s, p) => s + p.likes, 0);
-  const totalViews   = userPosts.reduce((s, p) => s + p.views, 0);
-  const totalComments = userPosts.reduce((s, p) => s + p.commentsCount, 0);
+  const totalLikes   = userPosts.reduce((s, p: any) => s + safeNumber(p.likes ?? p.likesCount), 0);
+  const totalViews   = userPosts.reduce((s, p: any) => s + safeNumber(p.views), 0);
+  const totalComments = userPosts.reduce((s, p: any) => s + safeNumber(p.commentsCount), 0);
 
   const userBadges = user?.badges || [];
   const nextBadge  = userBadges.length < 5 ? userBadges[userBadges.length] : null;
@@ -210,7 +213,7 @@ export function ProfilePage({
       if (!user?.joinedDate) return "không rõ";
       const d = new Date(user.joinedDate);
       if (isNaN(d.getTime())) return "không rõ";
-      return formatDistanceToNow(d, { addSuffix: false, locale: vi });
+      return formatVietnamDistance(user.joinedDate, false);
     } catch { return "không rõ"; }
   })();
 

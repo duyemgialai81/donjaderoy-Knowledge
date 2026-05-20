@@ -7,20 +7,14 @@ import { Dialog, DialogContent } from "./ui/dialog";
 import type { Post, Comment } from "../lib/mockData";
 import api from "../lib/api";
 import { useAuth } from "../lib/authContext";
-import { formatDistanceToNow } from "date-fns";
-import { vi } from "date-fns/locale";
 import { toast } from "sonner";
 import { Client } from '@stomp/stompjs';
 import { createSockJsConnection } from "../lib/realtime";
+import { formatVietnamDistance, parseAppDate } from "../lib/time";
 
 // Hàm xử lý thời gian chuẩn để sửa lỗi Java trả về mảng [2026, 4, 24...]
 const parseDateSafely = (dateVal: any): Date => {
-  if (!dateVal) return new Date();
-  if (Array.isArray(dateVal)) {
-    return new Date(dateVal[0], (dateVal[1] || 1) - 1, dateVal[2] || 1, dateVal[3] || 0, dateVal[4] || 0, dateVal[5] || 0);
-  }
-  const parsed = new Date(dateVal);
-  return isNaN(parsed.getTime()) ? new Date() : parsed;
+  return parseAppDate(dateVal);
 };
 
 interface PostDetailProps {
@@ -111,10 +105,15 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
   const [isFollowingLoading, setIsFollowingLoading] = useState(false);
 
   const [author, setAuthor] = useState<any | null>(null);
-  const [currentLikesCount, setCurrentLikesCount] = useState(post.likes || 0);
+  const safeNumber = (value: unknown) => {
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? numberValue : 0;
+  };
+  const [currentLikesCount, setCurrentLikesCount] = useState(safeNumber((post as any).likes ?? (post as any).likesCount));
   const [isLiked, setIsLiked] = useState(post.isLiked || false);
   const [isLiking, setIsLiking] = useState(false);
-  const [commentsCount, setCommentsCount] = useState(post.commentsCount || 0);
+  const [commentsCount, setCommentsCount] = useState(safeNumber(post.commentsCount));
+  const [currentViewsCount, setCurrentViewsCount] = useState(safeNumber(post.views));
   
   const { user: currentUser } = useAuth();
   const stompClientRef = useRef<Client | null>(null);
@@ -131,10 +130,11 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
   };
 
   useEffect(() => {
-    setCommentsCount(post.commentsCount || 0);
-    setCurrentLikesCount(post.likes || 0);
+    setCommentsCount(safeNumber(post.commentsCount));
+    setCurrentLikesCount(safeNumber((post as any).likes ?? (post as any).likesCount));
+    setCurrentViewsCount(safeNumber(post.views));
     setIsLiked(Boolean(post.isLiked));
-  }, [post.id, post.commentsCount, post.likes, post.isLiked]);
+  }, [post.id, post.commentsCount, post.likes, (post as any).likesCount, post.views, post.isLiked]);
 
   // ==========================================
   // 1. TẢI DỮ LIỆU BAN ĐẦU
@@ -146,7 +146,7 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
     const token = localStorage.getItem('ksp_auth_token') || undefined; 
 
     syncLikeState(token).catch(() => {
-      setCurrentLikesCount(post.likes || 0);
+      setCurrentLikesCount(safeNumber((post as any).likes ?? (post as any).likesCount));
       setIsLiked(false);
     });
     
@@ -254,6 +254,9 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
         client.subscribe(`/topic/post/${post.id}/update-comment`, (message) => {
             const updatedComment = JSON.parse(message.body);
             setPostComments(prev => prev.map(c => c.id === updatedComment.id ? updatedComment : c));
+        });
+        client.subscribe(`/topic/post/${post.id}/views`, (message) => {
+          setCurrentViewsCount(safeNumber(message.body));
         });
 
       }
@@ -453,10 +456,7 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
     }
     if (!commentAuthor) return null;
 
-    const commentTime = formatDistanceToNow(parseDateSafely(comment.createdAt), {
-      addSuffix: true,
-      locale: vi
-    });
+    const commentTime = formatVietnamDistance(comment.createdAt);
 
     const childReplies = postComments
       .filter(c => c.parentId === comment.id)
@@ -549,7 +549,7 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
     .filter(c => !c.parentId)
     .sort((a, b) => parseDateSafely(b.createdAt).getTime() - parseDateSafely(a.createdAt).getTime());
 
-  const timeAgo = formatDistanceToNow(new Date(post.createdAt), { addSuffix: true, locale: vi });
+  const timeAgo = formatVietnamDistance(post.createdAt);
   const tags = Array.isArray(post.tags) ? post.tags : (post.tags ? String(post.tags).split(',').map(t => t.trim()).filter(Boolean) : []);
 
   // ==========================================
@@ -696,7 +696,7 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
             <div className="flex items-center gap-5 text-sm font-medium text-slate-500">
               <div className="flex items-center gap-1.5">
                 <Eye className="h-4 w-4 text-slate-400" />
-                <span>{(post.views || 0).toLocaleString()} <span className="hidden sm:inline">lượt xem</span></span>
+                <span>{currentViewsCount.toLocaleString()} <span className="hidden sm:inline">lượt xem</span></span>
               </div>
               <div className="flex items-center gap-1.5">
                 <MessageCircle className="h-4 w-4 text-slate-400" />

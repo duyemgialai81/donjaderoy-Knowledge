@@ -45,9 +45,8 @@ import {
 } from "lucide-react";
 import type { Post, User } from "../lib/mockData";
 import api from "../lib/api";
-import { formatDistanceToNow } from "date-fns";
-import { vi } from "date-fns/locale";
 import { localStorage_service } from "../lib/localStorage";
+import { formatVietnamDistance } from "../lib/time";
 
 interface Report {
   id: string;
@@ -109,9 +108,13 @@ export function AdminDashboard() {
   // Statistics
   const totalUsers = users.length;
   const totalPosts = posts.length;
-  const totalViews = posts.reduce((sum, post) => sum + (post.views || 0), 0);
-  const totalLikes = posts.reduce((sum, post) => sum + (post.likes || 0), 0);
-  const totalComments = posts.reduce((sum, post) => sum + (post.commentsCount || 0), 0);
+  const safeNumber = (value: unknown) => {
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? numberValue : 0;
+  };
+  const totalViews = posts.reduce((sum, post: any) => sum + safeNumber(post.views), 0);
+  const totalLikes = posts.reduce((sum, post: any) => sum + safeNumber(post.likes ?? post.likesCount), 0);
+  const totalComments = posts.reduce((sum, post: any) => sum + safeNumber(post.commentsCount), 0);
   const pendingReports = reports.filter((r) => r.status === "pending").length;
 
   const handleReportAction = (reportId: string, action: "approve" | "reject") => {
@@ -363,10 +366,7 @@ export function AdminDashboard() {
                                 </p>
                                 <p className="text-sm font-semibold text-slate-800 truncate mb-1">{post.title}</p>
                                 <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">
-                                  {formatDistanceToNow(new Date(post.createdAt), {
-                                    addSuffix: true,
-                                    locale: vi,
-                                  })}
+                                  {formatVietnamDistance(post.createdAt)}
                                 </p>
                               </div>
                               <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-200 border-none shrink-0">{post.major}</Badge>
@@ -512,10 +512,7 @@ export function AdminDashboard() {
                                 <div className="pr-4">
                                   <p className="text-sm font-semibold text-slate-800 line-clamp-1 group-hover:text-[#F26B38] transition-colors">{post.title}</p>
                                   <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide mt-1">
-                                    {formatDistanceToNow(new Date(post.createdAt), {
-                                      addSuffix: true,
-                                      locale: vi,
-                                    })}
+                                    {formatVietnamDistance(post.createdAt)}
                                   </p>
                                 </div>
                               </TableCell>
@@ -584,10 +581,7 @@ export function AdminDashboard() {
                                     : "Đã xem xét"}
                                 </Badge>
                                 <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">
-                                  {formatDistanceToNow(new Date(report.createdAt), {
-                                    addSuffix: true,
-                                    locale: vi,
-                                  })}
+                                  {formatVietnamDistance(report.createdAt)}
                                 </span>
                               </div>
                               <h4 className="mb-2 text-lg font-bold text-slate-900">
