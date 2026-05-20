@@ -14,6 +14,7 @@ import java.util.List;
 public interface MessageRepository extends JpaRepository<Message, String> {
     List<Message> findByConversationIdOrderByCreatedAtAsc(String conversationId);
     List<Message> findByConversationIdOrderByCreatedAtDesc(String conversationId, Pageable pageable);
+    long countByConversationId(String conversationId);
 
     @Query("SELECT m FROM Message m WHERE m.conversationId = :convId AND m.createdAt > :since ORDER BY m.createdAt ASC")
     List<Message> findNewMessagesSince(@Param("convId") String convId, @Param("since") LocalDateTime since);

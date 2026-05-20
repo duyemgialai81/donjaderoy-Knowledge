@@ -120,6 +120,40 @@ public class MessageCacheService {
 
     public List<Message> getMessagesByConversation(String conversationId, int limit) {
         int safeLimit = normalizeLimit(limit);
+        String convKey = conversationMessagesKey(conversationId);
+        try {
+            List<Object> cachedIds = listOps.range(convKey, -safeLimit, -1);
+            if (cachedIds != null && !cachedIds.isEmpty()) {
+                List<Message> cachedMessages = hydrateMessages(cachedIds);
+                long expectedMessageCount = cachedIds.stream().filter(id -> id != null).count();
+                boolean cacheComplete = cachedMessages.size() == expectedMessageCount;
+                boolean scopedToConversation = cachedMessages.stream()
+                        .allMatch(message -> conversationId.equals(message.getConversationId()));
+                boolean cacheHasFullRequestedWindow = expectedMessageCount >= safeLimit;
+                if (!cacheHasFullRequestedWindow) {
+                    long dbMessageCount = messageRepository.countByConversationId(conversationId);
+                    cacheHasFullRequestedWindow = dbMessageCount <= expectedMessageCount;
+                }
+
+                if (cacheComplete && scopedToConversation && cacheHasFullRequestedWindow) {
+                    redisTemplate.expire(convKey, ttl(messagesTtlMinutes));
+                    return sortAscending(cachedMessages);
+                }
+
+                log.warn(
+                        "Redis conversation cache incomplete for {}. expected={}, hydrated={}, scoped={}, fullWindow={}",
+                        conversationId,
+                        expectedMessageCount,
+                        cachedMessages.size(),
+                        scopedToConversation,
+                        cacheHasFullRequestedWindow
+                );
+                safeDelete(convKey);
+            }
+        } catch (Exception e) {
+            log.warn("Redis conversation cache read failed for {}", conversationId, e);
+        }
+
         List<Message> latestDesc = messageRepository.findLatestVisibleMessages(
                 conversationId,
                 PageRequest.of(0, safeLimit)
