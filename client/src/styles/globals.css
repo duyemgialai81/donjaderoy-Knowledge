@@ -545,6 +545,9 @@
   pointer-events: none;
   z-index: 18;
   transition: opacity 120ms ease;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
 }
 
 .message-action-row[data-side="right"] {

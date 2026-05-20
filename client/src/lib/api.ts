@@ -479,6 +479,22 @@ export async function getUserStats(userId: string, token?: string) {
   return res?.data || res;
 }
 
+export async function recordProfileVisit(userId: string, token?: string) {
+  const res = await request('POST', `/api/profile-visits/${encodeURIComponent(userId)}`, undefined, token);
+  return res?.data || res;
+}
+
+export async function getProfileVisitCount(userId: string, token?: string) {
+  const res = await request('GET', `/api/profile-visits/${encodeURIComponent(userId)}/count`, undefined, token);
+  const data = res?.data || res;
+  return Number(data?.count || 0);
+}
+
+export async function getProfileVisitors(userId: string, token?: string) {
+  const res = await request('GET', `/api/profile-visits/${encodeURIComponent(userId)}/recent?limit=30`, undefined, token);
+  return res?.data || res;
+}
+
 // ==================== PRIVACY & BLOCK ====================
 export async function getPrivacySettings(token?: string) {
   const res = await request('GET', '/api/users/privacy', undefined, token);
@@ -768,6 +784,9 @@ export default {
   uploadFile,
   searchUsers,
   getUserStats,
+  recordProfileVisit,
+  getProfileVisitCount,
+  getProfileVisitors,
 
   // Privacy & Block 
   getPrivacySettings,

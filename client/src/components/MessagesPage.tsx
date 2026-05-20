@@ -112,6 +112,19 @@ interface CallSession {
 const REACTION_EMOJIS = ['❤️', '😂', '👍', '😮', '😢', '🎉', '👎', '😡', '⭐', '🔥'];
 
 // ── ORANGE THEME ──
+const SAFE_REACTION_EMOJIS = [
+  "\u2764\uFE0F",
+  "\uD83D\uDE06",
+  "\uD83D\uDE2E",
+  "\uD83D\uDE22",
+  "\uD83D\uDE21",
+  "\uD83D\uDC4D",
+  "\uD83C\uDF89",
+  "\uD83D\uDC4E",
+  "\u2B50",
+  "\uD83D\uDD25",
+];
+
 const ORANGE = "#FF6B35";
 const ORANGE_LIGHT = "#FFF0EB";
 const ORANGE_MID = "#FF8A5C";
@@ -727,54 +740,98 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
         };
 
         subscribeUserQueue("messages", (frame) => {
-          const msg = safe(frame.body); if (!msg) return;
-          const messageKey = toId(msg.id) || `${toId(msg.conversationId)}:${toId(msg.senderId)}:${toId(msg.createdAt)}:${toId(msg.content)}`;
-          if (messageKey && realtimeMessageIdsRef.current.has(messageKey)) return;
-          if (messageKey) {
-            realtimeMessageIdsRef.current.add(messageKey);
-            if (realtimeMessageIdsRef.current.size > 300) {
-              realtimeMessageIdsRef.current = new Set(Array.from(realtimeMessageIdsRef.current).slice(-150));
-            }
-          }
-          const convId = toId(msg.conversationId), senderId = toId(msg.senderId), receiverId = toId(msg.receiverId);
-          const peerId = getEventPeerId(senderId, receiverId);
-          setConversations((prev) => {
-            const updated = [...prev];
-            const idx = updated.findIndex((c) => (convId && toId(c.id) === convId) || (peerId && getConversationPeerId(c) === peerId));
-            if (idx > -1) {
-              const conv = { ...updated[idx] };
-              conv.lastMessage = msg.content;
-              conv.time = new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-              if (senderId !== currentUserId && !doesEventMatchSelectedChat(convId, senderId, receiverId)) conv.unread = (conv.unread || 0) + 1;
-              if (toId(conv.id).startsWith("new_") && convId) {
-                const prevPeerId = getConversationPeerId(conv);
-                conv.id = convId; conv.targetUserId = conv.targetUserId || prevPeerId || peerId;
-                if (selectedChatIdRef.current === `new_${prevPeerId}` || selectedChatIdRef.current === `new_${peerId}`) setSelectedChatId(convId);
-              }
-              updated.splice(idx, 1); updated.unshift(conv); return dedupConversations(updated);
-            }
-            void loadChatsAndFriends({ force: true, silent: true }); return updated;
-          });
-          if (doesEventMatchSelectedChat(convId, senderId, receiverId)) {
-            setMessages((prev) => {
-              if (prev.some((m) => m.id === msg.id)) return prev;
-              const clean = prev.filter((m) => !(m.id.startsWith("temp_") && m.text === msg.content));
-              return [...clean, {
-                id: msg.id,
-                senderId: senderId === currentUserId ? "me" : senderId,
-                senderName: msg.senderName,
-                senderAvatar: msg.senderAvatar,
-                text: msg.content,
-                time: new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                replyToMessageId: msg.replyToMessageId,
-                attachmentUrl: msg.attachmentUrl,
-                attachmentName: msg.attachmentName,
-                attachmentSize: msg.attachmentSize,
-                messageType: msg.messageType,
-              }];
-            });
-          }
-        });
+  const msg = safe(frame.body); 
+  if (!msg) return;
+  
+  const messageKey = toId(msg.id) || `${toId(msg.conversationId)}:${toId(msg.senderId)}:${toId(msg.createdAt)}:${toId(msg.content)}`;
+  if (messageKey && realtimeMessageIdsRef.current.has(messageKey)) return;
+  if (messageKey) {
+    realtimeMessageIdsRef.current.add(messageKey);
+    if (realtimeMessageIdsRef.current.size > 300) {
+      realtimeMessageIdsRef.current = new Set(Array.from(realtimeMessageIdsRef.current).slice(-150));
+    }
+  }
+  
+  const convId = toId(msg.conversationId);
+  const senderId = toId(msg.senderId);
+  const receiverId = toId(msg.receiverId);
+  const peerId = getEventPeerId(senderId, receiverId);
+  
+  // Cập nhật danh sách hội thoại
+  setConversations((prev) => {
+    const updated = [...prev];
+    
+    // Bước 1: Tìm bằng conversationId (ƯU TIÊN SỐ 1)
+    let idx = updated.findIndex((c) => convId && toId(c.id) === convId);
+    
+    // Bước 2: Nếu không tìm thấy, tìm theo peerId (cho chat 1-1)
+    if (idx === -1) {
+      idx = updated.findIndex((c) => {
+        const cPeerId = getConversationPeerId(c);
+        if (!c.type || c.type === "direct") {
+          return (senderId === currentUserId && cPeerId === receiverId) || 
+                 (receiverId === currentUserId && cPeerId === senderId);
+        }
+        return c.type === "group" && convId && toId(c.id) === convId;
+      });
+    }
+    
+    if (idx > -1) {
+      const conv = { ...updated[idx] };
+      conv.lastMessage = msg.content;
+      conv.time = new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      
+      // Chỉ tăng unread nếu:
+      // 1. Tin nhắn KHÔNG phải của mình
+      // 2. Hội thoại này KHÔNG đang được chọn
+      if (senderId !== currentUserId && toId(selectedChatIdRef.current) !== toId(conv.id)) {
+        conv.unread = (conv.unread || 0) + 1;
+      }
+      
+      // Cập nhật ID nếu hội thoại đang ở dạng "new_"
+      if (toId(conv.id).startsWith("new_") && convId) {
+        const prevPeerId = getConversationPeerId(conv);
+        conv.id = convId; 
+        conv.targetUserId = conv.targetUserId || prevPeerId || peerId;
+        if (selectedChatIdRef.current === `new_${prevPeerId}` || selectedChatIdRef.current === `new_${peerId}`) {
+          setSelectedChatId(convId);
+        }
+      }
+      
+      updated.splice(idx, 1); 
+      updated.unshift(conv); 
+      return dedupConversations(updated);
+    }
+    
+    void loadChatsAndFriends({ force: true, silent: true }); 
+    return updated;
+  });
+  
+  // ✅ CHỈ HIỂN THỊ TIN NHẮN NẾU ĐÚNG HỘI THOẠI ĐANG MỞ
+  // So sánh trực tiếp conversationId với selectedChatId
+  const selectedId = toId(selectedChatIdRef.current);
+  const messageBelongsToSelectedChat = convId && selectedId && toId(convId) === selectedId;
+  
+  if (messageBelongsToSelectedChat) {
+    setMessages((prev) => {
+      if (prev.some((m) => m.id === msg.id)) return prev;
+      const clean = prev.filter((m) => !(m.id.startsWith("temp_") && m.text === msg.content));
+      return [...clean, {
+        id: msg.id,
+        senderId: senderId === currentUserId ? "me" : senderId,
+        senderName: msg.senderName,
+        senderAvatar: msg.senderAvatar,
+        text: msg.content,
+        time: new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        replyToMessageId: msg.replyToMessageId,
+        attachmentUrl: msg.attachmentUrl,
+        attachmentName: msg.attachmentName,
+        attachmentSize: msg.attachmentSize,
+        messageType: msg.messageType,
+      }];
+    });
+  }
+});
 
         subscribeUserQueue("message-updates", (frame) => {
           const msg = safe(frame.body); if (!msg) return;
@@ -1489,7 +1546,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
 
                               {showReactionPicker === msg.id && !msg.isDeleted && (
                                 <div style={{ position: "absolute", bottom: "100%", [isMe ? "right" : "left"]: 0, background: "#fff", borderRadius: 24, boxShadow: "0 4px 20px rgba(0,0,0,0.12)", border: "1px solid #f0f0f0", padding: "6px 10px", display: "flex", gap: 4, zIndex: 20, marginBottom: 4 }}>
-                                  {REACTION_EMOJIS.map((emoji) => (
+                                  {SAFE_REACTION_EMOJIS.map((emoji) => (
                                     <button key={emoji} type="button" onClick={() => handleToggleReaction(msg.id, emoji)}
                                       style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, padding: 2, borderRadius: 8, transition: "transform 0.1s" }}
                                       onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.3)")}

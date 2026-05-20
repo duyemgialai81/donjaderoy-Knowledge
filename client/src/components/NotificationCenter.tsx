@@ -98,10 +98,21 @@ export function NotificationCenter() {
       if (!detail?.title) return;
 
       const id = detail.id || `realtime_${Date.now()}`;
-      const type: Notification["type"] =
-        detail.type === "message" || detail.type === "call" ? detail.type : "mention";
+      const allowedTypes: Notification["type"][] = ["like", "comment", "follow", "badge", "mention", "message", "call"];
+      const type: Notification["type"] = allowedTypes.includes(detail.type as Notification["type"])
+        ? detail.type as Notification["type"]
+        : "mention";
 
-      const icon = type === "call" ? "📞" : type === "message" ? "💬" : "📢";
+      const iconMap: Record<Notification["type"], string> = {
+        like: "❤️",
+        comment: "💬",
+        follow: "👤",
+        badge: "🏆",
+        mention: "📢",
+        message: "💬",
+        call: "📞",
+      };
+      const icon = iconMap[type];
       const item: Notification = {
         id,
         type,

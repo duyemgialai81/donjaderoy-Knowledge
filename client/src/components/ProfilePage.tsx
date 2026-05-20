@@ -18,7 +18,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { vi } from "date-fns/locale";
 import { PostCard } from "./PostCard";
-import api from "../lib/api";
+import api, { normalizeAvatarUrl } from "../lib/api";
 import { localStorage_service } from "../lib/localStorage";
 
 interface ProfilePageProps {
@@ -51,6 +51,10 @@ export function ProfilePage({
   const [isFollowBusy, setIsFollowBusy] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [followersCount, setFollowersCount] = useState(Number((user as any)?.followers || 0));
+  const [profileVisitCount, setProfileVisitCount] = useState(0);
+  const [profileVisitors, setProfileVisitors] = useState<any[]>([]);
+  const [showProfileVisitors, setShowProfileVisitors] = useState(false);
+  const [isLoadingProfileVisitors, setIsLoadingProfileVisitors] = useState(false);
 
   useEffect(() => {
     setEditedName(user?.name || "");
@@ -79,6 +83,20 @@ export function ProfilePage({
     loadFollowStatus();
     return () => { mounted = false; };
   }, [currentUser?.id, user?.id, isOwnProfile]);
+
+  useEffect(() => {
+    if (!user?.id || !currentUser?.id) return;
+    const token = localStorage_service.getAuthToken() || undefined;
+
+    if (isOwnProfile) {
+      api.getProfileVisitCount(user.id, token)
+        .then((count: number) => setProfileVisitCount(Number(count) || 0))
+        .catch(() => setProfileVisitCount(0));
+      return;
+    }
+
+    api.recordProfileVisit(user.id, token).catch(() => {});
+  }, [user?.id, currentUser?.id, isOwnProfile]);
 
   const handleSave = () => {
     if (onUpdateProfile) {
@@ -160,6 +178,22 @@ export function ProfilePage({
     }
   };
 
+  const openProfileVisitors = async () => {
+    if (!isOwnProfile || !user?.id) return;
+    setShowProfileVisitors(true);
+    setIsLoadingProfileVisitors(true);
+    try {
+      const token = localStorage_service.getAuthToken() || undefined;
+      const data = await api.getProfileVisitors(user.id, token);
+      setProfileVisitCount(Number(data?.count || 0));
+      setProfileVisitors(Array.isArray(data?.visitors) ? data.visitors : []);
+    } catch {
+      setProfileVisitors([]);
+    } finally {
+      setIsLoadingProfileVisitors(false);
+    }
+  };
+
   const userPosts    = posts?.filter((p) => p.authorId === user?.id) || [];
   const totalLikes   = userPosts.reduce((s, p) => s + p.likes, 0);
   const totalViews   = userPosts.reduce((s, p) => s + p.views, 0);
@@ -193,6 +227,10 @@ export function ProfilePage({
     { icon: MessageCircle, label: "Tổng bình luận",  value: totalComments.toLocaleString(), color: "text-emerald-500", bg: "bg-emerald-50" },
     { icon: Trophy,        label: "Điểm tích lũy",   value: (user.points || 0).toLocaleString(), color: "text-[#F26B38]", bg: "bg-orange-50" },
   ];
+
+  const profileVisitorStats = isOwnProfile
+    ? [{ icon: Eye, label: "Lượt ghé hồ sơ", value: profileVisitCount.toLocaleString(), color: "text-cyan-500", bg: "bg-cyan-50", onClick: openProfileVisitors }]
+    : [];
 
   return (
     <div className="min-h-screen" style={{ background: "#F7F9FC" }}>
@@ -418,13 +456,16 @@ export function ProfilePage({
 
               {/* Activity stats grid */}
               <div className="grid grid-cols-2 gap-2 mb-4">
-                {activityStats.map(({ icon: Icon, label, value, color, bg }) => (
-                  <div key={label} className={`${bg} rounded-xl p-3 flex flex-col gap-1`}>
-                    <Icon className={`h-4 w-4 ${color}`} />
-                    <p className="text-sm font-bold text-slate-700">{value}</p>
-                    <p className="text-[10px] text-slate-500">{label}</p>
-                  </div>
-                ))}
+                {[...activityStats, ...profileVisitorStats].map((stat: any) => {
+                  const { icon: Icon, label, value, color, bg, onClick } = stat;
+                  return (
+                    <button key={label} type="button" onClick={onClick} disabled={!onClick} className={`${bg} rounded-xl p-3 flex flex-col gap-1 text-left transition hover:shadow-sm disabled:cursor-default`}>
+                      <Icon className={`h-4 w-4 ${color}`} />
+                      <p className="text-sm font-bold text-slate-700">{value}</p>
+                      <p className="text-[10px] text-slate-500">{label}</p>
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Points progress */}
@@ -531,6 +572,52 @@ export function ProfilePage({
           </div>
         </div>
       </div>
+
+      {showProfileVisitors && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+              <h3 className="font-semibold text-slate-800">Ai hay vào hồ sơ của bạn</h3>
+              <button type="button" onClick={() => setShowProfileVisitors(false)} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="max-h-[70vh] overflow-y-auto p-3">
+              <div className="mb-3 rounded-xl bg-cyan-50 px-3 py-2 text-sm font-semibold text-cyan-700">
+                Tổng lượt ghé: {profileVisitCount.toLocaleString()}
+              </div>
+              {isLoadingProfileVisitors ? (
+                <div className="py-8 text-center text-sm text-slate-500">Đang tải...</div>
+              ) : profileVisitors.length > 0 ? (
+                <div className="space-y-2">
+                  {profileVisitors.map((visitor) => {
+                    const avatar = normalizeAvatarUrl(visitor.avatar, visitor.userId);
+                    return (
+                      <button
+                        key={visitor.userId}
+                        type="button"
+                        onClick={() => {
+                          setShowProfileVisitors(false);
+                          navigate(`/nguoi-dung/${visitor.userId}`);
+                        }}
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left hover:bg-orange-50"
+                      >
+                        <img src={avatar} alt={visitor.name || "User"} className="h-10 w-10 rounded-full object-cover" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-slate-800">{visitor.name || visitor.email || visitor.userId}</p>
+                          <p className="text-xs text-slate-500">{Number(visitor.visitCount || 0).toLocaleString()} lượt ghé</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="py-8 text-center text-sm text-slate-500">Chưa có lượt ghé hồ sơ nào</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {followModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4">

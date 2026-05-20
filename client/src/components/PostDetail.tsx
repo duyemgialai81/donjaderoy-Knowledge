@@ -57,6 +57,19 @@ function readLikeCountPayload(payload: any) {
   return Number.isFinite(count) ? count : null;
 }
 
+function readLikeEventPayload(payload: any) {
+  let value = payload;
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  if (value?.data && typeof value.data === "object") value = value.data;
+  return value && typeof value === "object" ? value : null;
+}
+
 function removeCommentTree(comments: Comment[], rootId: string) {
   const idsToRemove = new Set<string>([rootId]);
   let changed = true;
@@ -119,7 +132,9 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
 
   useEffect(() => {
     setCommentsCount(post.commentsCount || 0);
-  }, [post.id, post.commentsCount]);
+    setCurrentLikesCount(post.likes || 0);
+    setIsLiked(Boolean(post.isLiked));
+  }, [post.id, post.commentsCount, post.likes, post.isLiked]);
 
   // ==========================================
   // 1. TẢI DỮ LIỆU BAN ĐẦU
@@ -203,8 +218,12 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
       debug: () => {}, 
       onConnect: () => {
         client.subscribe(`/topic/post/${post.id}/likes`, (message) => {
+          const event = readLikeEventPayload(message.body);
           const nextCount = readLikeCountPayload(message.body);
           if (nextCount !== null) setCurrentLikesCount(nextCount);
+          if (event && String(event.userId || "") === String(currentUser?.id || "")) {
+            setIsLiked(Boolean(event.isLiked));
+          }
         });
         client.subscribe(`/topic/post/${post.id}/new-comment`, (message) => {
           const newComment = JSON.parse(message.body);
@@ -250,7 +269,7 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
         }
       }, 100);
     };
-  }, [post.id, isOpen]);
+  }, [post.id, isOpen, currentUser?.id]);
 
   // ==========================================
   // 3. CÁC HÀM XỬ LÝ (LIKE, FOLLOW, BÌNH LUẬN)

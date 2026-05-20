@@ -13,6 +13,7 @@ interface UserSidebarProps {
 
 export function UserSidebar({ user, onViewProfile }: UserSidebarProps) {
   const [allBadges, setAllBadges] = useState<any[]>([]);
+  const [stats, setStats] = useState<any | null>(null);
 
   const sortedBadges = [...allBadges].sort((a, b) => (a.requiredPoints || 0) - (b.requiredPoints || 0));
   const achievedBadges = sortedBadges.filter((b) => (user?.points || 0) >= (b.requiredPoints || 0));
@@ -29,10 +30,16 @@ export function UserSidebar({ user, onViewProfile }: UserSidebarProps) {
     const fetchData = async () => {
       try {
         const token = localStorage.getItem("ksp_auth_token") || undefined;
-        const badgesRes = await api.getBadges(token);
+        const [badgesRes, statsRes] = await Promise.all([
+          api.getBadges(token),
+          user?.id ? api.getUserStats(user.id, token).catch(() => null) : Promise.resolve(null),
+        ]);
         const badgesList = Array.isArray(badgesRes) ? badgesRes : (badgesRes?.data || badgesRes);
         if (mounted && Array.isArray(badgesList)) {
           setAllBadges(badgesList.sort((a, b) => (a.requiredPoints || 0) - (b.requiredPoints || 0)));
+        }
+        if (mounted && statsRes) {
+          setStats(statsRes);
         }
       } catch (error) {
         console.error("[UserSidebar] Error fetching badges:", error);
@@ -52,6 +59,12 @@ export function UserSidebar({ user, onViewProfile }: UserSidebarProps) {
     );
   }
 
+  const totalPosts = Number(stats?.totalPosts ?? user.postsCount ?? 0);
+  const totalViews = Number(stats?.totalViews ?? 0);
+  const totalLikes = Number(stats?.totalLikes ?? 0);
+  const totalComments = Number(stats?.totalComments ?? 0);
+  const totalPoints = Number(stats?.totalPoints ?? user.points ?? 0);
+
   const weekStats = [
     { label: "Lượt xem", value: "+234", icon: Eye, colorClass: "stat-card-blue", iconColor: "text-blue-500" },
     { label: "Lượt thích", value: "+45",  icon: Heart, colorClass: "stat-card-orange", iconColor: "text-[#F26B38]" },
@@ -64,6 +77,21 @@ export function UserSidebar({ user, onViewProfile }: UserSidebarProps) {
     { label: "Bình luận",     current: 8, target: 10 },
     { label: "Nhận lượt thích", current: 45, target: 50 },
   ];
+
+  const realWeekStats = [
+    { label: "Lượt xem", value: totalViews.toLocaleString(), icon: Eye, colorClass: "stat-card-blue", iconColor: "text-blue-500" },
+    { label: "Lượt thích", value: totalLikes.toLocaleString(), icon: Heart, colorClass: "stat-card-orange", iconColor: "text-[#F26B38]" },
+    { label: "Bình luận", value: totalComments.toLocaleString(), icon: MessageCircle, colorClass: "stat-card-green", iconColor: "text-emerald-500" },
+    { label: "Điểm", value: totalPoints.toLocaleString(), icon: Star, colorClass: "stat-card-purple", iconColor: "text-purple-500" },
+  ];
+
+  const realWeeklyGoals = [
+    { label: "Đăng bài viết", current: Math.min(totalPosts, 3), target: 3 },
+    { label: "Bình luận", current: Math.min(totalComments, 10), target: 10 },
+    { label: "Nhận lượt thích", current: Math.min(totalLikes, 50), target: 50 },
+  ];
+  void weekStats;
+  void weeklyGoals;
 
   return (
     <div className="space-y-5">
@@ -198,7 +226,7 @@ export function UserSidebar({ user, onViewProfile }: UserSidebarProps) {
           <h3 className="font-semibold text-slate-800 text-base">Thống kê tuần này</h3>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          {weekStats.map(({ label, value, icon: Icon, colorClass, iconColor }) => (
+          {realWeekStats.map(({ label, value, icon: Icon, colorClass, iconColor }) => (
             <div key={label} className={`${colorClass} rounded-xl p-3 flex flex-col gap-1.5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5`}>
               <div className="flex items-center justify-between">
                 <Icon className={`h-5 w-5 ${iconColor}`} />
@@ -217,7 +245,7 @@ export function UserSidebar({ user, onViewProfile }: UserSidebarProps) {
           <h3 className="font-semibold text-slate-800 text-base">Mục tiêu tuần này</h3>
         </div>
         <div className="space-y-4">
-          {weeklyGoals.map(({ label, current, target }) => {
+          {realWeeklyGoals.map(({ label, current, target }) => {
             const pct = Math.round((current / target) * 100);
             return (
               <div key={label}>

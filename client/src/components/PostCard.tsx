@@ -45,6 +45,19 @@ function readLikeCountPayload(payload: any) {
   return Number.isFinite(count) ? count : null;
 }
 
+function readLikeEventPayload(payload: any) {
+  let value = payload;
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  if (value?.data && typeof value.data === "object") value = value.data;
+  return value && typeof value === "object" ? value : null;
+}
+
 function readDeletedCommentPayload(payload: any) {
   if (typeof payload === "string") {
     try {
@@ -84,7 +97,9 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
   useEffect(() => {
     setCommentsCount(post.commentsCount || 0);
     setViewsCount(post.views || 0);
-  }, [post.commentsCount, post.views]);
+    setLikesCount(post.likes || 0);
+    setIsLiked(Boolean(post.isLiked));
+  }, [post.id, post.commentsCount, post.views, post.likes, post.isLiked]);
 
   // 1. TẢI DỮ LIỆU BAN ĐẦU
   useEffect(() => {
@@ -125,8 +140,12 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
       debug: () => {},
       onConnect: () => {
         client.subscribe(`/topic/post/${post.id}/likes`, (message) => {
+          const event = readLikeEventPayload(message.body);
           const nextCount = readLikeCountPayload(message.body);
           if (nextCount !== null) setLikesCount(nextCount);
+          if (event && String(event.userId || "") === String(currentUser?.id || "")) {
+            setIsLiked(Boolean(event.isLiked));
+          }
         });
         client.subscribe(`/topic/post/${post.id}/new-comment`, () => {
           setCommentsCount(prev => prev + 1);
@@ -151,7 +170,7 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
         }
       }, 100);
     };
-  }, [post.id]);
+  }, [post.id, currentUser?.id]);
 
   if (!author) return null;
 

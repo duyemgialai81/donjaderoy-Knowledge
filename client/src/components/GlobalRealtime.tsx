@@ -178,6 +178,31 @@ export function GlobalRealtime() {
           }
         });
 
+        subscribeUserQueue("notifications", (frame) => {
+          const notification = safeParse(frame.body);
+          if (!notification?.title) return;
+
+          const type = ["like", "comment", "follow", "badge", "mention"].includes(notification.type)
+            ? notification.type
+            : "system";
+          const link = notification.postId ? `/?post=${encodeURIComponent(notification.postId)}` : undefined;
+
+          emitRealtimeNotification({
+            id: toId(notification.id) || `notification_${Date.now()}`,
+            type: type as any,
+            title: notification.title,
+            description: notification.description,
+            createdAt: notification.createdAt,
+            link,
+            payload: notification,
+          });
+
+          toast(notification.title, {
+            description: notification.description,
+            duration: 3500,
+          });
+        });
+
         subscribeUserQueue("errors", (frame) => {
           const message = safeParse(frame.body) || frame.body;
           if (message) console.warn("[Realtime]", message);

@@ -445,7 +445,7 @@ function MainApp() {
                     <TabsTrigger
                       key={value}
                       value={value}
-                        className="feed-tab-trigger flex-1 h-11 gap-1.5 text-xs font-medium rounded-none border-b-2 border-transparent
+                        className="feed-tab-trigger flex-1 h-11 gap-1.5 text-xs font-medium rounded-none border-0 border-b-2 border-transparent
                         data-[state=active]:border-[#F26B38] data-[state=active]:text-[#F26B38]
                         data-[state=active]:bg-transparent text-slate-500 hover:text-slate-700"
                     >
