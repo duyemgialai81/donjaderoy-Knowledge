@@ -8,6 +8,7 @@ import com.example.server.service.PostService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,6 +47,9 @@ public class PostServiceImpl implements PostService {
 
     @Autowired
     private AttachmentRepository attachmentRepository;
+
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
 
     private static final int POINTS_POST = 10;
     private static final int POINTS_LIKE = 3;
@@ -142,6 +146,7 @@ public class PostServiceImpl implements PostService {
         postRepository.incrementViews(id);
         post.setViews((post.getViews() == null ? 0 : post.getViews()) + 1);
         post.setAttachments(attachmentRepository.findByPostId(id));
+        broadcastViewsCount(id, post.getViews());
 
         return ResponseObject.success(post, "OK");
     }
@@ -319,6 +324,11 @@ public class PostServiceImpl implements PostService {
                 .createdAt(LocalDateTime.now())
                 .build();
         notificationRepository.save(notif);
+        try {
+            messagingTemplate.convertAndSendToUser(recipientId, "/queue/notifications", notif);
+        } catch (Exception e) {
+            System.out.println("[STOMP] Khong the gui thong bao post: " + e.getMessage());
+        }
     }
 
     // Update leaderboard
@@ -402,5 +412,12 @@ public class PostServiceImpl implements PostService {
             return 10;
         }
         return Math.min(size, MAX_PAGE_SIZE);
+    }
+
+    private void broadcastViewsCount(String postId, int viewsCount) {
+        try {
+            messagingTemplate.convertAndSend("/topic/post/" + postId + "/views", String.valueOf(Math.max(0, viewsCount)));
+        } catch (Exception ignored) {
+        }
     }
 }

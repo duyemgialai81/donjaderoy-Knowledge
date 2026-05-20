@@ -1,11 +1,14 @@
 package com.example.server.controller;
 
 import com.example.server.entity.ProfileVisit;
+import com.example.server.entity.Notification;
 import com.example.server.entity.User;
 import com.example.server.model.response.ResponseObject;
+import com.example.server.repository.NotificationRepository;
 import com.example.server.repository.ProfileVisitRepository;
 import com.example.server.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -32,6 +35,12 @@ public class ProfileVisitController {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private NotificationRepository notificationRepository;
+
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
+
     @PostMapping("/{profileUserId}")
     public ResponseObject recordVisit(@PathVariable String profileUserId, Principal principal) {
         if (principal == null) {
@@ -50,6 +59,7 @@ public class ProfileVisitController {
                 .visitedAt(LocalDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh")))
                 .build();
         profileVisitRepository.save(visit);
+        createVisitNotification(profileUserId, visitorUserId);
 
         return ResponseObject.success(Map.of("count", profileVisitRepository.countByProfileUserId(profileUserId)), "OK");
     }
@@ -103,5 +113,28 @@ public class ProfileVisitController {
         value.put("avatar", user.getAvatar());
         value.put("email", user.getEmail());
         value.put("role", user.getRole() == null ? null : user.getRole().name());
+    }
+
+    private void createVisitNotification(String profileUserId, String visitorUserId) {
+        String visitorName = userRepository.findById(visitorUserId)
+                .map(User::getName)
+                .filter(name -> name != null && !name.isBlank())
+                .orElse("Có người");
+        Notification notification = Notification.builder()
+                .id(UUID.randomUUID().toString())
+                .userId(profileUserId)
+                .actorId(visitorUserId)
+                .type(Notification.NotificationType.mention)
+                .title("Có người vừa xem hồ sơ của bạn")
+                .description(visitorName + " đã ghé hồ sơ của bạn")
+                .isRead(false)
+                .createdAt(LocalDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh")))
+                .build();
+        notificationRepository.save(notification);
+        try {
+            messagingTemplate.convertAndSendToUser(profileUserId, "/queue/notifications", notification);
+        } catch (Exception e) {
+            System.out.println("[STOMP] Khong the gui thong bao profile visit: " + e.getMessage());
+        }
     }
 }

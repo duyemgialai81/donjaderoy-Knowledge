@@ -3,11 +3,13 @@ package com.example.server.service.impl;
 import com.example.server.entity.Comment;
 import com.example.server.entity.Notification;
 import com.example.server.entity.Post;
+import com.example.server.entity.User;
 import com.example.server.model.dto.CommentDTO;
 import com.example.server.model.response.ResponseObject;
 import com.example.server.repository.CommentRepository;
 import com.example.server.repository.NotificationRepository;
 import com.example.server.repository.PostRepository;
+import com.example.server.repository.UserRepository;
 import com.example.server.service.CommentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -35,6 +37,9 @@ public class CommentServiceImpl implements CommentService {
 
     @Autowired
     private NotificationRepository notificationRepository;
+
+    @Autowired
+    private UserRepository userRepository;
 
     // Tiêm (Inject) cái loa để bắn Realtime qua WebSockets
     @Autowired
@@ -181,6 +186,18 @@ public class CommentServiceImpl implements CommentService {
             e.printStackTrace();
         }
 
+        if (!userId.equals(comment.getAuthorId())) {
+            createNotification(
+                    comment.getAuthorId(),
+                    userId,
+                    Notification.NotificationType.like,
+                    "Bình luận của bạn có lượt thích mới",
+                    comment.getContent(),
+                    comment.getPostId(),
+                    comment.getId()
+            );
+        }
+
         return ResponseObject.success(updatedComment, "Comment liked");
     }
 
@@ -192,6 +209,13 @@ public class CommentServiceImpl implements CommentService {
         Comment comment = commentOpt.get();
         comment.setIsReported(true);
         commentRepository.save(comment);
+        notifyAdmins(
+                userId,
+                "Có báo cáo bình luận mới",
+                reason,
+                comment.getPostId(),
+                comment.getId()
+        );
 
         return ResponseObject.success(comment, "Comment reported");
     }
@@ -214,6 +238,20 @@ public class CommentServiceImpl implements CommentService {
         }
 
         if (!hasText(recipientId) || recipientId.equals(actorId)) {
+            if (hasText(comment.getParentId())
+                    && hasText(post.getAuthorId())
+                    && !post.getAuthorId().equals(actorId)
+                    && !post.getAuthorId().equals(recipientId)) {
+                createNotification(
+                        post.getAuthorId(),
+                        actorId,
+                        Notification.NotificationType.comment,
+                        "Bài viết của bạn có trả lời bình luận mới",
+                        comment.getContent(),
+                        post.getId(),
+                        comment.getId()
+                );
+            }
             return;
         }
 
@@ -236,6 +274,58 @@ public class CommentServiceImpl implements CommentService {
             messagingTemplate.convertAndSendToUser(recipientId, "/queue/notifications", notification);
         } catch (Exception e) {
             System.out.println("[STOMP] Khong the gui thong bao comment: " + e.getMessage());
+        }
+
+        if (hasText(comment.getParentId())
+                && hasText(post.getAuthorId())
+                && !post.getAuthorId().equals(actorId)
+                && !post.getAuthorId().equals(recipientId)) {
+            createNotification(
+                    post.getAuthorId(),
+                    actorId,
+                    Notification.NotificationType.comment,
+                    "Bài viết của bạn có trả lời bình luận mới",
+                    comment.getContent(),
+                    post.getId(),
+                    comment.getId()
+            );
+        }
+    }
+
+    private void createNotification(
+            String recipientId,
+            String actorId,
+            Notification.NotificationType type,
+            String title,
+            String description,
+            String postId,
+            String commentId
+    ) {
+        if (!hasText(recipientId) || recipientId.equals(actorId)) return;
+        Notification notification = Notification.builder()
+                .id(UUID.randomUUID().toString())
+                .userId(recipientId)
+                .actorId(actorId)
+                .type(type)
+                .title(title)
+                .description(description)
+                .postId(postId)
+                .commentId(commentId)
+                .isRead(false)
+                .createdAt(LocalDateTime.now())
+                .build();
+        notificationRepository.save(notification);
+        try {
+            messagingTemplate.convertAndSendToUser(recipientId, "/queue/notifications", notification);
+        } catch (Exception e) {
+            System.out.println("[STOMP] Khong the gui thong bao: " + e.getMessage());
+        }
+    }
+
+    private void notifyAdmins(String actorId, String title, String description, String postId, String commentId) {
+        for (User admin : userRepository.findByRole(User.Role.admin)) {
+            if (admin == null) continue;
+            createNotification(admin.getId(), actorId, Notification.NotificationType.report, title, description, postId, commentId);
         }
     }
 

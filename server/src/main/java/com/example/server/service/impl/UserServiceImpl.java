@@ -585,6 +585,7 @@ import com.example.server.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -606,6 +607,7 @@ public class UserServiceImpl implements UserService {
     @Autowired private UserBadgeRepository userBadgeRepository;
     @Autowired private BlockRepository blockRepository;
     @Autowired private UserPrivacyRepository userPrivacyRepository;
+    @Autowired private SimpMessagingTemplate messagingTemplate;
 
     @Override
     public ResponseObject getUserProfile(String id) {
@@ -940,6 +942,11 @@ public class UserServiceImpl implements UserService {
                 .createdAt(LocalDateTime.now())
                 .build();
         notificationRepository.save(notif);
+        try {
+            messagingTemplate.convertAndSendToUser(recipientId, "/queue/notifications", notif);
+        } catch (Exception e) {
+            System.out.println("[STOMP] Khong the gui thong bao user: " + e.getMessage());
+        }
     }
 
     // =========================================
