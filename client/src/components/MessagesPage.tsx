@@ -158,12 +158,10 @@ const iceServers = {
 };
 
 const CHAT_LIST_CACHE_TTL_MS = 45_000;
-const MESSAGE_HISTORY_CACHE_TTL_MS = 90_000;
 
 type ExpiringMemoryCache<T> = Map<string, { savedAt: number; value: T }>;
 
 const chatListMemoryCache: ExpiringMemoryCache<ConversationItem[]> = new Map();
-const messageHistoryMemoryCache: ExpiringMemoryCache<MessageItem[]> = new Map();
 
 function cloneCacheValue<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -256,13 +254,6 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     if (!currentUserId || conversations.length === 0) return;
     writeExpiringCache(chatListMemoryCache, `chat-list:${currentUserId}`, conversations);
   }, [conversations, currentUserId]);
-  useEffect(() => {
-    const conversationId = messagesConversationIdRef.current;
-    if (!currentUserId || !conversationId || conversationId.startsWith("new_") || messages.length === 0) return;
-    if (selectedChatIdRef.current !== conversationId) return;
-    writeExpiringCache(messageHistoryMemoryCache, `messages:${currentUserId}:${conversationId}`, messages);
-  }, [messages, currentUserId]);
-
   const dedupConversations = (list: ConversationItem[]) => {
     const map = new Map<string, ConversationItem>();
     list.forEach((c) => {
@@ -496,6 +487,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     }
 
     setConversations((prev) => prev.filter((c) => c.id !== selectedChat.id));
+    setConversationMessages(null, []);
     setSelectedChatId(null);
     if (succeeded) toast.success("Đã từ chối tin nhắn");
     else toast.warning("Đã xóa khỏi giao diện. Backend cần deploy endpoint reject mới.");
@@ -778,6 +770,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     // Bước 2: Nếu không tìm thấy, tìm theo peerId (cho chat 1-1)
     if (idx === -1) {
       idx = updated.findIndex((c) => {
+        if (!toId(c.id).startsWith("new_")) return false;
         const cPeerId = getConversationPeerId(c);
         if (!c.type || c.type === "direct") {
           return (senderId === currentUserId && cPeerId === receiverId) || 
@@ -981,6 +974,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
 
     const existing = conversations.find((chat) => getConversationPeerId(chat) === userId || chat.id === userId);
     if (existing) {
+      setConversationMessages(existing.id, []);
       setSelectedChatId(existing.id);
       return;
     }
@@ -997,7 +991,9 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
           isOnline: Boolean(user.isOnline),
         };
         setSearchResults((prev) => prev.some((u) => toId(u.id) === toId(item.id)) ? prev : [item, ...prev]);
-        setSelectedChatId(`new_${toId(item.id)}`);
+        const newConversationId = `new_${toId(item.id)}`;
+        setConversationMessages(newConversationId, []);
+        setSelectedChatId(newConversationId);
       } catch {
         toast.error("Không thể mở hội thoại với người dùng này.");
       }
@@ -1033,15 +1029,6 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     const conversationId = selectedChatId;
     if (conversationId.startsWith("new_")) { setConversationMessages(conversationId, []); return; }
     if (!currentUserId) return;
-    const cacheKey = `messages:${currentUserId}:${conversationId}`;
-    const hasUnread = Number(selectedChat?.unread || 0) > 0;
-    const cachedMessages = hasUnread ? null : readExpiringCache(messageHistoryMemoryCache, cacheKey, MESSAGE_HISTORY_CACHE_TTL_MS);
-    if (cachedMessages) {
-      if (selectedChatIdRef.current !== conversationId) return;
-      setConversationMessages(conversationId, cachedMessages);
-      setIsLoadingMessages(false);
-      return;
-    }
     let cancelled = false;
     setConversationMessages(conversationId, []);
     const fetchMessages = async () => {
@@ -1066,9 +1053,9 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
           messageType: m.messageType,
           reactions: m.reactions || {}, userReactions: m.userReactions || {},
         }));
-        writeExpiringCache(messageHistoryMemoryCache, cacheKey, nextMessages);
         setConversationMessages(conversationId, nextMessages);
         setConversations((prev) => prev.map((c) => c.id === conversationId ? { ...c, unread: 0 } : c));
+        void api.request("POST", `/api/chat/conversations/${conversationId}/read`).catch(() => {});
       } catch {
         if (!cancelled && selectedChatIdRef.current === conversationId) {
           setConversationMessages(conversationId, []);
@@ -1120,9 +1107,6 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   };
 
   const handleRecallMessage = async (message: MessageItem) => {
-    void message;
-    toast.error("Không hỗ trợ thu hồi/xóa từng tin nhắn. Lịch sử chỉ xóa khi xóa cả cuộc hội thoại.");
-    return;
     if (message.senderId !== "me" || message.isDeleted || message.id.startsWith("temp_")) return;
     if (!window.confirm("Thu hồi tin nhắn này?")) return;
     try {
@@ -1238,6 +1222,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
         memberCount: item.memberCount,
       };
       setConversations((prev) => dedupConversations([nextChat, ...prev]));
+      setConversationMessages(nextChat.id, []);
       setSelectedChatId(nextChat.id);
       setShowCreateGroup(false);
       setGroupName("");
@@ -1403,7 +1388,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                 <button
                   key={chat.id}
                   type="button"
-                  onClick={() => { setSelectedChatId(chat.id); setShowInfo(false); }}
+                  onClick={() => { setConversationMessages(chat.id, []); setSelectedChatId(chat.id); setShowInfo(false); }}
                   style={{
                     width: "100%", display: "flex", alignItems: "center", gap: 10,
                     padding: "9px 10px", borderRadius: 12, border: "none", cursor: "pointer", textAlign: "left",
@@ -1449,7 +1434,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
             <div style={{ height: 60, background: "#fff", borderBottom: "1px solid #f0f0f0", display: "flex", alignItems: "center", padding: "0 16px", gap: 10, flexShrink: 0 }}>
               <button
                 type="button"
-                onClick={() => setSelectedChatId(null)}
+                onClick={() => { setConversationMessages(null, []); setSelectedChatId(null); }}
                 className="mobile-back-btn"
                 style={{ width: 34, height: 34, borderRadius: 10, border: "1px solid #f0f0f0", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: ORANGE }}
               >
