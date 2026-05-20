@@ -22,5 +22,12 @@ public class DatabaseEncodingInitializer implements ApplicationRunner {
         } catch (Exception e) {
             log.warn("Could not ensure utf8mb4 encoding for messages table. Apply db/tidb-utf8mb4-messages.sql manually if inserts with Vietnamese text still fail.", e);
         }
+
+        try {
+            jdbcTemplate.execute("ALTER TABLE message_reactions DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+            jdbcTemplate.execute("ALTER TABLE message_reactions MODIFY emoji VARCHAR(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL");
+        } catch (Exception e) {
+            log.warn("Could not ensure utf8mb4 encoding for message_reactions. Apply db/tidb-utf8mb4-messages.sql manually if emoji reactions still fail.", e);
+        }
     }
 }

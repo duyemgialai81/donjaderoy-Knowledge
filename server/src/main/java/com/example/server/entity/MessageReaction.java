@@ -27,7 +27,12 @@ public class MessageReaction {
     @Column(name = "user_id")
     private String userId;
 
-    @Column(name = "emoji")
+    @Column(
+            name = "emoji",
+            nullable = false,
+            length = 16,
+            columnDefinition = "varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+    )
     private String emoji; // ❤️, 😂, 👍, 😮, 😢, 🎉
 
     private LocalDateTime createdAt;

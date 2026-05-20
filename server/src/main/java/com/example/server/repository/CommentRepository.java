@@ -12,12 +12,14 @@ import java.util.List;
 public interface CommentRepository extends JpaRepository<Comment, String> {
     // Hàm này (mình vừa thêm) để lấy comment gốc của bài viết và xếp MỚI NHẤT LÊN ĐẦU
     List<Comment> findByPostIdOrderByCreatedAtDesc(String postId);
+    Page<Comment> findByPostIdOrderByCreatedAtDesc(String postId, Pageable pageable);
     Page<Comment> findByPostIdAndParentIdIsNullOrderByCreatedAtDesc(String postId, Pageable pageable);
 
     // Các hàm cũ của bạn giữ nguyên
     List<Comment> findByPostId(String postId);
     List<Comment> findByParentId(String parentId);
     List<Comment> findByAuthorId(String authorId);
+    int countByAuthorId(String authorId);
 
     // Hàm này dùng để xếp các comment trả lời (reply) theo thứ tự thời gian đọc cho thuận mắt
     List<Comment> findByParentIdOrderByCreatedAtAsc(String parentId);

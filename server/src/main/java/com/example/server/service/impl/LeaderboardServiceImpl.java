@@ -2,6 +2,7 @@ package com.example.server.service.impl;
 
 import com.example.server.entity.Badge;
 import com.example.server.entity.Leaderboard;
+import com.example.server.entity.Post;
 import com.example.server.entity.User;
 import com.example.server.model.dto.LeaderboardDTO;
 import com.example.server.model.response.ResponseObject;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
@@ -39,6 +41,7 @@ public class LeaderboardServiceImpl implements LeaderboardService {
 
     @Override
     public ResponseObject getTopUsers(int limit) {
+        updateLeaderboard();
         List<Leaderboard> topUsers = leaderboardRepository
                 .findAllByOrderByPointsDesc(PageRequest.of(0, normalizeLimit(limit)))
                 .getContent();
@@ -86,12 +89,13 @@ public class LeaderboardServiceImpl implements LeaderboardService {
         // Get all users
         List<User> allUsers = userRepository.findAll();
 
-        LocalDateTime weekAgo = LocalDateTime.now().minus(7, ChronoUnit.DAYS);
+        LocalDateTime weekAgo = LocalDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh")).minus(7, ChronoUnit.DAYS);
 
         for (User user : allUsers) {
             // Count posts this week
-            int postsThisWeek = postRepository.countByAuthorIdAndCreatedAtAfter(
+            int postsThisWeek = postRepository.countByAuthorIdAndStatusAndCreatedAtAfter(
                     user.getId(),
+                    Post.Status.published,
                     weekAgo
             );
 
@@ -129,6 +133,7 @@ public class LeaderboardServiceImpl implements LeaderboardService {
 
     @Override
     public ResponseObject getLeaderboardByMajor(String majorId, int limit) {
+        updateLeaderboard();
         List<Leaderboard> leaderboards = leaderboardRepository
                 .findByMajorIdOrderByPointsDesc(majorId, PageRequest.of(0, normalizeLimit(limit)))
                 .getContent();
@@ -142,6 +147,7 @@ public class LeaderboardServiceImpl implements LeaderboardService {
 
     @Override
     public ResponseObject getTopPostersThisWeek(int limit) {
+        updateLeaderboard();
         List<Leaderboard> topPosters = leaderboardRepository
                 .findAllByOrderByPostsThisWeekDesc(PageRequest.of(0, normalizeLimit(limit)))
                 .getContent();

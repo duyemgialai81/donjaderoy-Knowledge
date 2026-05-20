@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -57,7 +58,7 @@ public class PostLikeServiceImpl implements PostLikeService {
 
         if (postLikeRepository.existsByPostIdAndUserId(postId, userId)) {
             int currentLikesCount = syncPostLikesCount(p.get(), postId);
-            broadcastLikesCount(postId, currentLikesCount);
+            broadcastLikesCount(postId, currentLikesCount, userId, true);
             return ResponseObject.success(currentLikesCount, "Đã đồng bộ lượt thích");
         }
 
@@ -72,7 +73,7 @@ public class PostLikeServiceImpl implements PostLikeService {
         int newLikesCount = syncPostLikesCount(post, postId);
 
         // 📢 LOA STOMP: Phát ngay tổng số Like MỚI cho mọi người đang xem bài viết này
-        broadcastLikesCount(postId, newLikesCount);
+        broadcastLikesCount(postId, newLikesCount, userId, true);
 
         String authorId = post.getAuthorId();
         if (!authorId.equals(userId)) {
@@ -106,7 +107,7 @@ public class PostLikeServiceImpl implements PostLikeService {
 
         if (likes.isEmpty()) {
             int currentLikesCount = syncPostLikesCount(p.get(), postId);
-            broadcastLikesCount(postId, currentLikesCount);
+            broadcastLikesCount(postId, currentLikesCount, userId, false);
             return ResponseObject.success(currentLikesCount, "Đã đồng bộ lượt thích");
         }
 
@@ -117,7 +118,7 @@ public class PostLikeServiceImpl implements PostLikeService {
         int newLikesCount = syncPostLikesCount(post, postId);
 
         // 📢 LOA STOMP: Phát ngay tổng số Like MỚI (Bị giảm đi)
-        broadcastLikesCount(postId, newLikesCount);
+        broadcastLikesCount(postId, newLikesCount, userId, false);
 
         String authorId = post.getAuthorId();
         if (!authorId.equals(userId)) {
@@ -138,9 +139,14 @@ public class PostLikeServiceImpl implements PostLikeService {
         return safeCount;
     }
 
-    private void broadcastLikesCount(String postId, int likesCount) {
+    private void broadcastLikesCount(String postId, int likesCount, String userId, boolean isLiked) {
         try {
-            messagingTemplate.convertAndSend("/topic/post/" + postId + "/likes", likesCount);
+            messagingTemplate.convertAndSend("/topic/post/" + postId + "/likes", Map.of(
+                    "postId", postId,
+                    "likesCount", likesCount,
+                    "userId", userId,
+                    "isLiked", isLiked
+            ));
         } catch (Exception e) {
             System.out.println("Lỗi khi gửi thông báo Like bài viết qua STOMP: " + e.getMessage());
         }
@@ -181,6 +187,11 @@ public class PostLikeServiceImpl implements PostLikeService {
                 .createdAt(LocalDateTime.now())
                 .build();
         notificationRepository.save(notif);
+        try {
+            messagingTemplate.convertAndSendToUser(recipientId, "/queue/notifications", notif);
+        } catch (Exception e) {
+            System.out.println("[STOMP] Khong the gui thong bao like/badge: " + e.getMessage());
+        }
     }
 
     private void updateLeaderboard(User user) {

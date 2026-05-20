@@ -26,6 +26,7 @@ public interface PostRepository extends JpaRepository<Post, String> {
 
     int countByAuthorId(String authorId);
     int countByAuthorIdAndCreatedAtAfter(String authorId, LocalDateTime createdAt);
+    int countByAuthorIdAndStatusAndCreatedAtAfter(String authorId, Post.Status status, LocalDateTime createdAt);
 
     @Query("SELECT COALESCE(SUM(p.views), 0) FROM Post p WHERE p.authorId = :authorId")
     int sumViewsByAuthorId(@Param("authorId") String authorId);

@@ -601,6 +601,7 @@ public class UserServiceImpl implements UserService {
     @Autowired private FollowRepository followRepository;
     @Autowired private NotificationRepository notificationRepository;
     @Autowired private PostRepository postRepository;
+    @Autowired private CommentRepository commentRepository;
     @Autowired private BadgeRepository badgeRepository;
     @Autowired private UserBadgeRepository userBadgeRepository;
     @Autowired private BlockRepository blockRepository;
@@ -789,6 +790,7 @@ public class UserServiceImpl implements UserService {
         int totalPosts = postRepository.countByAuthorId(userId);
         int totalViews = postRepository.sumViewsByAuthorId(userId);
         int totalLikes = postRepository.sumLikesByAuthorId(userId);
+        int totalComments = commentRepository.countByAuthorId(userId);
         int badgesCount = userBadgeRepository.countByUserId(userId);
 
         UserStatsDTO stats = new UserStatsDTO();
@@ -797,6 +799,7 @@ public class UserServiceImpl implements UserService {
         stats.setTotalPosts(totalPosts);
         stats.setTotalViews(totalViews);
         stats.setTotalLikes(totalLikes);
+        stats.setTotalComments(totalComments);
         stats.setFollowers(user.getFollowers());
         stats.setFollowing(user.getFollowing());
         stats.setBadgesCount(badgesCount);
@@ -959,6 +962,7 @@ public class UserServiceImpl implements UserService {
         private Integer totalPosts;
         private Integer totalViews;
         private Integer totalLikes;
+        private Integer totalComments;
         private Integer followers;
         private Integer following;
         private Integer badgesCount;
@@ -977,6 +981,9 @@ public class UserServiceImpl implements UserService {
 
         public Integer getTotalLikes() { return totalLikes; }
         public void setTotalLikes(Integer totalLikes) { this.totalLikes = totalLikes; }
+
+        public Integer getTotalComments() { return totalComments; }
+        public void setTotalComments(Integer totalComments) { this.totalComments = totalComments; }
 
         public Integer getFollowers() { return followers; }
         public void setFollowers(Integer followers) { this.followers = followers; }
