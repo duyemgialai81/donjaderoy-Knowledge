@@ -94,6 +94,20 @@ export async function request(method: string, path: string, body?: any, token?: 
   return parsed;
 }
 
+async function publicGet(path: string) {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const res = await fetch(`${API_BASE}${normalizedPath}`, { method: 'GET' });
+  const parsed = await safeJson(res);
+  if (!res.ok) {
+    const message = parsed?.message || JSON.stringify(parsed || {});
+    throw new Error(`API error: ${res.status} ${message}`);
+  }
+  if (parsed && typeof parsed === 'object' && parsed.isSuccess === false) {
+    throw new Error(parsed.message || 'Backend request failed');
+  }
+  return parsed;
+}
+
 function unwrapResponse(res: any) {
   if (!res) return res;
   if (Array.isArray(res)) return res;
@@ -672,7 +686,9 @@ export async function getReportStats(token?: string) {
 
 // ==================== LEADERBOARD ====================
 export async function getOverallLeaderboard(limit = 10, token?: string) {
-  const res = await request('GET', `/api/leaderboard/top?limit=${limit}`, undefined, token);
+  const res = token
+    ? await request('GET', `/api/leaderboard/top?limit=${limit}`, undefined, token)
+    : await publicGet(`/api/leaderboard/top?limit=${limit}`);
   return unwrapResponse(res);
 }
 
@@ -687,12 +703,15 @@ export async function updateLeaderboard(token?: string) {
 }
 
 export async function getLeaderboardByMajor(majorId: string, limit = 10, token?: string) {
-  const res = await request('GET', `/api/leaderboard/major/${encodeURIComponent(majorId)}?limit=${limit}`, undefined, token);
+  const path = `/api/leaderboard/major/${encodeURIComponent(majorId)}?limit=${limit}`;
+  const res = token ? await request('GET', path, undefined, token) : await publicGet(path);
   return unwrapResponse(res);
 }
 
 export async function getTopPostersThisWeek(limit = 10, token?: string) {
-  const res = await request('GET', `/api/leaderboard/top-posters-week?limit=${limit}`, undefined, token);
+  const res = token
+    ? await request('GET', `/api/leaderboard/top-posters-week?limit=${limit}`, undefined, token)
+    : await publicGet(`/api/leaderboard/top-posters-week?limit=${limit}`);
   return unwrapResponse(res);
 }
 
