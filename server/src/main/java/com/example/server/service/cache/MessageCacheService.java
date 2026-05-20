@@ -127,8 +127,15 @@ public class MessageCacheService {
             if (cachedIds != null && !cachedIds.isEmpty()) {
                 List<Message> cachedMessages = hydrateMessages(cachedIds);
                 if (!cachedMessages.isEmpty()) {
-                    return sortAscending(cachedMessages);
+                    List<Message> scopedMessages = cachedMessages.stream()
+                            .filter(message -> conversationId.equals(message.getConversationId()))
+                            .toList();
+                    if (scopedMessages.size() == cachedMessages.size()) {
+                        return sortAscending(scopedMessages);
+                    }
+                    log.warn("Redis conversation cache contained cross-conversation message ids for {}", conversationId);
                 }
+                safeDelete(convKey);
             }
         } catch (Exception e) {
             log.warn("Redis conversation cache read failed for {}", conversationId, e);
@@ -400,6 +407,10 @@ public class MessageCacheService {
         String key = conversationMessagesKey(conversationId);
         redisTemplate.delete(key);
         for (Message message : messages) {
+            if (!conversationId.equals(message.getConversationId())) {
+                log.warn("Skipped cross-conversation message {} while rebuilding cache for {}", message.getId(), conversationId);
+                continue;
+            }
             cacheMessage(message);
             listOps.rightPush(key, message.getId());
         }

@@ -21,7 +21,6 @@ public interface MessageRepository extends JpaRepository<Message, String> {
     @Query("""
             SELECT m FROM Message m
             WHERE m.conversationId = :conversationId
-              AND (m.isDeleted = false OR m.isDeleted IS NULL)
             ORDER BY m.createdAt DESC, m.id DESC
             """)
     List<Message> findLatestVisibleMessages(@Param("conversationId") String conversationId, Pageable pageable);
@@ -29,7 +28,6 @@ public interface MessageRepository extends JpaRepository<Message, String> {
     @Query("""
             SELECT m FROM Message m
             WHERE m.conversationId = :conversationId
-              AND (m.isDeleted = false OR m.isDeleted IS NULL)
               AND (
                     m.createdAt < :beforeCreatedAt
                     OR (m.createdAt = :beforeCreatedAt AND m.id < :beforeId)

@@ -90,7 +90,10 @@ public class ChatController {
     @GetMapping("/messages/{conversationId}")
     public ResponseObject getMessages(@PathVariable String conversationId, Principal principal) {
         if (principal == null) return ResponseObject.error("Unauthorized: User not authenticated.");
-        return new ResponseObject<>(chatService.getMessagesByConversation(conversationId), "Lay lich su tin nhan thanh cong");
+        return new ResponseObject<>(
+                chatService.getMessagesByConversation(conversationId, principal.getName()),
+                "Lay lich su tin nhan thanh cong"
+        );
     }
 
     @GetMapping("/messages/{conversationId}/page")

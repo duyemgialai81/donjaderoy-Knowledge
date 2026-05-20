@@ -17,6 +17,11 @@ public interface ConversationRepository extends JpaRepository<Conversation, Stri
             WHERE c.type = 'direct'
               AND cp1.user_id = :userA
               AND cp2.user_id = :userB
+              AND (
+                  SELECT COUNT(DISTINCT cp_all.user_id)
+                  FROM conversation_participants cp_all
+                  WHERE cp_all.conversation_id = c.id
+              ) = 2
             ORDER BY c.updated_at DESC
             """, nativeQuery = true)
     List<Conversation> findDirectConversationsBetween(@Param("userA") String userA, @Param("userB") String userB);

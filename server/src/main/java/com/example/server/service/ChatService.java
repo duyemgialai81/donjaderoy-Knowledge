@@ -82,6 +82,7 @@ public class ChatService {
         } else {
             assertAcceptedParticipant(conversationId, senderId);
             if (hasText(receiverId)) {
+                assertParticipant(conversationId, receiverId);
                 assertNotBlocked(senderId, receiverId);
             }
         }
@@ -143,9 +144,10 @@ public class ChatService {
         );
     }
 
-    public List<ChatDTO.MessageResponse> getMessagesByConversation(String conversationId) {
+    public List<ChatDTO.MessageResponse> getMessagesByConversation(String conversationId, String currentUserId) {
+        assertParticipant(conversationId, currentUserId);
         return cacheService.getMessagesByConversation(conversationId, DEFAULT_MESSAGE_LIMIT).stream()
-                .map(message -> mapToMessageResponse(message, null))
+                .map(message -> mapToMessageResponse(message, currentUserId))
                 .collect(Collectors.toList());
     }
 
@@ -164,6 +166,9 @@ public class ChatService {
         if (hasText(beforeMessageId)) {
             Message cursor = cacheService.getMessage(beforeMessageId)
                     .orElseThrow(() -> new IllegalArgumentException("beforeMessageId does not exist"));
+            if (!conversationId.equals(cursor.getConversationId())) {
+                throw new IllegalArgumentException("beforeMessageId does not belong to this conversation");
+            }
             messages = cacheService.getMessagesBefore(
                     conversationId,
                     cursor.getCreatedAt(),
@@ -284,7 +289,6 @@ public class ChatService {
         LocalDateTime now = LocalDateTime.now();
         message.setIsDeleted(true);
         message.setDeletedAt(now);
-        message.setContent(null);
         Message saved = messageRepository.save(message);
         cacheService.cacheUpdatedMessage(saved);
         touchConversation(saved.getConversationId(), now);
