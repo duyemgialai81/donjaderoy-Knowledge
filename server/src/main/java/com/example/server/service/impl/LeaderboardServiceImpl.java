@@ -19,7 +19,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -54,8 +57,9 @@ public class LeaderboardServiceImpl implements LeaderboardService {
     }
 
     @Override
+    @Transactional
     public ResponseObject getUserRank(String userId) {
-        Optional<Leaderboard> leaderboard = leaderboardRepository.findByUserId(userId);
+        Optional<Leaderboard> leaderboard = findPrimaryLeaderboard(userId);
 
         if (leaderboard.isEmpty()) {
             // If user not in leaderboard yet, create entry
@@ -76,7 +80,7 @@ public class LeaderboardServiceImpl implements LeaderboardService {
             leaderboardRepository.save(lb);
 
             recalculateRanks();
-            leaderboard = leaderboardRepository.findByUserId(userId);
+            leaderboard = findPrimaryLeaderboard(userId);
         }
 
         LeaderboardDTO dto = convertToDTO(leaderboard.get());
@@ -86,6 +90,7 @@ public class LeaderboardServiceImpl implements LeaderboardService {
     @Override
     @Transactional
     public ResponseObject updateLeaderboard() {
+        deduplicateLeaderboardRows();
         // Get all users
         List<User> allUsers = userRepository.findAll();
 
@@ -100,7 +105,7 @@ public class LeaderboardServiceImpl implements LeaderboardService {
             );
 
             // Find or create leaderboard entry
-            Optional<Leaderboard> existing = leaderboardRepository.findByUserId(user.getId());
+            Optional<Leaderboard> existing = findPrimaryLeaderboard(user.getId());
 
             if (existing.isPresent()) {
                 Leaderboard lb = existing.get();
@@ -168,6 +173,7 @@ public class LeaderboardServiceImpl implements LeaderboardService {
      */
     @Transactional
     public void recalculateRanks() {
+        deduplicateLeaderboardRows();
         List<Leaderboard> all = leaderboardRepository.findAllByOrderByPointsDesc();
         int rank = 1;
         for (Leaderboard lb : all) {
@@ -231,5 +237,40 @@ public class LeaderboardServiceImpl implements LeaderboardService {
             return 10;
         }
         return Math.min(limit, MAX_LIMIT);
+    }
+
+    private Optional<Leaderboard> findPrimaryLeaderboard(String userId) {
+        List<Leaderboard> rows = leaderboardRepository.findAllByUserIdOrderByIdAsc(userId);
+        if (rows.isEmpty()) {
+            return Optional.empty();
+        }
+        Leaderboard primary = rows.get(0);
+        if (rows.size() > 1) {
+            leaderboardRepository.deleteAll(rows.subList(1, rows.size()));
+        }
+        return Optional.of(primary);
+    }
+
+    private void deduplicateLeaderboardRows() {
+        List<Leaderboard> all = leaderboardRepository.findAllByOrderByPointsDesc();
+        Map<String, Leaderboard> primaryByUser = new LinkedHashMap<>();
+        List<Leaderboard> duplicates = new ArrayList<>();
+
+        for (Leaderboard row : all) {
+            String userId = row.getUserId();
+            if (userId == null || userId.isBlank()) {
+                duplicates.add(row);
+                continue;
+            }
+            if (primaryByUser.containsKey(userId)) {
+                duplicates.add(row);
+                continue;
+            }
+            primaryByUser.put(userId, row);
+        }
+
+        if (!duplicates.isEmpty()) {
+            leaderboardRepository.deleteAll(duplicates);
+        }
     }
 }

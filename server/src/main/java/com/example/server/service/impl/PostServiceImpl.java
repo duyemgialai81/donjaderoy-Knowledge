@@ -334,7 +334,7 @@ public class PostServiceImpl implements PostService {
     // Update leaderboard
     private void updateLeaderboard(User user) {
         // Find or create leaderboard entry
-        Optional<Leaderboard> existing = leaderboardRepository.findByUserId(user.getId());
+        Optional<Leaderboard> existing = findPrimaryLeaderboard(user.getId());
 
         if (existing.isPresent()) {
             Leaderboard lb = existing.get();
@@ -351,6 +351,17 @@ public class PostServiceImpl implements PostService {
 
         // Do not recalculate every rank on each write; that becomes O(n) at large scale.
         // Leaderboard refresh can run as a batch job or through the dedicated admin update endpoint.
+    }
+
+    private Optional<Leaderboard> findPrimaryLeaderboard(String userId) {
+        List<Leaderboard> rows = leaderboardRepository.findAllByUserIdOrderByIdAsc(userId);
+        if (rows.isEmpty()) {
+            return Optional.empty();
+        }
+        if (rows.size() > 1) {
+            leaderboardRepository.deleteAll(rows.subList(1, rows.size()));
+        }
+        return Optional.of(rows.get(0));
     }
 
     // Recalculate all ranks

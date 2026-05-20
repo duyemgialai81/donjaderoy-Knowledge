@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.security.Principal;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -158,6 +159,26 @@ public class ChatController {
         try {
             chatService.rejectConversationRequest(conversationId, principal.getName());
             return new ResponseObject<>(true, "Da tu choi tin nhan");
+        } catch (Exception e) {
+            return ResponseObject.error(e.getMessage());
+        }
+    }
+
+    @PutMapping("/conversations/{conversationId}/background")
+    public ResponseObject updateConversationBackground(
+            @PathVariable String conversationId,
+            @RequestBody ChatDTO.ConversationBackgroundRequest request,
+            Principal principal
+    ) {
+        if (principal == null) return ResponseObject.error("Unauthorized: User not authenticated.");
+        try {
+            ChatDTO.ConversationItem item = chatService.updateConversationBackground(conversationId, principal.getName(), request);
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("id", conversationId);
+            payload.put("backgroundId", item.getBackgroundId());
+            payload.put("backgroundUrl", item.getBackgroundUrl());
+            broadcastToConversation(conversationId, "/queue/conversation-updates", payload);
+            return new ResponseObject<>(item, "Da cap nhat nen hoi thoai");
         } catch (Exception e) {
             return ResponseObject.error(e.getMessage());
         }

@@ -195,7 +195,7 @@ public class PostLikeServiceImpl implements PostLikeService {
     }
 
     private void updateLeaderboard(User user) {
-        Optional<Leaderboard> existing = leaderboardRepository.findByUserId(user.getId());
+        Optional<Leaderboard> existing = findPrimaryLeaderboard(user.getId());
 
         if (existing.isPresent()) {
             Leaderboard lb = existing.get();
@@ -210,6 +210,17 @@ public class PostLikeServiceImpl implements PostLikeService {
             leaderboardRepository.save(lb);
         }
         recalculateLeaderboardRanks();
+    }
+
+    private Optional<Leaderboard> findPrimaryLeaderboard(String userId) {
+        List<Leaderboard> rows = leaderboardRepository.findAllByUserIdOrderByIdAsc(userId);
+        if (rows.isEmpty()) {
+            return Optional.empty();
+        }
+        if (rows.size() > 1) {
+            leaderboardRepository.deleteAll(rows.subList(1, rows.size()));
+        }
+        return Optional.of(rows.get(0));
     }
 
     private void recalculateLeaderboardRanks() {

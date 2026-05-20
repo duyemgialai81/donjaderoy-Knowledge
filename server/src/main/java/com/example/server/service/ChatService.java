@@ -39,8 +39,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ChatService {
 
-    private static final int DEFAULT_MESSAGE_LIMIT = 50;
-    private static final int MAX_MESSAGE_LIMIT = 100;
+    private static final int DEFAULT_MESSAGE_LIMIT = 100;
+    private static final int MAX_MESSAGE_LIMIT = 200;
 
     private final ConversationRepository conversationRepository;
     private final ConversationParticipantRepository participantRepository;
@@ -367,6 +367,38 @@ public class ChatService {
         invalidateConversationListCaches(conversationId);
     }
 
+    @Transactional
+    public ChatDTO.ConversationItem updateConversationBackground(
+            String conversationId,
+            String userId,
+            ChatDTO.ConversationBackgroundRequest request
+    ) {
+        if (!hasText(conversationId)) {
+            throw new IllegalArgumentException("conversationId is required");
+        }
+        assertParticipant(conversationId, userId);
+
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new IllegalArgumentException("Conversation does not exist"));
+
+        String backgroundId = request != null && hasText(request.getBackgroundId())
+                ? request.getBackgroundId().trim()
+                : "soft";
+        String backgroundUrl = request != null && hasText(request.getBackgroundUrl())
+                ? request.getBackgroundUrl().trim()
+                : null;
+
+        conversation.setBackgroundId(backgroundId);
+        conversation.setBackgroundUrl(backgroundUrl);
+        conversation.setUpdatedAt(LocalDateTime.now());
+        conversationRepository.save(conversation);
+        invalidateConversationListCaches(conversationId);
+
+        ConversationParticipant participant = participantRepository.findById(new ConversationParticipantId(conversationId, userId))
+                .orElseThrow(() -> new IllegalArgumentException("User is not a participant of this conversation"));
+        return buildConversationItem(userId, participant);
+    }
+
     public Set<String> getParticipantIds(String conversationId) {
         return participantRepository.findByConversationId(conversationId).stream()
                 .map(ConversationParticipant::getUserId)
@@ -407,6 +439,8 @@ public class ChatService {
         if (conversation != null) {
             item.setType(conversation.getType() != null ? conversation.getType().name() : "direct");
             item.setUpdatedAt(conversation.getUpdatedAt());
+            item.setBackgroundId(conversation.getBackgroundId());
+            item.setBackgroundUrl(conversation.getBackgroundUrl());
             if (conversation.getType() == Conversation.ConversationType.direct) {
                 fillDirectConversationTarget(item, userId, participants);
             } else {

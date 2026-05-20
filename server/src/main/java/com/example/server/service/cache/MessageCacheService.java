@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
 public class MessageCacheService {
 
     private static final int MAX_CACHED_MESSAGES_PER_CONVERSATION = 1000;
-    private static final int MAX_MESSAGE_PAGE_SIZE = 101;
+    private static final int MAX_MESSAGE_PAGE_SIZE = 201;
 
     private static final String KEY_MESSAGE = "chat:message:";
     private static final String KEY_CONVERSATION_MESSAGES = "chat:conversation:messages:";
@@ -120,27 +120,6 @@ public class MessageCacheService {
 
     public List<Message> getMessagesByConversation(String conversationId, int limit) {
         int safeLimit = normalizeLimit(limit);
-        String convKey = conversationMessagesKey(conversationId);
-        try {
-            List<Object> cachedIds = listOps.range(convKey, -safeLimit, -1);
-
-            if (cachedIds != null && !cachedIds.isEmpty()) {
-                List<Message> cachedMessages = hydrateMessages(cachedIds);
-                if (!cachedMessages.isEmpty()) {
-                    List<Message> scopedMessages = cachedMessages.stream()
-                            .filter(message -> conversationId.equals(message.getConversationId()))
-                            .toList();
-                    if (scopedMessages.size() == cachedMessages.size()) {
-                        return sortAscending(scopedMessages);
-                    }
-                    log.warn("Redis conversation cache contained cross-conversation message ids for {}", conversationId);
-                }
-                safeDelete(convKey);
-            }
-        } catch (Exception e) {
-            log.warn("Redis conversation cache read failed for {}", conversationId, e);
-        }
-
         List<Message> latestDesc = messageRepository.findLatestVisibleMessages(
                 conversationId,
                 PageRequest.of(0, safeLimit)

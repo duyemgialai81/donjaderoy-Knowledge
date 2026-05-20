@@ -22,6 +22,11 @@ public class Conversation {
     private String name; // Null nếu là direct (1-1)
     private String createdBy; // Admin tạo nhóm
 
+    private String backgroundId;
+
+    @Column(length = 1024)
+    private String backgroundUrl;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

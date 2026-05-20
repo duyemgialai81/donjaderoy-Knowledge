@@ -9,11 +9,10 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
-import java.util.Optional;
 
 @Repository
 public interface LeaderboardRepository extends JpaRepository<Leaderboard, Long> {
-    Optional<Leaderboard> findByUserId(String userId);
+    List<Leaderboard> findAllByUserIdOrderByIdAsc(String userId);
     List<Leaderboard> findAllByOrderByPointsDesc();
     Page<Leaderboard> findAllByOrderByPointsDesc(Pageable pageable);
     Page<Leaderboard> findAllByOrderByPostsThisWeekDesc(Pageable pageable);

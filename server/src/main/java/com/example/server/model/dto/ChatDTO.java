@@ -133,10 +133,21 @@ public class ChatDTO {
         private String status;                  // "accepted", "pending", "blocked"
         private int unreadCount;                // Số tin chưa đọc
 
+        private String backgroundId;
+        private String backgroundUrl;
+
         // Metadata (optional)
         private LocalDateTime updatedAt;        // Last activity time
         private Boolean isMuted;                // User có mute conversation này không
         private Boolean isPinned;               // User có pin conversation này không
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ConversationBackgroundRequest {
+        private String backgroundId;
+        private String backgroundUrl;
     }
 
     // ==================== REACTION (Discord-style) ====================
