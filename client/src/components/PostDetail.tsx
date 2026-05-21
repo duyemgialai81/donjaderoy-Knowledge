@@ -9,7 +9,7 @@ import api from "../lib/api";
 import { useAuth } from "../lib/authContext";
 import { toast } from "sonner";
 import { Client } from '@stomp/stompjs';
-import { createSockJsConnection } from "../lib/realtime";
+import { createRealtimeConnection } from "../lib/realtime";
 import { formatVietnamDistance, parseAppDate } from "../lib/time";
 
 // Hàm xử lý thời gian chuẩn để sửa lỗi Java trả về mảng [2026, 4, 24...]
@@ -213,7 +213,7 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
 
     const token = localStorage.getItem('ksp_auth_token') || "";
     const client = new Client({
-      webSocketFactory: () => createSockJsConnection(),
+      webSocketFactory: () => createRealtimeConnection(),
       connectHeaders: { Authorization: `Bearer ${token}` },
       debug: () => {}, 
       onConnect: () => {

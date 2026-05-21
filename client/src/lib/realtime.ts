@@ -1,4 +1,3 @@
-import SockJS from "sockjs-client";
 import api from "./api";
 
 export const REALTIME_NOTIFICATION_EVENT = "ksp:realtime-notification";
@@ -17,10 +16,8 @@ export interface RealtimeNotificationDetail {
   payload?: unknown;
 }
 
-export function createSockJsConnection() {
-  return new SockJS(api.getWebSocketUrl(), undefined, {
-    transports: ["xhr-streaming", "xhr-polling"],
-  });
+export function createRealtimeConnection() {
+  return new WebSocket(api.getNativeWebSocketUrl());
 }
 
 export function emitRealtimeNotification(detail: RealtimeNotificationDetail) {

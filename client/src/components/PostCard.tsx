@@ -8,7 +8,7 @@ import { useAuth } from "../lib/authContext";
 import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 import { Client } from '@stomp/stompjs';
-import { createSockJsConnection } from "../lib/realtime";
+import { createRealtimeConnection } from "../lib/realtime";
 import { formatVietnamDistance } from "../lib/time";
 
 interface PostCardProps {
@@ -138,7 +138,7 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
   useEffect(() => {
     const token = localStorage.getItem('ksp_auth_token') || "";
     const client = new Client({
-      webSocketFactory: () => createSockJsConnection(),
+      webSocketFactory: () => createRealtimeConnection(),
       connectHeaders: { Authorization: `Bearer ${token}` },
       debug: () => {},
       onConnect: () => {

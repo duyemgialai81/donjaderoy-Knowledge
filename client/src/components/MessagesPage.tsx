@@ -41,7 +41,7 @@ import {
 import { toast } from "sonner";
 import api, { normalizeAssetUrl, normalizeAvatarUrl } from "../lib/api";
 import { localStorage_service } from "../lib/localStorage";
-import { clearPendingCall, createSockJsConnection, INCOMING_CALL_EVENT, readPendingCall } from "../lib/realtime";
+import { clearPendingCall, createRealtimeConnection, INCOMING_CALL_EVENT, readPendingCall } from "../lib/realtime";
 import { formatVietnamTime } from "../lib/time";
 
 // ==================== INTERFACES ====================
@@ -924,7 +924,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     if (stompClientRef.current?.active) stompClientRef.current.deactivate();
 
     const client = new Client({
-      webSocketFactory: () => createSockJsConnection(),
+      webSocketFactory: () => createRealtimeConnection(),
       connectHeaders: { Authorization: `Bearer ${token}` },
       reconnectDelay: 5000, heartbeatIncoming: 10000, heartbeatOutgoing: 10000,
       onStompError: (f) => console.error("[STOMP Error]", f),

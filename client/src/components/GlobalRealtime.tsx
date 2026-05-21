@@ -7,7 +7,7 @@ import { useAuth } from "../lib/authContext";
 import { localStorage_service } from "../lib/localStorage";
 import {
   clearPendingCall,
-  createSockJsConnection,
+  createRealtimeConnection,
   emitIncomingCall,
   emitRealtimeNotification,
   savePendingCall,
@@ -117,7 +117,7 @@ export function GlobalRealtime() {
     };
 
     const client = new Client({
-      webSocketFactory: () => createSockJsConnection(),
+      webSocketFactory: () => createRealtimeConnection(),
       connectHeaders: { Authorization: `Bearer ${token}` },
       reconnectDelay: 5000,
       heartbeatIncoming: 10000,

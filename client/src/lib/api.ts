@@ -20,8 +20,23 @@ function normalizeHttpUrl(value?: string) {
 export const API_BASE = normalizeHttpUrl(import.meta.env.VITE_API_URL);
 export const WS_BASE = normalizeHttpUrl(import.meta.env.VITE_WS_URL || `${API_BASE}/ws`);
 
+function normalizeWsUrl(value?: string) {
+  const httpUrl = normalizeHttpUrl(value);
+  return httpUrl.startsWith('https://')
+    ? `wss://${httpUrl.slice('https://'.length)}`
+    : httpUrl.startsWith('http://')
+      ? `ws://${httpUrl.slice('http://'.length)}`
+      : httpUrl;
+}
+
+export const WS_NATIVE_BASE = normalizeWsUrl(import.meta.env.VITE_WS_NATIVE_URL || `${API_BASE}/ws-native`);
+
 export function getWebSocketUrl() {
   return WS_BASE;
+}
+
+export function getNativeWebSocketUrl() {
+  return WS_NATIVE_BASE;
 }
 
 export function normalizeAssetUrl(value?: string) {
@@ -767,6 +782,7 @@ export default {
   // Core
   request,
   getWebSocketUrl,
+  getNativeWebSocketUrl,
   normalizeAvatarUrl,
   
   // Auth
