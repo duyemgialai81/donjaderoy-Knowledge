@@ -39,6 +39,7 @@ public class MessageCacheService {
 
     private static final int MAX_CACHED_MESSAGES_PER_CONVERSATION = 1000;
     private static final int MAX_MESSAGE_PAGE_SIZE = 201;
+    private static final int DEFAULT_CONVERSATION_CACHE_WINDOW = 100;
 
     private static final String KEY_MESSAGE = "chat:message:";
     private static final String KEY_CONVERSATION_MESSAGES = "chat:conversation:messages:";
@@ -126,13 +127,14 @@ public class MessageCacheService {
             if (cachedIds != null && !cachedIds.isEmpty()) {
                 List<Message> cachedMessages = hydrateMessages(cachedIds);
                 long expectedMessageCount = cachedIds.stream().filter(id -> id != null).count();
+                long cachedWindowSize = Optional.ofNullable(listOps.size(convKey)).orElse(expectedMessageCount);
                 boolean cacheComplete = cachedMessages.size() == expectedMessageCount;
                 boolean scopedToConversation = cachedMessages.stream()
                         .allMatch(message -> conversationId.equals(message.getConversationId()));
-                boolean cacheHasFullRequestedWindow = expectedMessageCount >= safeLimit;
-                if (!cacheHasFullRequestedWindow) {
+                boolean cacheHasFullRequestedWindow = cachedWindowSize >= safeLimit;
+                if (cachedWindowSize < Math.max(safeLimit, DEFAULT_CONVERSATION_CACHE_WINDOW)) {
                     long dbMessageCount = messageRepository.countByConversationId(conversationId);
-                    cacheHasFullRequestedWindow = dbMessageCount <= expectedMessageCount;
+                    cacheHasFullRequestedWindow = dbMessageCount <= cachedWindowSize;
                 }
 
                 if (cacheComplete && scopedToConversation && cacheHasFullRequestedWindow) {
@@ -143,7 +145,7 @@ public class MessageCacheService {
                 log.warn(
                         "Redis conversation cache incomplete for {}. expected={}, hydrated={}, scoped={}, fullWindow={}",
                         conversationId,
-                        expectedMessageCount,
+                        cachedWindowSize,
                         cachedMessages.size(),
                         scopedToConversation,
                         cacheHasFullRequestedWindow
@@ -154,9 +156,10 @@ public class MessageCacheService {
             log.warn("Redis conversation cache read failed for {}", conversationId, e);
         }
 
+        int cacheWarmupLimit = Math.max(safeLimit, DEFAULT_CONVERSATION_CACHE_WINDOW);
         List<Message> latestDesc = messageRepository.findLatestVisibleMessages(
                 conversationId,
-                PageRequest.of(0, safeLimit)
+                PageRequest.of(0, cacheWarmupLimit)
         );
         List<Message> latestAsc = reverseToAscending(latestDesc);
         try {
@@ -164,7 +167,7 @@ public class MessageCacheService {
         } catch (Exception e) {
             log.warn("Redis conversation cache rebuild failed for {}", conversationId, e);
         }
-        return latestAsc;
+        return takeLast(latestAsc, safeLimit);
     }
 
     public List<Message> getMessagesBefore(String conversationId, LocalDateTime beforeCreatedAt, String beforeId, int limit) {
@@ -489,6 +492,13 @@ public class MessageCacheService {
         return messages.stream()
                 .sorted(Comparator.comparing(Message::getCreatedAt).thenComparing(Message::getId))
                 .toList();
+    }
+
+    private List<Message> takeLast(List<Message> messages, int limit) {
+        if (messages.size() <= limit) {
+            return messages;
+        }
+        return messages.subList(messages.size() - limit, messages.size());
     }
 
     private void decrementReactionCount(String messageId, String emoji) {

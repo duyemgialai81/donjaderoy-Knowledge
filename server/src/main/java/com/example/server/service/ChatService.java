@@ -28,8 +28,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -146,9 +148,10 @@ public class ChatService {
 
     public List<ChatDTO.MessageResponse> getMessagesByConversation(String conversationId, String currentUserId) {
         assertParticipant(conversationId, currentUserId);
-        return cacheService.getMessagesByConversation(conversationId, DEFAULT_MESSAGE_LIMIT).stream()
-                .map(message -> mapToMessageResponse(message, currentUserId))
-                .collect(Collectors.toList());
+        return mapToMessageResponses(
+                cacheService.getMessagesByConversation(conversationId, DEFAULT_MESSAGE_LIMIT),
+                currentUserId
+        );
     }
 
     public ChatDTO.MessagePageResponse getMessagesByConversationPage(
@@ -157,6 +160,7 @@ public class ChatService {
             int limit,
             String currentUserId
     ) {
+        long startedAtNanos = System.nanoTime();
         assertParticipant(conversationId, currentUserId);
 
         int pageSize = normalizeLimit(limit);
@@ -185,18 +189,28 @@ public class ChatService {
             pageMessages.remove(0);
         }
 
-        List<ChatDTO.MessageResponse> responseMessages = pageMessages.stream()
-                .map(message -> mapToMessageResponse(message, currentUserId))
-                .collect(Collectors.toList());
+        List<ChatDTO.MessageResponse> responseMessages = mapToMessageResponses(pageMessages, currentUserId);
 
         Message nextCursor = pageMessages.isEmpty() ? null : pageMessages.get(0);
-        return ChatDTO.MessagePageResponse.builder()
+        ChatDTO.MessagePageResponse response = ChatDTO.MessagePageResponse.builder()
                 .messages(responseMessages)
                 .nextBeforeMessageId(hasMore && nextCursor != null ? nextCursor.getId() : null)
                 .nextBeforeCreatedAt(hasMore && nextCursor != null ? nextCursor.getCreatedAt() : null)
                 .hasMore(hasMore)
                 .limit(pageSize)
                 .build();
+        long elapsedMs = (System.nanoTime() - startedAtNanos) / 1_000_000;
+        if (elapsedMs > 1500) {
+            log.warn(
+                    "Slow message page load conversation={} before={} requestedLimit={} returned={} elapsedMs={}",
+                    conversationId,
+                    beforeMessageId,
+                    pageSize,
+                    responseMessages.size(),
+                    elapsedMs
+            );
+        }
+        return response;
     }
 
     public ChatDTO.MessageResponse getMessageWithReactions(String messageId, String currentUserId) {
@@ -606,13 +620,70 @@ public class ChatService {
         };
     }
 
+    private List<ChatDTO.MessageResponse> mapToMessageResponses(List<Message> messages, String currentUserId) {
+        if (messages == null || messages.isEmpty()) {
+            return List.of();
+        }
+
+        Set<String> senderIds = messages.stream()
+                .map(Message::getSenderId)
+                .filter(this::hasText)
+                .collect(Collectors.toSet());
+        Map<String, User> usersById = new HashMap<>();
+        userRepository.findAllById(senderIds).forEach(user -> usersById.put(user.getId(), user));
+
+        List<String> messageIds = messages.stream()
+                .map(Message::getId)
+                .filter(this::hasText)
+                .toList();
+        Map<String, Map<String, Long>> reactionCountsByMessage = new HashMap<>();
+        Map<String, Map<String, Boolean>> userReactionsByMessage = new HashMap<>();
+        if (currentUserId != null && !messageIds.isEmpty()) {
+            for (com.example.server.entity.MessageReaction reaction : messageReactionRepository.findByMessageIdIn(messageIds)) {
+                if (!hasText(reaction.getMessageId()) || !hasText(reaction.getEmoji())) {
+                    continue;
+                }
+                reactionCountsByMessage
+                        .computeIfAbsent(reaction.getMessageId(), ignored -> new HashMap<>())
+                        .merge(reaction.getEmoji(), 1L, Long::sum);
+                if (currentUserId.equals(reaction.getUserId())) {
+                    userReactionsByMessage
+                            .computeIfAbsent(reaction.getMessageId(), ignored -> new HashMap<>())
+                            .put(reaction.getEmoji(), true);
+                }
+            }
+        }
+
+        return messages.stream()
+                .map(message -> mapToMessageResponse(
+                        message,
+                        usersById.get(message.getSenderId()),
+                        reactionCountsByMessage.get(message.getId()),
+                        userReactionsByMessage.get(message.getId())
+                ))
+                .collect(Collectors.toList());
+    }
+
     private ChatDTO.MessageResponse mapToMessageResponse(Message message, String currentUserId) {
+        List<ChatDTO.MessageResponse> responses = mapToMessageResponses(List.of(message), currentUserId);
+        if (responses.isEmpty()) {
+            return null;
+        }
+        return responses.get(0);
+    }
+
+    private ChatDTO.MessageResponse mapToMessageResponse(
+            Message message,
+            User sender,
+            Map<String, Long> reactionCounts,
+            Map<String, Boolean> userReactions
+    ) {
         ChatDTO.MessageResponse response = ChatDTO.MessageResponse.builder()
                 .id(message.getId())
                 .conversationId(message.getConversationId())
                 .senderId(message.getSenderId())
-                .senderName(userRepository.findById(message.getSenderId()).map(User::getName).orElse(null))
-                .senderAvatar(userRepository.findById(message.getSenderId()).map(User::getAvatar).orElse(null))
+                .senderName(sender != null ? sender.getName() : null)
+                .senderAvatar(sender != null ? sender.getAvatar() : null)
                 .content(message.getContent())
                 .messageType(message.getMessageType() != null ? message.getMessageType().name() : "text")
                 .createdAt(message.getCreatedAt())
@@ -625,10 +696,8 @@ public class ChatService {
                 .attachmentSize(message.getAttachmentSize())
                 .build();
 
-        if (currentUserId != null) {
-            response.setReactions(cacheService.getReactionCounts(message.getId()));
-            response.setUserReactions(cacheService.getUserReactions(message.getId(), currentUserId));
-        }
+        response.setReactions(reactionCounts != null ? reactionCounts : Map.of());
+        response.setUserReactions(userReactions != null ? userReactions : Map.of());
         return response;
     }
 

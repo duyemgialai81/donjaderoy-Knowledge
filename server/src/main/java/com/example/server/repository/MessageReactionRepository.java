@@ -17,6 +17,8 @@ public interface MessageReactionRepository extends JpaRepository<MessageReaction
 
     List<MessageReaction> findByMessageId(String messageId);
 
+    List<MessageReaction> findByMessageIdIn(List<String> messageIds);
+
     @Query("SELECT DISTINCT mr.emoji FROM MessageReaction mr WHERE mr.messageId = :messageId")
     List<String> findDistinctEmojisByMessageId(String messageId);
 
