@@ -152,18 +152,26 @@ const formatCallDuration = (seconds: number) => {
   return `${mins}:${secs}`;
 };
 
-const iceServers = {
+const iceServers: RTCConfiguration = {
+  iceCandidatePoolSize: 10,
   iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
-    { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
-    { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+    { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
+    {
+      urls: [
+        "turn:openrelay.metered.ca:80",
+        "turn:openrelay.metered.ca:443",
+        "turn:openrelay.metered.ca:443?transport=tcp",
+        "turns:openrelay.metered.ca:443?transport=tcp",
+      ],
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
   ],
 };
 
 const CHAT_LIST_CACHE_TTL_MS = 45_000;
-const CALL_CONNECT_TIMEOUT_MS = 45_000;
-const CALL_DISCONNECT_GRACE_MS = 12_000;
+const CALL_CONNECT_TIMEOUT_MS = 90_000;
+const CALL_DISCONNECT_GRACE_MS = 30_000;
 
 type ExpiringMemoryCache<T> = Map<string, { savedAt: number; value: T }>;
 
@@ -406,6 +414,18 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     return Boolean(selPeerId && evPeerId && selPeerId === evPeerId);
   };
 
+  const resolveCallConversationId = (peerId: string, preferredConversationId?: string | null) => {
+    const preferred = toId(preferredConversationId);
+    if (preferred && !preferred.startsWith("new_")) return preferred;
+    const selected = toId(selectedChatIdRef.current);
+    if (selected && !selected.startsWith("new_")) {
+      const selectedConversation = conversationsRef.current.find((c) => toId(c.id) === selected);
+      if (selectedConversation && getConversationPeerId(selectedConversation) === peerId) return selected;
+    }
+    const found = conversationsRef.current.find((c) => getConversationPeerId(c) === peerId);
+    return found && !found.id.startsWith("new_") ? found.id : "";
+  };
+
   const selectedChat = useMemo(() => {
     if (!selectedChatId) return null;
     return [
@@ -629,13 +649,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   const sendCallSignal = (type: string, signalData: any = null, targetId: string, callId: string, callMode: CallMode) => {
     if (!stompClientRef.current?.connected) return;
     const sessionConvId = callSessionRef.current?.id === callId ? callSessionRef.current.conversationId : undefined;
-    let convId = sessionConvId !== undefined
-      ? sessionConvId
-      : selectedChatIdRef.current?.startsWith("new_") ? "" : selectedChatIdRef.current || "";
-    if (!convId && (type === "end" || type === "reject")) {
-      const found = conversationsRef.current.find((c) => getConversationPeerId(c) === targetId);
-      if (found && !found.id.startsWith("new_")) convId = found.id;
-    }
+    const convId = resolveCallConversationId(targetId, sessionConvId);
     stompClientRef.current.publish({
       destination: "/app/chat.call",
       body: JSON.stringify({ callId, conversationId: convId, receiverId: targetId, type, callType: callMode, signalData }),
@@ -659,14 +673,11 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
       : (session.elapsedSeconds === 0 || reason === "missed")
       ? (session.mode === "video" ? "📹 Cuộc gọi video nhỡ" : "📞 Cuộc gọi thoại nhỡ")
       : `📞 Cuộc gọi kết thúc. Thời lượng: ${formatCallDuration(session.elapsedSeconds)}`;
-    let convId = selectedChatIdRef.current?.startsWith("new_") ? "" : selectedChatIdRef.current;
-    if (!convId) {
-      const found = conversationsRef.current.find((c) => getConversationPeerId(c) === session.peerId);
-      if (found && !found.id.startsWith("new_")) convId = found.id;
-    }
+    const convId = resolveCallConversationId(session.peerId, session.conversationId);
+    if (!convId) return;
     stompClientRef.current.publish({
       destination: "/app/chat.sendMessage",
-      body: JSON.stringify({ conversationId: convId || "", receiverId: session.peerId, content: logText, messageType: "text" }),
+      body: JSON.stringify({ conversationId: convId, receiverId: session.peerId, content: logText, messageType: "call_log" }),
     });
   };
 
@@ -682,9 +693,6 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
         if (remoteAudioRef.current) { remoteAudioRef.current.srcObject = e.streams[0]; remoteAudioRef.current.play().catch(() => {}); }
       }
     };
-    pc.oniceconnectionstatechange = () => {
-      if (pc.iceConnectionState === "failed") { toast.error("Kết nối thất bại"); closeCall(true); }
-    };
     const handleConnectionState = () => {
       const state = pc.connectionState;
       const iceState = pc.iceConnectionState;
@@ -698,6 +706,12 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
           if (peerConnectionRef.current !== pc) return;
           const currentState = pc.connectionState;
           const currentIceState = pc.iceConnectionState;
+          if (currentState === "connected" || currentIceState === "connected" || currentIceState === "completed") {
+            markCallActive(callId);
+            return;
+          }
+          const currentSession = callSessionRef.current;
+          if (currentSession?.id === callId && currentSession.status === "connecting") return;
           if (currentState === "failed" || currentIceState === "failed" || currentState === "disconnected" || currentIceState === "disconnected") {
             toast.error("Ket noi cuoc goi bi gian doan.");
             closeCall(true);
@@ -827,9 +841,10 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
       if (s.mode === "video" && stream.getVideoTracks().length > 0) cameraStreamRef.current = stream.clone();
       if (localVideoRef.current) { localVideoRef.current.srcObject = stream; localVideoRef.current.play().catch(() => {}); }
       const pc = createPeerConnection(s.peerId, s.id, s.mode);
-      const next = { ...s, status: "active" as CallStatus, startedAt: Date.now() };
+      const next = { ...s, status: "connecting" as CallStatus, startedAt: null };
       callSessionRef.current = next; setCallSession(next);
       sendCallSignal("accept", null, s.peerId, s.id, s.mode);
+      scheduleCallConnectTimeout(s.id);
       if (incomingOfferRef.current) {
         await pc.setRemoteDescription(new RTCSessionDescription(incomingOfferRef.current));
         incomingOfferRef.current = null;
@@ -1080,6 +1095,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
             clearPendingCall();
             const caller = conversationsRef.current.find((c) => getConversationPeerId(c) === toId(senderId));
             const incoming: CallSession = { id: callId, mode: callType, status: "incoming", startedAt: null, elapsedSeconds: 0, isMuted: false, isCameraOff: callType === "audio", isScreenSharing: false, cameraFacing: "user", isSpeakerOn: true, peerId: toId(senderId), peerName: caller?.name || "Người gọi", peerAvatar: caller?.avatar || getAvatarUrl("", senderId), hasMediaPermission: true, error: null };
+            incoming.conversationId = toId(ev.conversationId);
             callSessionRef.current = incoming; setCallSession(incoming);
           } else if (type === "offer" && parsed) {
             if (!callSessionRef.current) {
@@ -1096,7 +1112,10 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                 iceCandidateQueueRef.current = [];
                 return pc.createAnswer();
               }).then((ans) => pc.setLocalDescription(ans)).then(() => {
-                if (pc.localDescription) sendCallSignal("answer", { type: pc.localDescription.type, sdp: pc.localDescription.sdp }, toId(senderId), callId, callType);
+                if (pc.localDescription) {
+                  sendCallSignal("answer", { type: pc.localDescription.type, sdp: pc.localDescription.sdp }, toId(senderId), callId, callType);
+                  markCallActive(normalizedCallId);
+                }
               }).catch(console.error);
             }
           } else if (type === "answer" && parsed && peerConnectionRef.current) {
