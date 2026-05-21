@@ -221,6 +221,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   const [typingUsers, setTypingUsers] = useState<Record<string, boolean>>({});
   const [callSession, setCallSession] = useState<CallSession | null>(null);
   const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
+  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   const [isAcceptingRequest, setIsAcceptingRequest] = useState(false);
   const [chatBackgroundId, setChatBackgroundId] = useState(() => {
     try {
@@ -251,6 +252,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
   const remoteStreamRef = useRef<MediaStream | null>(null);
   const incomingOfferRef = useRef<RTCSessionDescriptionInit | null>(null);
   const iceCandidateQueueRef = useRef<RTCIceCandidateInit[]>([]);
+  const pendingAutoAcceptCallIdRef = useRef<string | null>(null);
   const acceptCallTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const callDisconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -303,12 +305,33 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     return dedupConversations(next);
   };
 
+  const getMessageRenderKey = (message: MessageItem, index: number) => {
+    const id = toId(message.id);
+    if (id) return id;
+    return `${toId(message.senderId)}:${toId(message.time)}:${toId(message.text)}:${index}`;
+  };
+
+  const dedupeMessages = (list: MessageItem[]) => {
+    const seen = new Set<string>();
+    const result: MessageItem[] = [];
+    list.forEach((message, index) => {
+      const key = getMessageRenderKey(message, index);
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      result.push(message);
+    });
+    return result;
+  };
+
   const setConversationMessages = (
     conversationId: string | null,
     value: MessageItem[] | ((prev: MessageItem[]) => MessageItem[]),
   ) => {
     messagesConversationIdRef.current = conversationId;
-    setMessages(value);
+    setMessages((prev) => {
+      const next = typeof value === "function" ? value(prev) : value;
+      return dedupeMessages(next);
+    });
   };
 
   const mapMessageItem = (m: any): MessageItem => ({
@@ -458,6 +481,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     const callId = toId(ev.callId);
     const senderId = toId(ev.senderId);
     if (!callId || !senderId || senderId === currentUserId) return;
+    if (ev.autoAccept) pendingAutoAcceptCallIdRef.current = callId;
     const activeCall = callSessionRef.current;
     if (activeCall && activeCall.id !== callId) return;
 
@@ -817,6 +841,13 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
       }
     } catch (err: any) { toast.error(`Lỗi thiết bị: ${err.message}`); closeCall(true, true); }
   };
+
+  useEffect(() => {
+    if (!callSession || callSession.status !== "incoming") return;
+    if (pendingAutoAcceptCallIdRef.current !== callSession.id) return;
+    pendingAutoAcceptCallIdRef.current = null;
+    void acceptCall();
+  }, [callSession?.id, callSession?.status]);
 
   const rejectCall = () => closeCall(true, true);
   const toggleMute = () => setCallSession((prev) => { if (!prev) return prev; const m = !prev.isMuted; localStreamRef.current?.getAudioTracks().forEach((t) => (t.enabled = !m)); return { ...prev, isMuted: m }; });
@@ -1718,9 +1749,13 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                         const repliedMessage = msg.replyToMessageId ? messages.find((item) => item.id === msg.replyToMessageId) : null;
                         const previousSameSender = idx > 0 && messages[idx - 1]?.senderId === msg.senderId;
                         return (
-                          <div key={msg.id}
+                          <div key={getMessageRenderKey(msg, idx)}
                             style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start", alignItems: "flex-end", gap: 8, position: "relative", marginTop: previousSameSender ? 1 : 7 }}
-                            onMouseLeave={() => setShowReactionPicker(null)}>
+                            onMouseEnter={() => !msg.isDeleted && setHoveredMessageId(msg.id)}
+                            onMouseLeave={() => {
+                              setHoveredMessageId((current) => current === msg.id ? null : current);
+                              setShowReactionPicker((current) => current === msg.id ? null : current);
+                            }}>
                             {!isMe && (
                               <div style={{ width: 32, flexShrink: 0 }}>
                                 {showAvatar ? <img src={selectedChatAvatar} alt="" style={{ width: 32, height: 32, borderRadius: 10, objectFit: "cover" }} /> : <div style={{ width: 32 }} />}
@@ -1745,9 +1780,9 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                                   fontStyle: msg.isDeleted ? "italic" : "normal",
                                   boxShadow: isMe ? `0 2px 8px ${ORANGE}40` : "0 1px 4px rgba(0,0,0,0.06)",
                                 }}
-                                onMouseEnter={() => !msg.isDeleted && setShowReactionPicker(msg.id)}
                                 onContextMenu={(event) => {
                                   event.preventDefault();
+                                  setShowReactionPicker(null);
                                   if (!msg.isDeleted) setActiveMessageMenu(activeMessageMenu === msg.id ? null : msg.id);
                                 }}
                               >
@@ -1774,12 +1809,12 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                               </div>
 
                               {!msg.isDeleted && (
-                                <div className="message-action-row" data-side={isMe ? "right" : "left"} data-active={activeMessageMenu === msg.id || showReactionPicker === msg.id ? "true" : "false"} style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start", gap: 6 }}>
+                                <div className="message-action-row" data-side={isMe ? "right" : "left"} data-active={hoveredMessageId === msg.id || activeMessageMenu === msg.id || showReactionPicker === msg.id ? "true" : "false"} style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start", gap: 6 }}>
                                   <button type="button" title="Copy" onClick={() => handleCopyMessage(msg)} style={{ width: 26, height: 26, borderRadius: 13, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Copy size={13} /></button>
                                   <button type="button" title="Trả lời" onClick={() => setReplyingTo(msg)} style={{ width: 26, height: 26, borderRadius: 13, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Reply size={13} /></button>
-                                  <button type="button" title="React" onClick={() => setShowReactionPicker(showReactionPicker === msg.id ? null : msg.id)} style={{ width: 26, height: 26, borderRadius: 13, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Smile size={13} /></button>
+                                  <button type="button" title="React" onClick={(event) => { event.stopPropagation(); setActiveMessageMenu(null); setShowReactionPicker(showReactionPicker === msg.id ? null : msg.id); }} style={{ width: 26, height: 26, borderRadius: 13, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Smile size={13} /></button>
                                   {isMe && !msg.id.startsWith("temp_") && (
-                                    <button type="button" title="Thêm" onClick={() => setActiveMessageMenu(activeMessageMenu === msg.id ? null : msg.id)} style={{ width: 26, height: 26, borderRadius: 13, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><MoreHorizontal size={14} /></button>
+                                    <button type="button" title="Thêm" onClick={(event) => { event.stopPropagation(); setShowReactionPicker(null); setActiveMessageMenu(activeMessageMenu === msg.id ? null : msg.id); }} style={{ width: 26, height: 26, borderRadius: 13, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><MoreHorizontal size={14} /></button>
                                   )}
                                 </div>
                               )}
@@ -1798,9 +1833,9 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                               )}
 
                               {showReactionPicker === msg.id && !msg.isDeleted && (
-                                <div style={{ position: "absolute", bottom: "100%", [isMe ? "right" : "left"]: 0, background: "#fff", borderRadius: 24, boxShadow: "0 4px 20px rgba(0,0,0,0.12)", border: "1px solid #f0f0f0", padding: "6px 10px", display: "flex", gap: 4, zIndex: 20, marginBottom: 4 }}>
+                                <div style={{ position: "absolute", top: "100%", [isMe ? "right" : "left"]: 0, background: "#fff", borderRadius: 24, boxShadow: "0 4px 20px rgba(0,0,0,0.12)", border: "1px solid #f0f0f0", padding: "6px 10px", display: "flex", gap: 4, zIndex: 20, marginTop: 6 }}>
                                   {SAFE_REACTION_EMOJIS.map((emoji) => (
-                                    <button key={emoji} type="button" onClick={() => handleToggleReaction(msg.id, emoji)}
+                                    <button key={`${msg.id}:${emoji}`} type="button" onClick={() => { handleToggleReaction(msg.id, emoji); setShowReactionPicker(null); }}
                                       style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, padding: 2, borderRadius: 8, transition: "transform 0.1s" }}
                                       onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.3)")}
                                       onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
@@ -1811,8 +1846,8 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
 
                               {!msg.isDeleted && msg.reactions && Object.entries(msg.reactions).some(([, c]) => c > 0) && (
                                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, justifyContent: isMe ? "flex-end" : "flex-start" }}>
-                                  {Object.entries(msg.reactions).map(([emoji, count]) => count > 0 && (
-                                    <button key={emoji} type="button" onClick={() => handleToggleReaction(msg.id, emoji)}
+                                  {Object.entries(msg.reactions).filter(([, count]) => count > 0).map(([emoji, count]) => (
+                                    <button key={`${msg.id}:reaction:${emoji}`} type="button" onClick={() => handleToggleReaction(msg.id, emoji)}
                                       style={{ display: "flex", alignItems: "center", gap: 3, padding: "2px 8px", borderRadius: 12, border: `1px solid ${msg.userReactions?.[emoji] ? ORANGE : "#f0f0f0"}`, background: msg.userReactions?.[emoji] ? ORANGE_LIGHT : "#fff", cursor: "pointer", fontSize: 12 }}>
                                       <span>{emoji}</span><span style={{ fontWeight: 600, color: ORANGE }}>{count}</span>
                                     </button>
@@ -2010,10 +2045,10 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                         <div style={{ fontSize: 11, fontWeight: 700, color: "#b0b0b0", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Tin nhắn gần đây</div>
                         {messages.length === 0 ? (
                           <div style={{ textAlign: "center", padding: 24, color: "#b0b0b0", fontSize: 13 }}>Chưa có tin nhắn nào</div>
-                        ) : [...messages].reverse().slice(0, 20).map((msg) => {
+                        ) : [...messages].reverse().slice(0, 20).map((msg, recentIdx) => {
                           const isMe = msg.senderId === "me";
                           return (
-                            <div key={msg.id} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                            <div key={getMessageRenderKey(msg, recentIdx)} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
                               <img src={isMe ? getAvatarUrl(currentUser?.avatar, currentUserId) : getAvatarUrl(msg.senderAvatar || selectedChat.avatar, msg.senderId)} alt="" style={{ width: 26, height: 26, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
                               <div style={{ flex: 1 }}>
                                 <div style={{ fontSize: 11, color: "#b0b0b0", marginBottom: 2 }}>{isMe ? "Bạn" : (msg.senderName || selectedChat.name)} · {msg.time}</div>
@@ -2063,7 +2098,6 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                   {callSession.status === "incoming" ? "Đang gọi đến..." : callSession.status === "connecting" ? "Đang kết nối..." : `Đang gọi ${formatCallDuration(callSession.elapsedSeconds)}`}
                 </div>
               </div>
-
               {callSession.mode === "video" && callSession.status !== "incoming" && (
                 <div style={{ position: "relative", borderRadius: 18, overflow: "hidden", background: "#111", height: 200, marginBottom: 22 }}>
                   <video ref={remoteVideoRef} autoPlay playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />

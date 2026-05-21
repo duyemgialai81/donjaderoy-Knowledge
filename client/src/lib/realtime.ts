@@ -47,7 +47,7 @@ export function savePendingCall(call: unknown) {
   }
 }
 
-export function readPendingCall<T = any>(maxAgeMs = 45000): T | null {
+export function readPendingCall<T = any>(maxAgeMs = 120000): T | null {
   try {
     const raw = sessionStorage.getItem(PENDING_CALL_STORAGE_KEY);
     if (!raw) return null;

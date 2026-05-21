@@ -49,9 +49,12 @@ export function GlobalRealtime() {
   }, [location.pathname]);
 
   const answerIncomingCall = () => {
-    if (incomingCall) {
-      pendingCallRef.current = incomingCall;
-      savePendingCall(incomingCall);
+    const call = incomingCall || pendingCallRef.current;
+    if (call) {
+      const answerableCall = { ...call, autoAccept: true };
+      pendingCallRef.current = answerableCall;
+      savePendingCall(answerableCall);
+      emitIncomingCall(answerableCall);
     }
     setIncomingCall(null);
     navigate("/tin-nhan");
@@ -175,6 +178,11 @@ export function GlobalRealtime() {
               if (pendingCallRef.current?.callId === callId) pendingCallRef.current = null;
               clearPendingCall();
               setIncomingCall((prev) => toId(prev?.callId) === callId ? null : prev);
+              return;
+            }
+            if (event.type === "start" || event.type === "offer" || event.type === "ice-candidate" || event.type === "ice") {
+              mergePendingCall(event);
+              return;
             }
             return;
           }
