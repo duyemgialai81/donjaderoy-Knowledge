@@ -30,6 +30,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
+        registry.addEndpoint("/ws-native")
+                .setAllowedOriginPatterns("*");
+
         registry.addEndpoint("/ws")
                 .setAllowedOriginPatterns("*") // ✅ Dev: cho phép mọi origin. Prod: thay bằng "https://yourdomain.com"
                 .withSockJS() // ✅ Bắt buộc để hỗ trợ fallback

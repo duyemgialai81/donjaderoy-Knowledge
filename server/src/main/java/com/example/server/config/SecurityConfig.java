@@ -73,7 +73,7 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/ws/**").permitAll()
+                        .requestMatchers("/ws/**", "/ws-native", "/ws-native/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
                         .requestMatchers(HttpMethod.HEAD, "/uploads/**").permitAll()
                         .requestMatchers(PUBLIC_URLS).permitAll()
