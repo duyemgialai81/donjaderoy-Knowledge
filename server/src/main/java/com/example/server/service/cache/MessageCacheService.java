@@ -71,7 +71,7 @@ public class MessageCacheService {
     private final MessageRepository messageRepository;
     private final MessageReactionRepository reactionRepository;
 
-    @Value("${cache.messages.ttl-minutes:30}")
+    @Value("${cache.messages.ttl-minutes:1440}")
     private long messagesTtlMinutes;
 
     @Value("${cache.reactions.ttl-minutes:60}")
@@ -434,13 +434,49 @@ public class MessageCacheService {
     }
 
     private List<Message> hydrateMessages(List<Object> ids) {
-        List<Message> messages = new ArrayList<>();
-        for (Object id : ids) {
-            if (id != null) {
-                getMessage(String.valueOf(id)).ifPresent(messages::add);
+        List<String> orderedIds = ids.stream()
+                .filter(id -> id != null)
+                .map(String::valueOf)
+                .toList();
+        if (orderedIds.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, Message> messagesById = new LinkedHashMap<>();
+        List<String> missingIds = new ArrayList<>();
+        List<String> keys = orderedIds.stream().map(this::messageKey).toList();
+
+        try {
+            List<Object> cachedValues = valueOps.multiGet(keys);
+            for (int i = 0; i < orderedIds.size(); i++) {
+                Object cached = cachedValues != null && i < cachedValues.size() ? cachedValues.get(i) : null;
+                if (cached instanceof Message message) {
+                    messagesById.put(orderedIds.get(i), message);
+                } else {
+                    missingIds.add(orderedIds.get(i));
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Redis batch message cache read failed", e);
+            missingIds.addAll(orderedIds);
+        }
+
+        if (!missingIds.isEmpty()) {
+            List<Message> dbMessages = messageRepository.findAllById(missingIds);
+            for (Message message : dbMessages) {
+                messagesById.put(message.getId(), message);
+                try {
+                    cacheMessage(message);
+                } catch (Exception e) {
+                    log.warn("Redis message cache restore failed for {}", message.getId(), e);
+                }
             }
         }
-        return messages;
+
+        return orderedIds.stream()
+                .map(messagesById::get)
+                .filter(message -> message != null)
+                .toList();
     }
 
     private List<Message> reverseToAscending(List<Message> messagesDesc) {
