@@ -18,7 +18,9 @@ export interface RealtimeNotificationDetail {
 }
 
 export function createSockJsConnection() {
-  return new SockJS(api.getWebSocketUrl());
+  return new SockJS(api.getWebSocketUrl(), undefined, {
+    transports: ["websocket"],
+  });
 }
 
 export function emitRealtimeNotification(detail: RealtimeNotificationDetail) {
