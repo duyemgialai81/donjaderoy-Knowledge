@@ -42,7 +42,7 @@ export function SuggestedPosts({ currentPost }: SuggestedPostsProps) {
       {/* ── Suggested Posts – nâng cấp ── */}
       <div className="card-premium p-5 hover:shadow-lg transition-all duration-300">
         <div className="flex items-center gap-2 mb-4">
-          <Lightbulb className="h-5 w-5 text-[#F26B38]" />
+          <Lightbulb className="h-5 w-5 text-sky-600" />
           <h3 className="font-semibold text-slate-800 text-base">Gợi ý cho bạn</h3>
         </div>
         <div className="space-y-2">
@@ -54,9 +54,9 @@ export function SuggestedPosts({ currentPost }: SuggestedPostsProps) {
             return (
               <div
                 key={post.id}
-                className="group cursor-pointer hover:bg-gradient-to-r hover:from-orange-50 hover:to-transparent p-3 rounded-xl transition-all duration-200 border border-transparent hover:border-orange-100 hover:shadow-sm"
+                className="group cursor-pointer hover:bg-gradient-to-r hover:from-sky-50 hover:to-transparent p-3 rounded-xl transition-all duration-200 border border-transparent hover:border-sky-100 hover:shadow-sm"
               >
-                <h4 className="text-sm font-semibold text-slate-700 line-clamp-2 mb-2 group-hover:text-[#F26B38] transition-colors">
+                <h4 className="text-sm font-semibold text-slate-700 line-clamp-2 mb-2 group-hover:text-sky-600 transition-colors">
                   {post.title}
                 </h4>
                 <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">
@@ -71,7 +71,7 @@ export function SuggestedPosts({ currentPost }: SuggestedPostsProps) {
                     {post.tags.slice(0, 2).map(tag => (
                       <Badge 
                         key={tag} 
-                        className="text-[10px] font-medium bg-orange-50 text-orange-600 hover:bg-orange-100 border-none px-2 py-0.5 rounded-full transition-colors"
+                        className="text-[10px] font-medium bg-sky-50 text-sky-600 hover:bg-sky-100 border-none px-2 py-0.5 rounded-full transition-colors"
                       >
                         #{tag}
                       </Badge>

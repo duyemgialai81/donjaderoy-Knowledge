@@ -285,10 +285,10 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
 
   return (
     <div
-      className="card-premium group p-5 cursor-pointer bg-white border border-slate-100 hover:border-orange-200 transition-all duration-300 shadow-sm hover:shadow-xl rounded-2xl relative overflow-hidden"
+      className="card-premium group p-5 cursor-pointer bg-white border border-slate-100 hover:border-sky-200 transition-all duration-300 shadow-sm hover:shadow-xl rounded-2xl relative overflow-hidden"
       onClick={onClick}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-orange-50/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-br from-sky-50/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
       
       <div className="relative z-10 flex items-start justify-between mb-5">
         <div className="flex items-center gap-3.5">
@@ -296,7 +296,7 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
             <img 
               src={author.avatar} 
               alt={author.name} 
-              className="h-12 w-12 rounded-full object-cover ring-2 ring-white shadow-sm group-hover:ring-orange-200 transition-all" 
+              className="h-12 w-12 rounded-full object-cover ring-2 ring-white shadow-sm group-hover:ring-sky-200 transition-all"
             />
             {latestBadge && (
               <span className="absolute -bottom-1 -right-1 text-base bg-white rounded-full p-0.5 shadow-sm" title={latestBadge.name}>
@@ -306,7 +306,7 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-slate-900 group-hover:text-orange-600 font-bold transition-colors text-base">{author.name}</span>
+              <span className="text-slate-900 group-hover:text-sky-600 font-bold transition-colors text-base">{author.name}</span>
               {author.role === 'lecturer' && (
                 <Badge className="text-[10px] font-bold uppercase tracking-wider bg-purple-50 text-purple-600 hover:bg-purple-100 border-none px-2 py-0.5 rounded-md">
                   Giảng viên
@@ -325,8 +325,8 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
           size="icon"
           className={`rounded-xl h-9 w-9 transition-all duration-200 ${
             isSaved 
-              ? "bg-orange-100 text-orange-600 hover:bg-orange-200" 
-              : "text-slate-400 hover:text-orange-500 hover:bg-orange-50"
+              ? "bg-sky-100 text-sky-600 hover:bg-sky-200"
+              : "text-slate-400 hover:text-sky-500 hover:bg-sky-50"
           }`}
           onClick={handleSave}
           disabled={isLoading}
@@ -336,7 +336,7 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
       </div>
 
       <div className="relative z-10 mb-5">
-        <h2 className="mb-2 text-xl font-extrabold text-slate-900 group-hover:text-orange-600 transition-colors tracking-tight leading-snug line-clamp-2">
+        <h2 className="mb-2 text-xl font-extrabold text-slate-900 group-hover:text-sky-600 transition-colors tracking-tight leading-snug line-clamp-2">
           {post.title}
         </h2>
         <p className="text-slate-600 text-sm line-clamp-3 leading-relaxed">
@@ -345,7 +345,7 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
       </div>
 
       <div className="relative z-10 flex flex-wrap gap-2 mb-5">
-        <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 font-semibold px-3 py-1 rounded-full text-xs">
+        <Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-200 font-semibold px-3 py-1 rounded-full text-xs">
           {post.topic || 'Chủ đề chung'}
         </Badge>
         {post.major && (
@@ -373,7 +373,7 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
         <div className="relative z-10 flex flex-wrap gap-3 mb-5">
           {post.attachments && post.attachments.length > 0 && (
             <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold transition-all hover:bg-slate-100 cursor-pointer">
-              <FileText className="h-3.5 w-3.5 text-orange-500" />
+              <FileText className="h-3.5 w-3.5 text-sky-500" />
               <span className="text-slate-700">{post.attachments.length} tệp đính kèm</span>
             </div>
           )}
@@ -416,7 +416,7 @@ export function PostCard({ post, onClick, onLike, onUserUpdate }: PostCardProps)
           <Button 
             variant="outline" 
             size="sm" 
-            className="rounded-xl h-9 w-9 p-0 bg-white border-slate-200 hover:bg-slate-50 hover:text-orange-600 transition-all shadow-sm"
+            className="rounded-xl h-9 w-9 p-0 bg-white border-slate-200 hover:bg-slate-50 hover:text-sky-600 transition-all shadow-sm"
             onClick={handleShare}
           >
             <Share2 className="h-4 w-4" />

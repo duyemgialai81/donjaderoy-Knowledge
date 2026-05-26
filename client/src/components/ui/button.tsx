@@ -9,16 +9,16 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:from-orange-600 hover:to-orange-700 shadow-sm hover:shadow-orange",
+        default: "bg-gradient-to-r from-sky-500 to-cyan-600 text-white hover:from-sky-600 hover:to-cyan-700 shadow-sm hover:shadow-ocean",
         destructive:
           "bg-gradient-to-r from-red-500 to-rose-500 text-white hover:from-red-600 hover:to-rose-600 shadow-sm focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
         outline:
           "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-sm dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
         secondary:
-          "bg-orange-50 text-orange-700 hover:bg-orange-100",
+          "bg-sky-50 text-sky-700 hover:bg-sky-100",
         ghost:
           "hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-accent/50",
-        link: "text-orange-600 underline-offset-4 hover:underline",
+        link: "text-sky-600 underline-offset-4 hover:underline",
       },
       size: {
         default: "h-10 px-5 py-2 has-[>svg]:px-4",

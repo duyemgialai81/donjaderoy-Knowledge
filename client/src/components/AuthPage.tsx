@@ -169,26 +169,26 @@ export function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-orange-50 p-4 relative">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 via-white to-cyan-50 p-4 relative">
       <div className="w-full max-w-4xl grid md:grid-cols-2 gap-8 items-center">
         
         {/* Left Side - Branding */}
         <div className="hidden md:block">
           <div className="text-center space-y-6">
             <div className="flex items-center justify-center">
-              <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-red-500 shadow-xl">
+              <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-cyan-600 shadow-xl">
                 <span className="text-white text-4xl">FP</span>
               </div>
             </div>
             <div>
-              <h1 className="text-4xl text-orange-600 mb-2">FPT Polytechnic</h1>
+              <h1 className="text-4xl text-sky-700 mb-2">Don Jade Roy</h1>
               <p className="text-xl text-gray-600">Knowledge Hub</p>
             </div>
             <div className="space-y-3 text-left bg-white rounded-lg p-6 shadow-lg">
               <h3 className="text-lg text-gray-800 mb-3">Tham gia ngay để:</h3>
-              <div className="flex items-start gap-3"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100">📚</div><p className="text-sm mt-1">Chia sẻ và học hỏi kiến thức</p></div>
-              <div className="flex items-start gap-3"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100">🏆</div><p className="text-sm mt-1">Tích lũy điểm và huy hiệu</p></div>
-              <div className="flex items-start gap-3"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100">👥</div><p className="text-sm mt-1">Kết nối với cộng đồng sinh viên</p></div>
+              <div className="flex items-start gap-3"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100">📚</div><p className="text-sm mt-1">Chia sẻ và học hỏi kiến thức</p></div>
+              <div className="flex items-start gap-3"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100">🏆</div><p className="text-sm mt-1">Tích lũy điểm và huy hiệu</p></div>
+              <div className="flex items-start gap-3"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100">👥</div><p className="text-sm mt-1">Kết nối với cộng đồng sinh viên</p></div>
             </div>
           </div>
         </div>
@@ -228,12 +228,12 @@ export function AuthPage() {
                   <div className="flex items-center justify-between text-sm">
                     <label className="flex items-center gap-2"><input type="checkbox" className="rounded" disabled={isLoading} /><span>Ghi nhớ đăng nhập</span></label>
                     {/* BẤM VÀO ĐÂY ĐỂ MỞ MODAL QUÊN MẬT KHẨU */}
-                    <button type="button" onClick={() => setIsForgotModalOpen(true)} className="text-orange-600 hover:underline">
+                    <button type="button" onClick={() => setIsForgotModalOpen(true)} className="text-sky-600 hover:underline">
                       Quên mật khẩu?
                     </button>
                   </div>
 
-                  <Button type="submit" className="w-full bg-orange-600 hover:bg-orange-700" disabled={isLoading}>
+                  <Button type="submit" className="w-full bg-sky-600 hover:bg-sky-700" disabled={isLoading}>
                     {isLoading ? "Đang đăng nhập..." : "Đăng nhập"}
                   </Button>
 
@@ -259,7 +259,7 @@ export function AuthPage() {
                     <form onSubmit={handleVerifyOtp} className="space-y-4 mt-4">
                         <div className="text-center mb-4">
                             <p className="text-sm text-gray-600">Chúng tôi đã gửi mã OTP gồm 6 chữ số đến email</p>
-                            <p className="font-semibold text-orange-600">{registerEmail}</p>
+                            <p className="font-semibold text-sky-600">{registerEmail}</p>
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="otp-code">Mã OTP</Label>
@@ -268,7 +268,7 @@ export function AuthPage() {
                                 <Input id="otp-code" placeholder="Nhập 6 số OTP" className="pl-10 text-center tracking-widest text-lg" value={otpCode} onChange={(e) => setOtpCode(e.target.value)} maxLength={6} disabled={isLoading} />
                             </div>
                         </div>
-                        <Button type="submit" className="w-full bg-orange-600 hover:bg-orange-700" disabled={isLoading}>
+                        <Button type="submit" className="w-full bg-sky-600 hover:bg-sky-700" disabled={isLoading}>
                            {isLoading ? "Đang xác nhận..." : "Xác nhận đăng ký"}
                         </Button>
                         <Button type="button" variant="ghost" className="w-full mt-2" onClick={() => setIsOtpStep(false)}>
@@ -317,7 +317,7 @@ export function AuthPage() {
                         <div className="relative"><Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" /><Input id="register-confirm-password" type="password" placeholder="Nhập lại mật khẩu" className="pl-10" value={registerConfirmPassword} onChange={(e) => setRegisterConfirmPassword(e.target.value)} disabled={isLoading} /></div>
                       </div>
 
-                      <Button type="submit" className="w-full bg-orange-600 hover:bg-orange-700" disabled={isLoading}>
+                      <Button type="submit" className="w-full bg-sky-600 hover:bg-sky-700" disabled={isLoading}>
                         {isLoading ? "Đang gửi OTP..." : "Nhận mã OTP"}
                       </Button>
                     </form>
@@ -355,7 +355,7 @@ export function AuthPage() {
                       <Input type="email" placeholder="Nhập email của bạn" className="pl-10" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} disabled={isLoading} />
                     </div>
                   </div>
-                  <Button type="submit" className="w-full bg-orange-600 hover:bg-orange-700" disabled={isLoading}>
+                  <Button type="submit" className="w-full bg-sky-600 hover:bg-sky-700" disabled={isLoading}>
                     {isLoading ? "Đang gửi..." : "Gửi mã OTP"}
                   </Button>
                 </form>
@@ -376,7 +376,7 @@ export function AuthPage() {
                       <Input type="password" placeholder="Ít nhất 6 ký tự" className="pl-10" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} disabled={isLoading} />
                     </div>
                   </div>
-                  <Button type="submit" className="w-full bg-orange-600 hover:bg-orange-700" disabled={isLoading}>
+                  <Button type="submit" className="w-full bg-sky-600 hover:bg-sky-700" disabled={isLoading}>
                     {isLoading ? "Đang xử lý..." : "Xác nhận đổi mật khẩu"}
                   </Button>
                 </form>

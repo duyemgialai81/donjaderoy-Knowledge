@@ -5,8 +5,6 @@ import { localStorage_service } from "../lib/localStorage";
 import type { User as UserType } from "../lib/mockData";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { Input } from "./ui/input";
 import { Switch } from "./ui/switch";
 import { Textarea } from "./ui/textarea";
 import {
@@ -76,6 +74,20 @@ function getAvatarUrl(user?: any) {
   return `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id || user?.email || "default"}`;
 }
 
+function formatSettingDate(value?: string) {
+  if (!value) return "--";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "--";
+  return date.toLocaleString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
 export function SettingsPage() {
   const { user } = useAuth();
 
@@ -96,13 +108,40 @@ export function SettingsPage() {
   const userAvatar = getAvatarUrl(user);
   const token = localStorage_service.getAuthToken();
 
-  const overviewStats = useMemo(
+  const accountFields = useMemo(
     () => [
-      { label: "Điểm hiện tại", value: user?.points || 0 },
-      { label: "Người theo dõi", value: user?.followers || 0 },
-      { label: "Bài viết", value: user?.postsCount || 0 },
+      { label: "ID người dùng", value: user?.id || "--" },
+      { label: "Tên hệ thống", value: user?.name || "--" },
+      { label: "Email", value: user?.email || "--" },
+      { label: "Vai trò", value: formatRole(user?.role) },
+      { label: "Ngành học", value: user?.major || "--" },
+      { label: "Lớp", value: user?.class || (user as any)?.className || "--" },
+      { label: "Điểm hiện tại", value: (user?.points || 0).toLocaleString("vi-VN") },
+      { label: "Bài viết", value: (user?.postsCount || 0).toLocaleString("vi-VN") },
+      { label: "Người theo dõi", value: (user?.followers || 0).toLocaleString("vi-VN") },
+      { label: "Trạng thái DB", value: user ? "active" : "--" },
+      { label: "Đăng ký lúc", value: formatSettingDate(user?.joinedDate || (user as any)?.createdAt) },
+      { label: "Cập nhật lúc", value: formatSettingDate((user as any)?.updatedAt) },
     ],
     [user],
+  );
+
+  const communicationFields = useMemo(
+    () => [
+      {
+        label: "Tin nhắn từ",
+        value: privacySettings.allowMessagesFrom === "everyone" ? "Mọi người" : "Theo dõi chéo",
+      },
+      { label: "Tin nhắn chờ", value: privacySettings.requireApproval ? "Bật" : "Tắt" },
+      { label: "Hiện online", value: callPreferences.showActiveStatus ? "Bật" : "Tắt" },
+      { label: "Gọi thoại", value: callPreferences.allowAudioCalls ? "Bật" : "Tắt" },
+      { label: "Gọi video", value: callPreferences.allowVideoCalls ? "Bật" : "Tắt" },
+      { label: "Thông báo desktop", value: callPreferences.desktopNotifications ? "Bật" : "Tắt" },
+      { label: "Tự phát media", value: callPreferences.autoPlayMedia ? "Bật" : "Tắt" },
+      { label: "Composer gọn", value: callPreferences.compactComposer ? "Bật" : "Tắt" },
+      { label: "Ghi chú profile", value: callPreferences.profileNote || "--" },
+    ],
+    [callPreferences, privacySettings],
   );
 
   const fetchPrivacySettings = async () => {
@@ -227,13 +266,13 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="mx-auto min-h-screen max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-      <div className="rounded-2xl bg-white/80 backdrop-blur-sm shadow-xl border border-slate-100 overflow-hidden">
+    <div className="settings-page-modern mx-auto min-h-screen max-w-[1512px] px-4 py-6">
+      <div className="settings-shell rounded-2xl bg-white/80 backdrop-blur-sm shadow-xl border border-slate-100 overflow-hidden">
         <div className="grid gap-0 lg:grid-cols-[300px_minmax(0,1fr)]">
           {/* Sidebar */}
-          <aside className="border-r border-slate-100 bg-gradient-to-b from-slate-50/50 to-white p-5">
+          <aside className="settings-sidebar border-r border-slate-100 bg-gradient-to-b from-slate-50/50 to-white p-5">
             <div className="mb-6 flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#F26B38] to-[#D9541E] shadow-md">
+              <div className="settings-sidebar-icon flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#0284c7] to-[#06b6d4] shadow-md">
                 <SettingsIcon className="h-5 w-5 text-white" />
               </div>
               <div>
@@ -255,7 +294,7 @@ export function SettingsPage() {
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
-                <Badge className="rounded-full bg-orange-500 text-white hover:bg-orange-600 text-[10px] px-2 py-0.5">
+                <Badge className="rounded-full bg-sky-500 text-white hover:bg-sky-600 text-[10px] px-2 py-0.5">
                   {formatRole(user?.role)}
                 </Badge>
                 <Badge variant="secondary" className="rounded-full text-[10px] px-2 py-0.5">
@@ -276,12 +315,12 @@ export function SettingsPage() {
                   variant="ghost"
                   className={`w-full justify-start rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
                     activeTab === item.id
-                      ? "bg-orange-50 text-orange-700 shadow-sm ring-1 ring-orange-200"
+                      ? "bg-sky-50 text-sky-700 shadow-sm ring-1 ring-sky-200"
                       : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                   }`}
                   onClick={() => setActiveTab(item.id as SettingsTab)}
                 >
-                  <item.icon className={`mr-3 h-4 w-4 ${activeTab === item.id ? "text-orange-600" : "text-slate-400"}`} />
+                  <item.icon className={`mr-3 h-4 w-4 ${activeTab === item.id ? "text-sky-600" : "text-slate-400"}`} />
                   {item.label}
                 </Button>
               ))}
@@ -291,85 +330,55 @@ export function SettingsPage() {
           {/* Main content */}
           <main className="p-6 md:p-8">
             {activeTab === "overview" && (
-              <div className="space-y-6">
-                <div className="rounded-2xl bg-gradient-to-r from-orange-500 to-orange-600 p-6 text-white shadow-lg">
-                  <div className="flex items-center gap-2 text-orange-100 text-xs font-semibold uppercase tracking-wider mb-2">
-                    <ShieldCheck className="h-4 w-4" />
-                    Tổng quan tài khoản
-                  </div>
-                  <h1 className="text-2xl font-bold">Chào mừng trở lại, {user?.name?.split(' ')[0] || 'bạn'} 👋</h1>
-                  <p className="mt-2 text-orange-100 max-w-xl text-sm">
-                    Quản lý thông tin cá nhân, cài đặt quyền riêng tư và tùy chỉnh trải nghiệm cuộc gọi.
-                  </p>
-                </div>
-
-                <div className="grid gap-5 sm:grid-cols-3">
-                  {overviewStats.map((item) => (
-                    <div key={item.label} className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
-                      <div className="text-sm font-medium text-slate-500">{item.label}</div>
-                      <div className="mt-2 text-3xl font-bold text-slate-800">{item.value.toLocaleString()}</div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="grid gap-6 lg:grid-cols-2">
-                  <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
-                    <h3 className="font-semibold text-slate-800">Thông tin tài khoản</h3>
-                    <p className="text-xs text-slate-400 mt-0.5 mb-4">Thông tin chính được sử dụng trong hệ thống.</p>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-xs font-medium text-slate-500">Họ và tên</label>
-                        <Input value={user?.name || ""} readOnly className="mt-1 h-10 rounded-lg bg-slate-50 border-slate-200 text-sm" />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-slate-500">Vai trò</label>
-                        <Input value={formatRole(user?.role)} readOnly className="mt-1 h-10 rounded-lg bg-slate-50 border-slate-200 text-sm" />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-slate-500">Email</label>
-                        <Input value={user?.email || ""} readOnly className="mt-1 h-10 rounded-lg bg-slate-50 border-slate-200 text-sm" />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-slate-500">Ngành học</label>
-                        <Input value={user?.major || ""} readOnly className="mt-1 h-10 rounded-lg bg-slate-50 border-slate-200 text-sm" />
-                      </div>
+              <div className="space-y-5">
+                <section className="soft-info-panel">
+                  <div className="soft-info-header">
+                    <span className="soft-info-icon">
+                      <User className="h-4 w-4" />
+                    </span>
+                    <div>
+                      <h2>Hồ sơ cơ bản</h2>
+                      <p>Thông tin tài khoản đang được dùng trên toàn bộ ứng dụng.</p>
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
-                    <h3 className="font-semibold text-slate-800">Trạng thái liên lạc</h3>
-                    <p className="text-xs text-slate-400 mt-0.5 mb-4">Cài đặt nhanh cho khu vực nhắn tin & gọi.</p>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 text-orange-500" />
-                          <span className="text-sm font-medium">Cuộc gọi thoại</span>
-                        </div>
-                        <Badge variant={callPreferences.allowAudioCalls ? "default" : "secondary"} className="text-[10px]">
-                          {callPreferences.allowAudioCalls ? "Đang bật" : "Đã tắt"}
-                        </Badge>
+                  <div className="soft-info-grid">
+                    {accountFields.map((item) => (
+                      <div key={item.label} className="soft-info-cell">
+                        <span>{item.label}</span>
+                        <strong>{item.value}</strong>
                       </div>
-                      <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
-                        <div className="flex items-center gap-2">
-                          <Video className="h-4 w-4 text-orange-500" />
-                          <span className="text-sm font-medium">Cuộc gọi video</span>
-                        </div>
-                        <Badge variant={callPreferences.allowVideoCalls ? "default" : "secondary"} className="text-[10px]">
-                          {callPreferences.allowVideoCalls ? "Đang bật" : "Đã tắt"}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
-                        <div className="flex items-center gap-2">
-                          <Bell className="h-4 w-4 text-orange-500" />
-                          <span className="text-sm font-medium">Thông báo desktop</span>
-                        </div>
-                        <Badge variant={callPreferences.desktopNotifications ? "default" : "secondary"} className="text-[10px]">
-                          {callPreferences.desktopNotifications ? "Đang bật" : "Đã tắt"}
-                        </Badge>
-                      </div>
-                    </div>
+                    ))}
                   </div>
-                </div>
+                </section>
+
+                <section className="soft-info-panel">
+                  <div className="soft-info-header">
+                    <span className="soft-info-icon">
+                      <ShieldCheck className="h-4 w-4" />
+                    </span>
+                    <div>
+                      <h2>Liên lạc & quyền riêng tư</h2>
+                      <p>Tóm tắt các tùy chọn nhắn tin, gọi và trạng thái hoạt động.</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="soft-info-action"
+                      onClick={() => setActiveTab("privacy")}
+                    >
+                      Tùy chỉnh
+                    </Button>
+                  </div>
+
+                  <div className="soft-info-grid">
+                    {communicationFields.map((item) => (
+                      <div key={item.label} className="soft-info-cell">
+                        <span>{item.label}</span>
+                        <strong>{item.value}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </section>
               </div>
             )}
 
@@ -385,12 +394,12 @@ export function SettingsPage() {
                       onClick={() => setPrivacySettings((prev) => ({ ...prev, allowMessagesFrom: "everyone" }))}
                       className={`rounded-xl border p-4 text-left transition-all ${
                         privacySettings.allowMessagesFrom === "everyone"
-                          ? "border-orange-200 bg-orange-50 shadow-sm ring-1 ring-orange-200"
+                          ? "border-sky-200 bg-sky-50 shadow-sm ring-1 ring-sky-200"
                           : "border-slate-100 bg-white hover:bg-slate-50"
                       }`}
                     >
                       <div className="flex items-start gap-3">
-                        <Mail className="h-5 w-5 text-orange-500 mt-0.5" />
+                        <Mail className="h-5 w-5 text-sky-500 mt-0.5" />
                         <div>
                           <div className="font-semibold text-slate-800">Mọi người</div>
                           <p className="text-sm text-slate-500">Cho phép tất cả người dùng bắt đầu hội thoại với bạn.</p>
@@ -402,12 +411,12 @@ export function SettingsPage() {
                       onClick={() => setPrivacySettings((prev) => ({ ...prev, allowMessagesFrom: "mutual_followers" }))}
                       className={`rounded-xl border p-4 text-left transition-all ${
                         privacySettings.allowMessagesFrom === "mutual_followers"
-                          ? "border-orange-200 bg-orange-50 shadow-sm ring-1 ring-orange-200"
+                          ? "border-sky-200 bg-sky-50 shadow-sm ring-1 ring-sky-200"
                           : "border-slate-100 bg-white hover:bg-slate-50"
                       }`}
                     >
                       <div className="flex items-start gap-3">
-                        <BadgeCheck className="h-5 w-5 text-orange-500 mt-0.5" />
+                        <BadgeCheck className="h-5 w-5 text-sky-500 mt-0.5" />
                         <div>
                           <div className="font-semibold text-slate-800">Chỉ bạn bè theo dõi chéo</div>
                           <p className="text-sm text-slate-500">Hạn chế tin nhắn mới chỉ với những người đã kết nối hai chiều.</p>
@@ -443,7 +452,7 @@ export function SettingsPage() {
                   </div>
 
                   <Button
-                    className="mt-6 h-10 rounded-lg bg-orange-500 hover:bg-orange-600 text-white px-5"
+                    className="mt-6 h-10 rounded-lg bg-sky-500 hover:bg-sky-600 text-white px-5"
                     onClick={handleSavePrivacy}
                     disabled={isSavingPrivacy}
                   >
@@ -490,7 +499,7 @@ export function SettingsPage() {
                       <div key={item.key} className="rounded-xl border border-slate-100 p-4 hover:shadow-sm transition-shadow">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-start gap-3">
-                            <div className="mt-0.5 rounded-lg bg-orange-50 p-2 text-orange-500">
+                            <div className="mt-0.5 rounded-lg bg-sky-50 p-2 text-sky-500">
                               <item.icon className="h-4 w-4" />
                             </div>
                             <div>
@@ -529,13 +538,13 @@ export function SettingsPage() {
                     <Textarea
                       value={callPreferences.profileNote}
                       onChange={(e) => setCallPreferences((prev) => ({ ...prev, profileNote: e.target.value }))}
-                      className="mt-2 min-h-[100px] rounded-xl border-slate-200 focus:border-orange-300 focus:ring-orange-200"
+                      className="mt-2 min-h-[100px] rounded-xl border-slate-200 focus:border-sky-300 focus:ring-sky-200"
                       placeholder="Thêm một dòng ghi chú ngắn để hiển thị trong profile thông tin hội thoại..."
                     />
                   </div>
 
                   <Button
-                    className="mt-6 h-10 rounded-lg bg-orange-500 hover:bg-orange-600 text-white px-5"
+                    className="mt-6 h-10 rounded-lg bg-sky-500 hover:bg-sky-600 text-white px-5"
                     onClick={handleSaveCallPreferences}
                     disabled={isSavingCalls}
                   >

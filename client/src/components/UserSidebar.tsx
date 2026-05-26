@@ -71,7 +71,7 @@ export function UserSidebar({ user, onViewProfile }: UserSidebarProps) {
 
   const weekStats = [
     { label: "Lượt xem", value: "+234", icon: Eye, colorClass: "stat-card-blue", iconColor: "text-blue-500" },
-    { label: "Lượt thích", value: "+45",  icon: Heart, colorClass: "stat-card-orange", iconColor: "text-[#F26B38]" },
+    { label: "Lượt thích", value: "+45",  icon: Heart, colorClass: "stat-card-ocean", iconColor: "text-sky-600" },
     { label: "Bình luận", value: "+28",  icon: MessageCircle, colorClass: "stat-card-green", iconColor: "text-emerald-500" },
     { label: "Điểm +",    value: "+78",  icon: Star, colorClass: "stat-card-purple", iconColor: "text-purple-500" },
   ];
@@ -84,7 +84,7 @@ export function UserSidebar({ user, onViewProfile }: UserSidebarProps) {
 
   const realWeekStats = [
     { label: "Lượt xem", value: totalViews.toLocaleString(), icon: Eye, colorClass: "stat-card-blue", iconColor: "text-blue-500" },
-    { label: "Lượt thích", value: totalLikes.toLocaleString(), icon: Heart, colorClass: "stat-card-orange", iconColor: "text-[#F26B38]" },
+    { label: "Lượt thích", value: totalLikes.toLocaleString(), icon: Heart, colorClass: "stat-card-ocean", iconColor: "text-sky-600" },
     { label: "Bình luận", value: totalComments.toLocaleString(), icon: MessageCircle, colorClass: "stat-card-green", iconColor: "text-emerald-500" },
     { label: "Điểm", value: totalPoints.toLocaleString(), icon: Star, colorClass: "stat-card-purple", iconColor: "text-purple-500" },
   ];
@@ -117,7 +117,7 @@ export function UserSidebar({ user, onViewProfile }: UserSidebarProps) {
               }}
             />
             {currentBadge && (
-              <span className="absolute -bottom-1 -right-1 text-xl bg-white rounded-full shadow-md p-0.5 border-2 border-orange-100">
+              <span className="absolute -bottom-1 -right-1 text-xl bg-white rounded-full shadow-md p-0.5 border-2 border-sky-100">
                 {currentBadge.icon}
               </span>
             )}
@@ -136,7 +136,7 @@ export function UserSidebar({ user, onViewProfile }: UserSidebarProps) {
           {onViewProfile && (
             <Button
               size="sm"
-              className="w-full mb-5 h-9 text-sm rounded-xl btn-gradient-orange font-semibold shadow-md hover:shadow-orange-hover transition-all"
+              className="w-full mb-5 h-9 text-sm rounded-xl btn-gradient-ocean font-semibold shadow-md hover:shadow-lg transition-all"
               onClick={onViewProfile}
             >
               <UserIcon className="h-3.5 w-3.5 mr-2" />
@@ -146,18 +146,18 @@ export function UserSidebar({ user, onViewProfile }: UserSidebarProps) {
 
           {/* Stats row – điểm, bài viết, theo dõi */}
           <div className="grid grid-cols-3 text-center pt-4 border-t border-slate-100 gap-3">
-            <div className="bg-slate-50 rounded-xl py-2 transition-colors hover:bg-orange-50">
+            <div className="bg-slate-50 rounded-xl py-2 transition-colors hover:bg-sky-50">
               <div className="flex items-center justify-center gap-1 mb-1">
-                <Trophy className="h-4 w-4 text-[#F26B38]" />
-                <span className="font-bold text-base text-[#F26B38]">{(user.points || 0).toLocaleString()}</span>
+                <Trophy className="h-4 w-4 text-sky-600" />
+                <span className="font-bold text-base text-sky-600">{(user.points || 0).toLocaleString()}</span>
               </div>
               <p className="text-[11px] text-slate-500 font-medium">Điểm</p>
             </div>
-            <div className="bg-slate-50 rounded-xl py-2 transition-colors hover:bg-orange-50">
+            <div className="bg-slate-50 rounded-xl py-2 transition-colors hover:bg-sky-50">
               <p className="font-bold text-base text-slate-700 mb-1">{user.postsCount || 0}</p>
               <p className="text-[11px] text-slate-500 font-medium">Bài viết</p>
             </div>
-            <div className="bg-slate-50 rounded-xl py-2 transition-colors hover:bg-orange-50">
+            <div className="bg-slate-50 rounded-xl py-2 transition-colors hover:bg-sky-50">
               <p className="font-bold text-base text-slate-700 mb-1">{user.followers || 0}</p>
               <p className="text-[11px] text-slate-500 font-medium">Theo dõi</p>
             </div>
@@ -168,12 +168,12 @@ export function UserSidebar({ user, onViewProfile }: UserSidebarProps) {
       {/* ── Badge Progress – nâng cấp ── */}
       <div className="card-premium p-5 hover:shadow-lg transition-all duration-300">
         <div className="flex items-center gap-2 mb-4">
-          <Award className="h-5 w-5 text-[#F26B38]" />
+          <Award className="h-5 w-5 text-sky-600" />
           <h3 className="font-semibold text-slate-800 text-base">Danh hiệu</h3>
         </div>
 
         {/* Current badge */}
-        <div className="flex items-center gap-4 p-3 rounded-xl bg-gradient-to-r from-[#FEF0E8] to-[#FFF7F3] border border-orange-100 mb-4">
+        <div className="flex items-center gap-4 p-3 rounded-xl bg-gradient-to-r from-sky-50 to-cyan-50 border border-sky-100 mb-4">
           <span className="text-3xl">{currentBadge?.icon ?? "🏅"}</span>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-slate-800 truncate">{currentBadge?.name ?? "Chưa có danh hiệu"}</p>
@@ -186,9 +186,9 @@ export function UserSidebar({ user, onViewProfile }: UserSidebarProps) {
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-500">Tiến đến <span className="font-medium text-slate-700">{nextBadge.name}</span></span>
-              <span className="font-semibold text-[#F26B38]">{user.points || 0}/{nextBadge.requiredPoints}</span>
+              <span className="font-semibold text-sky-600">{user.points || 0}/{nextBadge.requiredPoints}</span>
             </div>
-            <div className="progress-fpt">
+            <div className="progress-ocean">
               <Progress value={progressToNext} className="h-2 rounded-full" />
             </div>
             <p className="text-[11px] text-slate-400">Còn {nextBadge.requiredPoints - (user.points || 0)} điểm nữa</p>
@@ -209,7 +209,7 @@ export function UserSidebar({ user, onViewProfile }: UserSidebarProps) {
                     key={badge.id}
                     className={`flex items-center justify-center h-11 w-11 rounded-full border-2 transition-all duration-200 hover:scale-110 cursor-help ${
                       achieved 
-                        ? `${badge.color || "bg-gradient-to-br from-orange-400 to-orange-600"} border-transparent shadow-md` 
+                        ? `${badge.color || "bg-gradient-to-br from-sky-400 to-cyan-600"} border-transparent shadow-md`
                         : "bg-slate-100 border-slate-200 grayscale opacity-50"
                     }`}
                     title={`${badge.name} – ${badge.requiredPoints} điểm`}
@@ -226,7 +226,7 @@ export function UserSidebar({ user, onViewProfile }: UserSidebarProps) {
       {/* ── Weekly Stats – 4 mini cards (đã đẹp sẵn, chỉ thêm hover) ── */}
       <div className="card-premium p-5 hover:shadow-lg transition-all duration-300">
         <div className="flex items-center gap-2 mb-4">
-          <TrendingUp className="h-5 w-5 text-[#F26B38]" />
+          <TrendingUp className="h-5 w-5 text-sky-600" />
           <h3 className="font-semibold text-slate-800 text-base">Thống kê tuần này</h3>
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -245,7 +245,7 @@ export function UserSidebar({ user, onViewProfile }: UserSidebarProps) {
       {/* ── Weekly Goals – nâng cấp ── */}
       <div className="card-premium p-5 hover:shadow-lg transition-all duration-300">
         <div className="flex items-center gap-2 mb-4">
-          <Target className="h-5 w-5 text-[#F26B38]" />
+          <Target className="h-5 w-5 text-sky-600" />
           <h3 className="font-semibold text-slate-800 text-base">Mục tiêu tuần này</h3>
         </div>
         <div className="space-y-4">
@@ -255,11 +255,11 @@ export function UserSidebar({ user, onViewProfile }: UserSidebarProps) {
               <div key={label}>
                 <div className="flex items-center justify-between text-xs mb-1.5">
                   <span className="text-slate-600 font-medium">{label}</span>
-                  <span className={`font-semibold ${pct >= 100 ? "text-emerald-600" : "text-[#F26B38]"}`}>
+                  <span className={`font-semibold ${pct >= 100 ? "text-emerald-600" : "text-sky-600"}`}>
                     {current}/{target}
                   </span>
                 </div>
-                <div className="progress-fpt">
+                <div className="progress-ocean">
                   <Progress value={pct} className="h-2 rounded-full" />
                 </div>
               </div>

@@ -33,7 +33,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-orange-50 p-4">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-sky-50 p-4">
           <Card className="w-full max-w-md shadow-xl">
             <CardHeader>
               <div className="flex items-center gap-2">
@@ -51,7 +51,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
               <div className="flex gap-2">
                 <Button 
                   onClick={this.resetError}
-                  className="flex-1 bg-orange-600 hover:bg-orange-700"
+                  className="flex-1 bg-sky-600 hover:bg-sky-700"
                 >
                   Thử lại
                 </Button>

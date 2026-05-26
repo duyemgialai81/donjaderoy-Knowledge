@@ -228,7 +228,7 @@ export function ProfilePage({
     { icon: Heart,         label: "Tổng lượt thích", value: totalLikes.toLocaleString(),   color: "text-rose-500",    bg: "bg-rose-50"    },
     { icon: Eye,           label: "Tổng lượt xem",   value: totalViews.toLocaleString(),   color: "text-blue-500",    bg: "bg-blue-50"    },
     { icon: MessageCircle, label: "Tổng bình luận",  value: totalComments.toLocaleString(), color: "text-emerald-500", bg: "bg-emerald-50" },
-    { icon: Trophy,        label: "Điểm tích lũy",   value: (user.points || 0).toLocaleString(), color: "text-[#F26B38]", bg: "bg-orange-50" },
+    { icon: Trophy,        label: "Điểm tích lũy",   value: (user.points || 0).toLocaleString(), color: "text-sky-600", bg: "bg-sky-50" },
   ];
 
   const profileVisitorStats = isOwnProfile
@@ -236,15 +236,9 @@ export function ProfilePage({
     : [];
 
   return (
-    <div className="min-h-screen" style={{ background: "#F7F9FC" }}>
+    <div className="profile-page-modern min-h-screen">
       {/* ── Cover Banner ── */}
-      <div className="h-52 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#F26B38] via-[#e55a2a] to-[#c44415]" />
-        {/* Decorative circles */}
-        <div className="absolute -top-10 -right-10 h-48 w-48 rounded-full bg-white/10" />
-        <div className="absolute -bottom-8 left-20 h-32 w-32 rounded-full bg-white/10" />
-        <div className="absolute top-8 left-1/3 h-20 w-20 rounded-full bg-white/5" />
-      </div>
+      <div className="profile-cover-panel h-52 relative overflow-hidden" />
 
       <div className="profile-content-layer container mx-auto px-4">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 -mt-28 pb-10">
@@ -284,7 +278,7 @@ export function ProfilePage({
                     </>
                   )}
                   {userBadges.length > 0 && (
-                    <div className="absolute -bottom-2 -right-2 flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-md text-xl border border-orange-100">
+                    <div className="absolute -bottom-2 -right-2 flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-md text-xl border border-sky-100">
                       {userBadges[userBadges.length - 1]?.icon}
                     </div>
                   )}
@@ -351,7 +345,7 @@ export function ProfilePage({
                       <Button
                         type="button"
                         variant="outline"
-                        className="h-9 w-full rounded-xl border-orange-200 bg-orange-50 text-sm font-semibold text-[#F26B38] hover:bg-orange-100"
+                        className="h-9 w-full rounded-xl border-sky-200 bg-sky-50 text-sm font-semibold text-sky-600 hover:bg-sky-100"
                         onClick={() => avatarInputRef.current?.click()}
                         disabled={isUploadingAvatar}
                       >
@@ -396,7 +390,7 @@ export function ProfilePage({
                 {isOwnProfile ? (
                   isEditing ? (
                     <>
-                      <Button className="flex-1 h-9 text-sm btn-gradient-orange rounded-lg" onClick={handleSave}>
+                      <Button className="flex-1 h-9 text-sm btn-gradient-ocean rounded-lg" onClick={handleSave}>
                         <Save className="h-3.5 w-3.5 mr-1.5" /> Lưu
                       </Button>
                       <Button variant="outline" className="flex-1 h-9 text-sm rounded-lg" onClick={() => setIsEditing(false)}>
@@ -404,20 +398,20 @@ export function ProfilePage({
                       </Button>
                     </>
                   ) : (
-                    <Button className="flex-1 h-9 text-sm btn-gradient-orange rounded-lg" onClick={() => setIsEditing(true)}>
+                    <Button className="flex-1 h-9 text-sm btn-gradient-ocean rounded-lg" onClick={() => setIsEditing(true)}>
                       <Edit className="h-3.5 w-3.5 mr-1.5" /> Chỉnh sửa hồ sơ
                     </Button>
                   )
                 ) : (
                   <>
                     <Button
-                      className={`flex-1 h-9 text-sm rounded-lg ${isFollowing ? "bg-slate-100 text-slate-700 hover:bg-slate-200" : "btn-gradient-orange"}`}
+                      className={`flex-1 h-9 text-sm rounded-lg ${isFollowing ? "bg-slate-100 text-slate-700 hover:bg-slate-200" : "btn-gradient-ocean"}`}
                       onClick={handleFollowToggle}
                       disabled={isFollowBusy}
                     >
                       <Users className="h-3.5 w-3.5 mr-1.5" /> {isFollowing ? "Bỏ theo dõi" : "Theo dõi"}
                     </Button>
-                    <Button variant="outline" className="flex-1 h-9 text-sm rounded-lg border-orange-200 bg-orange-50 text-[#F26B38] hover:bg-orange-100 hover:text-[#D9541E]" onClick={openMessageThread}>
+                    <Button variant="outline" className="flex-1 h-9 text-sm rounded-lg border-sky-200 bg-sky-50 text-sky-600 hover:bg-sky-100 hover:text-sky-700" onClick={openMessageThread}>
                       <MessageCircle className="h-3.5 w-3.5 mr-1.5" /> Nhắn tin
                     </Button>
                   </>
@@ -441,9 +435,9 @@ export function ProfilePage({
                       if (index === 2) openFollowModal("following");
                     }}
                     disabled={index === 0}
-                    className="rounded-xl bg-slate-50 py-2.5 transition-colors hover:bg-orange-50 disabled:hover:bg-slate-50"
+                    className="rounded-xl bg-slate-50 py-2.5 transition-colors hover:bg-sky-50 disabled:hover:bg-slate-50"
                   >
-                    <div className="text-lg font-bold text-[#F26B38]">{value}</div>
+                    <div className="text-lg font-bold text-sky-600">{value}</div>
                     <div className="text-[10px] text-slate-500">{label}</div>
                   </button>
                 ))}
@@ -453,7 +447,7 @@ export function ProfilePage({
             {/* ── Achievement Card ── */}
             <div className="card-premium p-5">
               <div className="flex items-center gap-2 mb-4">
-                <Trophy className="h-4 w-4 text-[#F26B38]" />
+                <Trophy className="h-4 w-4 text-sky-600" />
                 <h3 className="font-semibold text-slate-800 text-sm">Thành tích</h3>
               </div>
 
@@ -476,9 +470,9 @@ export function ProfilePage({
                 <div className="mb-4">
                   <div className="flex items-center justify-between text-xs mb-1.5">
                     <span className="text-slate-500">Tiến độ đến <span className="font-medium">"{nextBadge.name}"</span></span>
-                    <span className="font-semibold text-[#F26B38]">{user.points || 0}/{nextBadge.requiredPoints}</span>
+                    <span className="font-semibold text-sky-600">{user.points || 0}/{nextBadge.requiredPoints}</span>
                   </div>
-                  <div className="progress-fpt">
+                  <div className="progress-ocean">
                     <Progress value={progressToNextBadge} className="h-2" />
                   </div>
                 </div>
@@ -492,7 +486,7 @@ export function ProfilePage({
                     {userBadges.map((badge) => (
                       <div
                         key={badge.id}
-                        className="text-center p-2.5 rounded-xl border border-slate-100 hover:border-orange-200 hover:bg-orange-50 transition-colors"
+                        className="text-center p-2.5 rounded-xl border border-slate-100 hover:border-sky-200 hover:bg-sky-50 transition-colors"
                         title={badge.description}
                       >
                         <div className="text-2xl mb-1">{badge.icon}</div>
@@ -519,7 +513,7 @@ export function ProfilePage({
                       <TabsTrigger
                         key={value}
                         value={value}
-                        className="h-9 px-4 text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-[#F26B38] data-[state=active]:text-[#F26B38] data-[state=active]:bg-transparent"
+                        className="h-9 px-4 text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-sky-500 data-[state=active]:text-sky-600 data-[state=active]:bg-transparent"
                       >
                         <Icon className="h-3.5 w-3.5 mr-1.5" />
                         {label}
@@ -603,7 +597,7 @@ export function ProfilePage({
                           setShowProfileVisitors(false);
                           navigate(`/nguoi-dung/${visitor.userId}`);
                         }}
-                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left hover:bg-orange-50"
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left hover:bg-sky-50"
                       >
                         <img src={avatar} alt={visitor.name || "User"} className="h-10 w-10 rounded-full object-cover" />
                         <div className="min-w-0 flex-1">
@@ -657,7 +651,7 @@ export function ProfilePage({
                         <div className="truncate text-sm font-semibold text-slate-800">{item.name || "Người dùng"}</div>
                         <div className="truncate text-xs text-slate-500">{item.email || item.role || ""}</div>
                       </div>
-                      <span className="rounded-lg bg-orange-50 px-2 py-1 text-xs font-semibold text-[#F26B38]">Xem</span>
+                      <span className="rounded-lg bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-600">Xem</span>
                     </a>
                   );
                 })

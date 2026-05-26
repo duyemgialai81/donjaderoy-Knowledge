@@ -115,28 +115,30 @@ interface CallSession {
 // ==================== CONSTANTS ====================
 const REACTION_EMOJIS = ['❤️', '😂', '👍', '😮', '😢', '🎉', '👎', '😡', '⭐', '🔥'];
 
-// ── ORANGE THEME ──
+// ── OCEAN THEME ──
 const SAFE_REACTION_EMOJIS = [
   "\u2764\uFE0F",
+  "\uD83D\uDE02",
   "\uD83D\uDE06",
+  "\uD83D\uDC4D",
   "\uD83D\uDE2E",
   "\uD83D\uDE22",
   "\uD83D\uDE21",
-  "\uD83D\uDC4D",
   "\uD83C\uDF89",
   "\uD83D\uDC4E",
   "\u2B50",
   "\uD83D\uDD25",
+  "\uD83D\uDCAF",
 ];
 
-const ORANGE = "#FF6B35";
-const ORANGE_LIGHT = "#FFF0EB";
-const ORANGE_MID = "#FF8A5C";
-const ORANGE_DARK = "#E85520";
+const ORANGE = "#0284C7";
+const ORANGE_LIGHT = "#E0F2FE";
+const ORANGE_MID = "#0EA5E9";
+const ORANGE_DARK = "#0369A1";
 
 const CHAT_BACKGROUNDS = [
   { id: "soft", label: "Sáng", value: "linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%)" },
-  { id: "warm", label: "Ấm", value: "linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%)" },
+  { id: "warm", label: "Sóng", value: "linear-gradient(180deg, #e0f2fe 0%, #cffafe 100%)" },
   { id: "mint", label: "Mint", value: "linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%)" },
   { id: "sky", label: "Sky", value: "linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%)" },
   { id: "slate", label: "Xám", value: "linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%)" },
@@ -456,7 +458,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     if (conversationId) {
       setConversations((prev) => mergeConversationUpdate(prev, { id: conversationId, backgroundId: id, backgroundUrl: "" }));
       try {
-        const res = await api.request("PUT", `/api/chat/conversations/${conversationId}/background`, { backgroundId: id, backgroundUrl: "" });
+        const res = await api.updateChatConversationBackground(conversationId, { backgroundId: id, backgroundUrl: "" });
         const updated = normalizeConversationItem(res?.data || res);
         setConversations((prev) => mergeConversationUpdate(prev, updated));
       } catch (error: any) {
@@ -480,7 +482,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     if (conversationId) {
       setConversations((prev) => mergeConversationUpdate(prev, { id: conversationId, backgroundId: "custom", backgroundUrl: normalizedUrl }));
       try {
-        const res = await api.request("PUT", `/api/chat/conversations/${conversationId}/background`, { backgroundId: "custom", backgroundUrl: normalizedUrl });
+        const res = await api.updateChatConversationBackground(conversationId, { backgroundId: "custom", backgroundUrl: normalizedUrl });
         const updated = normalizeConversationItem(res?.data || res);
         setConversations((prev) => mergeConversationUpdate(prev, updated));
       } catch (error: any) {
@@ -556,8 +558,8 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     try {
       let convs: ConversationItem[] = [];
       try {
-        const res = await api.request("GET", "/api/chat/conversations");
-        const raw = res?.data || (Array.isArray(res) ? res : []);
+        const res = await api.getChatConversationsPage(0, 50);
+        const raw = res?.content || [];
         convs = raw.map((c: any) => ({
           id: toId(c.id), type: c.type || "direct", targetUserId: toId(c.targetUserId) || undefined,
           name: c.type === "group" ? (c.groupName || "Nhóm chat") : (c.targetUserName || "Người dùng"), avatar: c.targetUserAvatar,
@@ -569,7 +571,6 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
       } catch (e) { console.error(e); }
 
       let friends: any[] = [];
-      try { friends = (await api.getMutualFollowersForChat()) || []; } catch (e) { console.error(e); }
 
       const final = [...convs];
       const existingIds = new Set(convs.map((c) => String(c.targetUserId || c.id)));
@@ -594,7 +595,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     const convId = selectedChat.id.startsWith("new_") ? "" : selectedChat.id;
 
     try {
-      if (convId) await api.request("PUT", `/api/chat/conversations/${convId}/accept`);
+      if (convId) await api.acceptChatConversation(convId);
       setConversations((prev) => prev.map((c) => c.id === selectedChat.id ? { ...c, status: "accepted" } : c));
       toast.success("Đã chấp nhận tin nhắn");
     } catch {
@@ -612,8 +613,8 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
 
     try {
       if (!convId) throw new Error("Không thể chấp nhận hội thoại chưa có id.");
-      const res = await api.request("PUT", `/api/chat/conversations/${convId}/accept`);
-      const accepted = res?.data || {};
+      const res = await api.acceptChatConversation(convId);
+      const accepted = normalizeConversationItem(res || {});
       setConversations((prev) => prev.map((c) => c.id === selectedChat.id ? { ...c, ...accepted, id: convId, status: "accepted", unread: c.unread } : c));
       await loadChatsAndFriends({ force: true });
       toast.success("Đã chấp nhận tin nhắn");
@@ -631,7 +632,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     let succeeded = false;
     if (convId) {
       try {
-        await api.request("POST", `/api/chat/conversations/${convId}/reject`);
+        await api.rejectChatConversation(convId);
         succeeded = true;
       } catch {
         succeeded = false;
@@ -1275,7 +1276,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     const fetchMessages = async () => {
       setIsLoadingMessages(true);
       try {
-        const res = await api.request("GET", `/api/chat/messages/${conversationId}/page?limit=100`);
+        const res = await api.getChatMessagesPage(conversationId, 100);
         if (cancelled || selectedChatIdRef.current !== conversationId) return;
         const payload = res?.data || res;
         const list = Array.isArray(payload) ? payload : payload?.messages || [];
@@ -1299,7 +1300,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
         setHasMoreMessages(Boolean(!Array.isArray(payload) && payload?.hasMore));
         setConversationMessages(conversationId, nextMessages);
         setConversations((prev) => prev.map((c) => c.id === conversationId ? { ...c, unread: 0 } : c));
-        void api.request("POST", `/api/chat/conversations/${conversationId}/read`).catch(() => {});
+        void api.markChatConversationRead(conversationId).catch(() => {});
       } catch {
         if (!cancelled && selectedChatIdRef.current === conversationId) {
           setConversationMessages(conversationId, []);
@@ -1320,7 +1321,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
 
     setIsLoadingOlderMessages(true);
     try {
-      const res = await api.request("GET", `/api/chat/messages/${conversationId}/page?limit=100&beforeMessageId=${encodeURIComponent(oldestMessageCursor)}`);
+      const res = await api.getChatMessagesPage(conversationId, 100, oldestMessageCursor);
       if (toId(selectedChatIdRef.current) !== conversationId) return;
       const payload = res?.data || res;
       const list = payload?.messages || [];
@@ -1355,7 +1356,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     });
     const payload = { conversationId: selectedChat.id.startsWith("new_") ? "" : selectedChat.id, receiverId: getConversationPeerId(selectedChat), content, messageType: "text", replyToMessageId: currentReply?.id };
     if (stompClientRef.current?.connected) stompClientRef.current.publish({ destination: "/app/chat.sendMessage", body: JSON.stringify(payload) });
-    else { try { await api.request("POST", "/api/chat/messages", payload); } catch { toast.error("Không thể gửi tin nhắn."); } }
+    else { try { await api.sendChatMessage(payload); } catch { toast.error("Không thể gửi tin nhắn."); } }
     if (stompClientRef.current?.connected) stompClientRef.current.publish({ destination: "/app/chat.typing", body: JSON.stringify({ ...payload, isTyping: false, typing: false }) });
   };
 
@@ -1366,7 +1367,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     const nextContent = content.trim();
     if (!nextContent) return;
     try {
-      const res = await api.request("PUT", `/api/chat/messages/${encodeURIComponent(message.id)}`, { content: nextContent });
+      const res = await api.editChatMessage(message.id, nextContent);
       const updated = res?.data || res || {};
       setConversationMessages(messagesConversationIdRef.current, (prev) => prev.map((item) => item.id === message.id ? { ...item, text: updated.content || nextContent, isEdited: true } : item));
     } catch (error: any) {
@@ -1378,7 +1379,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
     if (message.senderId !== "me" || message.isDeleted || message.id.startsWith("temp_")) return;
     if (!window.confirm("Thu hồi tin nhắn này?")) return;
     try {
-      await api.request("DELETE", `/api/chat/messages/${encodeURIComponent(message.id)}`);
+      await api.deleteChatMessage(message.id);
       setConversationMessages(messagesConversationIdRef.current, (prev) => prev.map((item) => item.id === message.id ? { ...item, text: "Tin nhắn đã được thu hồi", isDeleted: true } : item));
     } catch (error: any) {
       toast.error(error?.message || "Không thể thu hồi tin nhắn.");
@@ -1412,7 +1413,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
       if (stompClientRef.current?.connected) {
         stompClientRef.current.publish({ destination: "/app/chat.sendMessage", body: JSON.stringify(payload) });
       } else {
-        await api.request("POST", "/api/chat/messages", payload);
+        await api.sendChatMessage(payload);
       }
     } catch (error: any) {
       toast.error(error?.message || "Không thể gửi file.");
@@ -1473,7 +1474,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
       return;
     }
     try {
-      const res = await api.request("POST", "/api/chat/conversations", {
+      const res = await api.createChatConversation({
         type: "group",
         groupName: groupName.trim() || "Nhóm chat",
         memberIds,
@@ -1577,7 +1578,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
             <h1 style={{ fontSize: 20, fontWeight: 700, color: "#1a1a1a", margin: 0 }}>Tin nhắn</h1>
             <div style={{ display: "flex", gap: 6 }}>
-              {/* Plus button - orange */}
+              {/* Plus button */}
               <button type="button" onClick={() => setShowCreateGroup(true)} style={{
                 width: 34, height: 34, borderRadius: 10,
                 border: "none", background: ORANGE, cursor: "pointer",
@@ -1932,7 +1933,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                       <button type="button" onClick={() => attachmentInputRef.current?.click()} disabled={isUploadingAttachment} style={{ width: 38, height: 38, borderRadius: 10, border: "1px solid #f0f0f0", background: "#f8f8f8", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: ORANGE, flexShrink: 0 }}>
                         {isUploadingAttachment ? <Loader2 size={17} style={{ animation: "spin 1s linear infinite" }} /> : <ImageIcon size={17} />}
                       </button>
-                      <button type="button" title="Live" onClick={() => startCall("video")} style={{ width: 38, height: 38, borderRadius: 10, border: "1px solid #fed7aa", background: "#fff7ed", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: ORANGE, flexShrink: 0 }}><Video size={17} /></button>
+                      <button type="button" title="Live" onClick={() => startCall("video")} style={{ width: 38, height: 38, borderRadius: 10, border: "1px solid #bae6fd", background: "#f0f9ff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: ORANGE, flexShrink: 0 }}><Video size={17} /></button>
                       <div className="message-composer-input" style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", background: "#f8f8f8", borderRadius: 20, border: "1px solid #f0f0f0", padding: "0 12px" }}>
                         <input
                           type="text"
@@ -1978,7 +1979,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                   <div style={{ flex: 1, overflowY: "auto", padding: 14 }}>
                     {infoTab === "info" ? (
                       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                        <div style={{ background: `linear-gradient(135deg, ${ORANGE_LIGHT}, #fff8f5)`, borderRadius: 18, padding: 18, textAlign: "center" }}>
+                        <div style={{ background: `linear-gradient(135deg, ${ORANGE_LIGHT}, #f0f9ff)`, borderRadius: 18, padding: 18, textAlign: "center" }}>
                           <img src={selectedChatAvatar} alt={selectedChat.name} style={{ width: 64, height: 64, borderRadius: 20, objectFit: "cover", border: "3px solid #fff", boxShadow: `0 4px 16px ${ORANGE}30` }} />
                           <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginTop: 10 }}>{selectedChat.name}</div>
                           <div style={{ fontSize: 12, color: ORANGE, marginTop: 4 }}>{selectedChat.isOnline ? "🟢 Đang hoạt động" : "⭕ Ngoại tuyến"}</div>
@@ -2017,7 +2018,7 @@ export default function MessagesPage({ currentUser }: MessagesPageProps) {
                               />
                             ))}
                           </div>
-                          <button type="button" onClick={() => chatBackgroundInputRef.current?.click()} style={{ marginTop: 8, width: "100%", height: 34, borderRadius: 10, border: "1px solid #fed7aa", background: "#fff7ed", color: ORANGE, cursor: "pointer", fontSize: 12, fontWeight: 800 }}>
+                          <button type="button" onClick={() => chatBackgroundInputRef.current?.click()} style={{ marginTop: 8, width: "100%", height: 34, borderRadius: 10, border: "1px solid #bae6fd", background: "#f0f9ff", color: ORANGE, cursor: "pointer", fontSize: 12, fontWeight: 800 }}>
                             Tải ảnh nền lên
                           </button>
                         </div>

@@ -83,12 +83,12 @@ export function Header({
           onClick={onViewFeed}
           className="flex items-center gap-2.5 cursor-pointer hover:opacity-90 transition-opacity bg-transparent border-0 p-0 shrink-0"
         >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#F26B38] to-[#D9541E] shadow-[0_3px_10px_rgba(242,107,56,0.4)]">
-            <span className="text-white font-extrabold text-sm tracking-tight">FP</span>
+          <div className="brand-mark flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
+            <span className="text-white font-extrabold text-sm tracking-tight">DJ</span>
           </div>
           <div className="flex flex-col text-left hidden sm:flex">
-            <span className="text-[#D9541E] font-bold text-sm leading-tight tracking-tight">
-              FPT Polytechnic
+            <span className="brand-title font-bold text-sm leading-tight tracking-tight">
+              Don Jade Roy
             </span>
             <span className="text-[10px] text-slate-400 font-medium tracking-wide">Knowledge Hub</span>
           </div>
@@ -101,7 +101,7 @@ export function Header({
             type="text"
             placeholder="Tìm kiếm bài viết, tài liệu, môn học..."
             className="pl-9 pr-4 h-9 bg-slate-50 border-slate-200 rounded-xl text-sm
-              focus:bg-white focus:border-[#F26B38] focus:ring-2 focus:ring-[#F26B38]/20
+              focus:bg-white focus:border-[#0ea5e9] focus:ring-2 focus:ring-[#0ea5e9]/20
               transition-all placeholder:text-slate-400"
             value={searchQuery}
             onFocus={() => setIsUserSearchOpen(true)}
@@ -118,7 +118,7 @@ export function Header({
                   type="button"
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => openUserProfile(item.id)}
-                  className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-orange-50"
+                  className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-sky-50"
                 >
                   <img
                     src={item.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.id}`}
@@ -129,7 +129,7 @@ export function Header({
                     <div className="truncate text-sm font-semibold text-slate-800">{item.name || "Người dùng"}</div>
                     <div className="truncate text-xs text-slate-500">{item.email || item.role || ""}</div>
                   </div>
-                  <span className="text-xs font-semibold text-[#F26B38]">Xem</span>
+                  <span className="text-xs font-semibold text-[#0284c7]">Xem</span>
                 </button>
               ))}
             </div>
@@ -147,7 +147,7 @@ export function Header({
           {/* Create post button – gradient */}
           <Button
             onClick={onCreatePost}
-            className="btn-gradient-orange h-9 px-3 sm:px-4 rounded-xl font-semibold text-sm"
+            className="btn-gradient-ocean h-9 px-3 sm:px-4 rounded-xl font-semibold text-sm"
           >
             <Plus className="h-4 w-4 sm:mr-1.5" />
             <span className="hidden sm:inline">Đăng bài</span>
@@ -158,7 +158,7 @@ export function Header({
             variant="ghost"
             size="icon"
             onClick={onViewMessages}
-            className="h-9 w-9 rounded-xl text-slate-500 hover:text-[#F26B38] hover:bg-[#FEF0E8] relative"
+            className="h-9 w-9 rounded-xl text-slate-500 hover:text-[#0284c7] hover:bg-sky-50 relative"
             title="Tin nhắn"
           >
             <MessageCircle className="h-5 w-5" />
@@ -192,7 +192,7 @@ export function Header({
                   <span className="text-xs font-semibold line-clamp-1 max-w-[90px] text-slate-700">
                     {currentUser?.name || "Đang tải..."}
                   </span>
-                  <span className="text-[10px] text-[#F26B38] font-medium">
+                  <span className="text-[10px] text-[#0284c7] font-medium">
                     {(currentUser?.points || 0).toLocaleString()} điểm
                   </span>
                 </div>
@@ -201,11 +201,11 @@ export function Header({
 
             <DropdownMenuContent align="end" className="w-56 rounded-xl shadow-lg border-slate-100 p-1">
               {/* User info header */}
-              <div className="px-3 py-2.5 mb-1 rounded-lg bg-gradient-to-r from-[#FEF0E8] to-[#FFF7F3]">
+              <div className="px-3 py-2.5 mb-1 rounded-lg bg-gradient-to-r from-sky-50 to-cyan-50">
                 <p className="text-sm font-semibold text-slate-800 line-clamp-1">
                   {currentUser?.name || "Người dùng"}
                 </p>
-                <p className="text-xs text-[#F26B38] font-medium mt-0.5 flex items-center gap-1">
+                <p className="text-xs text-[#0284c7] font-medium mt-0.5 flex items-center gap-1">
                   <Trophy className="h-3 w-3" />
                   {(currentUser?.points || 0).toLocaleString()} điểm tích lũy
                 </p>

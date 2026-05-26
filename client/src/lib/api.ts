@@ -139,6 +139,24 @@ function unwrapData(res: any) {
   return res.data !== undefined ? res.data : res;
 }
 
+function unwrapPage(res: any) {
+  const payload = unwrapData(res);
+  if (!payload || typeof payload !== 'object') {
+    return { content: Array.isArray(payload) ? payload : [], page: 0, size: 0, totalElements: 0, totalPages: 0 };
+  }
+  if (Array.isArray(payload)) {
+    return { content: payload, page: 0, size: payload.length, totalElements: payload.length, totalPages: 1 };
+  }
+  return {
+    ...payload,
+    content: Array.isArray(payload.content) ? payload.content : [],
+    page: Number.isFinite(Number(payload.page)) ? Number(payload.page) : 0,
+    size: Number.isFinite(Number(payload.size)) ? Number(payload.size) : 0,
+    totalElements: Number.isFinite(Number(payload.totalElements)) ? Number(payload.totalElements) : 0,
+    totalPages: Number.isFinite(Number(payload.totalPages)) ? Number(payload.totalPages) : 0,
+  };
+}
+
 function unwrapDeepData(res: any) {
   let value = res;
   for (let i = 0; i < 6; i += 1) {
@@ -606,6 +624,63 @@ export async function searchUsersToChat(keyword: string, token?: string) {
   return users;
 }
 
+export async function getChatConversationsPage(page = 0, size = 50, token?: string) {
+  const res = await request('GET', `/api/chat/conversations/page?page=${page}&size=${size}`, undefined, token);
+  return unwrapPage(res);
+}
+
+export async function getChatMessagesPage(conversationId: string, limit = 100, beforeMessageId?: string | null, token?: string) {
+  const cursor = beforeMessageId ? `&beforeMessageId=${encodeURIComponent(beforeMessageId)}` : '';
+  const res = await request(
+    'GET',
+    `/api/chat/messages/${encodeURIComponent(conversationId)}/page?limit=${limit}${cursor}`,
+    undefined,
+    token,
+  );
+  const payload = unwrapData(res);
+  return payload || { messages: [], hasMore: false, nextBeforeMessageId: null };
+}
+
+export async function markChatConversationRead(conversationId: string, token?: string) {
+  const res = await request('POST', `/api/chat/conversations/${encodeURIComponent(conversationId)}/read`, undefined, token);
+  return unwrapData(res);
+}
+
+export async function sendChatMessage(data: any, token?: string) {
+  const res = await request('POST', '/api/chat/messages', data, token);
+  return unwrapData(res);
+}
+
+export async function createChatConversation(data: any, token?: string) {
+  const res = await request('POST', '/api/chat/conversations', data, token);
+  return unwrapData(res);
+}
+
+export async function acceptChatConversation(conversationId: string, token?: string) {
+  const res = await request('PUT', `/api/chat/conversations/${encodeURIComponent(conversationId)}/accept`, undefined, token);
+  return unwrapData(res);
+}
+
+export async function rejectChatConversation(conversationId: string, token?: string) {
+  const res = await request('POST', `/api/chat/conversations/${encodeURIComponent(conversationId)}/reject`, undefined, token);
+  return unwrapData(res);
+}
+
+export async function updateChatConversationBackground(conversationId: string, data: any, token?: string) {
+  const res = await request('PUT', `/api/chat/conversations/${encodeURIComponent(conversationId)}/background`, data, token);
+  return unwrapData(res);
+}
+
+export async function editChatMessage(messageId: string, content: string, token?: string) {
+  const res = await request('PUT', `/api/chat/messages/${encodeURIComponent(messageId)}`, { content }, token);
+  return unwrapData(res);
+}
+
+export async function deleteChatMessage(messageId: string, token?: string) {
+  const res = await request('DELETE', `/api/chat/messages/${encodeURIComponent(messageId)}`, undefined, token);
+  return unwrapData(res);
+}
+
 // ==================== BADGES ====================
 export async function getBadges(token?: string) {
   const res = await request('GET', '/api/badges', undefined, token);
@@ -848,6 +923,16 @@ export default {
   // Chat & Messaging (NEW)
   getMutualFollowersForChat,
   searchUsersToChat,
+  getChatConversationsPage,
+  getChatMessagesPage,
+  markChatConversationRead,
+  sendChatMessage,
+  createChatConversation,
+  acceptChatConversation,
+  rejectChatConversation,
+  updateChatConversationBackground,
+  editChatMessage,
+  deleteChatMessage,
   
   // Video Calls
   getCallHistory,

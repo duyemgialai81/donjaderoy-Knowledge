@@ -141,13 +141,13 @@ export function AdminDashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#fff7ed_0%,#ffffff_28%,#fffaf5_100%)] p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-[linear-gradient(180deg,#f0f9ff_0%,#ffffff_28%,#f8fbff_100%)] p-4 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-7xl">
         {/* Header */}
         <div className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-orange-700 shadow-sm">
+              <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-sky-700 shadow-sm">
                 <Shield className="h-3.5 w-3.5" /> Quản trị viên
               </div>
               <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">Trung tâm điều khiển</h1>
@@ -161,7 +161,7 @@ export function AdminDashboard() {
                 <span className="hidden xs:inline font-semibold">Xuất báo cáo</span>
                 <span className="xs:hidden font-semibold">Xuất</span>
               </Button>
-              <Button className="h-11 rounded-xl bg-gradient-to-r from-[#F26B38] to-[#F37B4D] hover:from-[#e35d2a] hover:to-[#e36a3e] text-white shadow-sm flex-1 sm:flex-none transition-all">
+              <Button className="h-11 rounded-xl bg-gradient-to-r from-sky-600 to-cyan-500 hover:from-sky-700 hover:to-cyan-600 text-white shadow-sm flex-1 sm:flex-none transition-all">
                 <BarChart3 className="h-4 w-4 mr-2" />
                 <span className="hidden xs:inline font-semibold">Phân tích chi tiết</span>
                 <span className="xs:hidden font-semibold">Phân tích</span>
@@ -191,7 +191,7 @@ export function AdminDashboard() {
           </Card>
 
           <Card className="card-premium group hover:-translate-y-1 transition-all duration-300 border-none shadow-sm hover:shadow-md relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-orange-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="absolute inset-0 bg-gradient-to-br from-sky-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
             <CardContent className="pt-6 relative">
               <div className="flex items-center justify-between">
                 <div>
@@ -201,7 +201,7 @@ export function AdminDashboard() {
                     <TrendingUp className="h-3 w-3" /> +8% tuần này
                   </p>
                 </div>
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#FEF0E8] text-[#F26B38] group-hover:scale-110 group-hover:bg-orange-100 transition-all">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-50 text-sky-600 group-hover:scale-110 group-hover:bg-sky-100 transition-all">
                   <FileText className="h-7 w-7" />
                 </div>
               </div>
@@ -251,13 +251,13 @@ export function AdminDashboard() {
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <div className="border-b border-slate-100 px-4 sm:px-0">
                 <TabsList className="flex w-full sm:w-auto overflow-x-auto bg-transparent gap-2 pb-0 mb-[-1px] no-scrollbar">
-                  <TabsTrigger value="overview" className="flex items-center gap-2 px-4 py-2.5 rounded-t-xl rounded-b-none data-[state=active]:bg-white data-[state=active]:border-t data-[state=active]:border-x data-[state=active]:border-slate-100 data-[state=active]:shadow-none data-[state=active]:text-[#D9541E] text-slate-500 font-semibold transition-all whitespace-nowrap">
+                  <TabsTrigger value="overview" className="flex items-center gap-2 px-4 py-2.5 rounded-t-xl rounded-b-none data-[state=active]:bg-white data-[state=active]:border-t data-[state=active]:border-x data-[state=active]:border-slate-100 data-[state=active]:shadow-none data-[state=active]:text-sky-700 text-slate-500 font-semibold transition-all whitespace-nowrap">
                     <TrendingUp className="h-4 w-4" /> Tổng quan
                   </TabsTrigger>
-                  <TabsTrigger value="users" className="flex items-center gap-2 px-4 py-2.5 rounded-t-xl rounded-b-none data-[state=active]:bg-white data-[state=active]:border-t data-[state=active]:border-x data-[state=active]:border-slate-100 data-[state=active]:shadow-none data-[state=active]:text-[#D9541E] text-slate-500 font-semibold transition-all whitespace-nowrap">
+                  <TabsTrigger value="users" className="flex items-center gap-2 px-4 py-2.5 rounded-t-xl rounded-b-none data-[state=active]:bg-white data-[state=active]:border-t data-[state=active]:border-x data-[state=active]:border-slate-100 data-[state=active]:shadow-none data-[state=active]:text-sky-700 text-slate-500 font-semibold transition-all whitespace-nowrap">
                     <Users className="h-4 w-4" /> Người dùng
                   </TabsTrigger>
-                  <TabsTrigger value="posts" className="flex items-center gap-2 px-4 py-2.5 rounded-t-xl rounded-b-none data-[state=active]:bg-white data-[state=active]:border-t data-[state=active]:border-x data-[state=active]:border-slate-100 data-[state=active]:shadow-none data-[state=active]:text-[#D9541E] text-slate-500 font-semibold transition-all whitespace-nowrap">
+                  <TabsTrigger value="posts" className="flex items-center gap-2 px-4 py-2.5 rounded-t-xl rounded-b-none data-[state=active]:bg-white data-[state=active]:border-t data-[state=active]:border-x data-[state=active]:border-slate-100 data-[state=active]:shadow-none data-[state=active]:text-sky-700 text-slate-500 font-semibold transition-all whitespace-nowrap">
                     <FileText className="h-4 w-4" /> Bài viết
                   </TabsTrigger>
                   <TabsTrigger value="reports" className="flex items-center gap-2 px-4 py-2.5 rounded-t-xl rounded-b-none data-[state=active]:bg-white data-[state=active]:border-t data-[state=active]:border-x data-[state=active]:border-slate-100 data-[state=active]:shadow-none data-[state=active]:text-rose-600 text-slate-500 font-semibold transition-all whitespace-nowrap">
@@ -320,7 +320,7 @@ export function AdminDashboard() {
                           .slice(0, 5)
                           .map((user, index) => (
                             <div key={user.id} className="flex items-center gap-3 p-2 bg-white rounded-xl border border-slate-100">
-                              <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${index === 0 ? 'bg-amber-100 text-amber-600' : index === 1 ? 'bg-slate-200 text-slate-600' : index === 2 ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-500'}`}>
+                              <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${index === 0 ? 'bg-amber-100 text-amber-600' : index === 1 ? 'bg-slate-200 text-slate-600' : index === 2 ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 text-slate-500'}`}>
                                 {index + 1}
                               </div>
                               <img
@@ -330,7 +330,7 @@ export function AdminDashboard() {
                               />
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-semibold text-slate-800 truncate">{user.name}</p>
-                                <p className="text-xs font-medium text-[#F26B38]">{user.points} điểm</p>
+                                <p className="text-xs font-medium text-sky-600">{user.points} điểm</p>
                               </div>
                               <Badge
                                 variant="outline"
@@ -354,7 +354,7 @@ export function AdminDashboard() {
                         {posts.slice(0, 5).map((post: any) => {
                           const author = users.find((u) => u.id === post.authorId);
                           return (
-                            <div key={post.id} className="flex items-start gap-4 p-4 bg-white rounded-xl border border-slate-100 transition-colors hover:border-orange-200">
+                            <div key={post.id} className="flex items-start gap-4 p-4 bg-white rounded-xl border border-slate-100 transition-colors hover:border-sky-200">
                               <img
                                 src={author?.avatar}
                                 alt={author?.name}
@@ -386,13 +386,13 @@ export function AdminDashboard() {
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <Input
                       placeholder="Tìm kiếm người dùng..."
-                      className="pl-10 h-11 bg-slate-50 border-transparent focus:border-orange-200 focus:bg-white rounded-xl transition-all"
+                      className="pl-10 h-11 bg-slate-50 border-transparent focus:border-sky-200 focus:bg-white rounded-xl transition-all"
                       value={userSearchQuery}
                       onChange={(e) => setUserSearchQuery(e.target.value)}
                     />
                   </div>
                   <Select defaultValue="all">
-                    <SelectTrigger className="w-full sm:w-[180px] h-11 rounded-xl bg-slate-50 border-transparent focus:border-orange-200">
+                    <SelectTrigger className="w-full sm:w-[180px] h-11 rounded-xl bg-slate-50 border-transparent focus:border-sky-200">
                       <SelectValue placeholder="Lọc theo" />
                     </SelectTrigger>
                     <SelectContent className="rounded-xl">
@@ -425,7 +425,7 @@ export function AdminDashboard() {
                                 <img
                                   src={user.avatar}
                                   alt={user.name}
-                                  className="h-10 w-10 rounded-full object-cover ring-2 ring-transparent group-hover:ring-orange-100 transition-all"
+                                  className="h-10 w-10 rounded-full object-cover ring-2 ring-transparent group-hover:ring-sky-100 transition-all"
                                 />
                                 <div>
                                   <p className="text-sm font-semibold text-slate-800">{user.name}</p>
@@ -445,7 +445,7 @@ export function AdminDashboard() {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-sm text-slate-600 font-medium">{user.major}</TableCell>
-                            <TableCell className="text-sm text-center font-bold text-[#F26B38]">{user.points.toLocaleString()}</TableCell>
+                            <TableCell className="text-sm text-center font-bold text-sky-600">{user.points.toLocaleString()}</TableCell>
                             <TableCell className="text-sm text-center font-medium text-slate-700">{user.postsCount}</TableCell>
                             <TableCell className="text-right">
                               <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
@@ -472,13 +472,13 @@ export function AdminDashboard() {
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <Input
                       placeholder="Tìm kiếm bài viết..."
-                      className="pl-10 h-11 bg-slate-50 border-transparent focus:border-orange-200 focus:bg-white rounded-xl transition-all"
+                      className="pl-10 h-11 bg-slate-50 border-transparent focus:border-sky-200 focus:bg-white rounded-xl transition-all"
                       value={postSearchQuery}
                       onChange={(e) => setPostSearchQuery(e.target.value)}
                     />
                   </div>
                   <Select defaultValue="all">
-                    <SelectTrigger className="w-full sm:w-[180px] h-11 rounded-xl bg-slate-50 border-transparent focus:border-orange-200">
+                    <SelectTrigger className="w-full sm:w-[180px] h-11 rounded-xl bg-slate-50 border-transparent focus:border-sky-200">
                       <SelectValue placeholder="Trạng thái" />
                     </SelectTrigger>
                     <SelectContent className="rounded-xl">
@@ -510,7 +510,7 @@ export function AdminDashboard() {
                             <TableRow key={post.id} className="group hover:bg-slate-50/80 transition-colors border-b border-slate-50 last:border-0">
                               <TableCell className="py-4">
                                 <div className="pr-4">
-                                  <p className="text-sm font-semibold text-slate-800 line-clamp-1 group-hover:text-[#F26B38] transition-colors">{post.title}</p>
+                                  <p className="text-sm font-semibold text-slate-800 line-clamp-1 group-hover:text-sky-600 transition-colors">{post.title}</p>
                                   <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide mt-1">
                                     {formatVietnamDistance(post.createdAt)}
                                   </p>
@@ -598,7 +598,7 @@ export function AdminDashboard() {
                                 </div>
                                 <div className="flex items-center gap-2 max-w-full">
                                   <span className="text-slate-500 font-medium">Bài viết:</span>
-                                  <span className="font-semibold text-slate-800 truncate max-w-xs block hover:text-[#F26B38] cursor-pointer transition-colors">
+                                  <span className="font-semibold text-slate-800 truncate max-w-xs block hover:text-sky-600 cursor-pointer transition-colors">
                                     {post?.title}
                                   </span>
                                 </div>
@@ -685,7 +685,7 @@ export function AdminDashboard() {
                 Từ chối
               </Button>
               <Button
-                className="bg-orange-600 hover:bg-orange-700"
+                className="bg-sky-600 hover:bg-sky-700"
                 onClick={() => handleReportAction(selectedReport.id, "approve")}
               >
                 Xác nhận vi phạm

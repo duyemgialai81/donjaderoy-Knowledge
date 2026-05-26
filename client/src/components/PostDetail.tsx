@@ -476,7 +476,7 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
             }}
           />
           <div className="flex-1 min-w-0">
-            <div className={`bg-slate-100/80 rounded-2xl rounded-tl-none p-3.5 inline-block min-w-[200px] max-w-full ${replyTo === comment.id ? 'ring-2 ring-orange-200 bg-orange-50/80' : ''}`}>
+            <div className={`bg-slate-100/80 rounded-2xl rounded-tl-none p-3.5 inline-block min-w-[200px] max-w-full ${replyTo === comment.id ? 'ring-2 ring-sky-200 bg-sky-50/80' : ''}`}>
               <div className="flex items-center gap-2 mb-1.5">
                 <span className="text-sm font-bold text-slate-800">{commentAuthor.name}</span>
                 {commentAuthor.role === 'lecturer' && (
@@ -495,7 +495,7 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
                     <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setEditingCommentId(null); setEditingCommentContent(""); }}>
                       Hủy
                     </Button>
-                    <Button type="button" size="sm" className="h-7 px-3 text-xs btn-gradient-orange" onClick={() => handleEditComment(comment.id)} disabled={!editingCommentContent.trim()}>
+                    <Button type="button" size="sm" className="h-7 px-3 text-xs btn-gradient-ocean" onClick={() => handleEditComment(comment.id)} disabled={!editingCommentContent.trim()}>
                       Lưu
                     </Button>
                   </div>
@@ -510,7 +510,7 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
                 <ThumbsUp className="h-3.5 w-3.5" />
                 <span>{comment.likes || 0}</span>
               </button>
-              <button className={`transition-colors ${replyTo === comment.id ? 'text-[#F26B38] font-bold' : 'hover:text-[#F26B38]'}`} onClick={() => setReplyTo(replyTo === comment.id ? null : comment.id)}>
+              <button className={`transition-colors ${replyTo === comment.id ? 'text-sky-600 font-bold' : 'hover:text-sky-600'}`} onClick={() => setReplyTo(replyTo === comment.id ? null : comment.id)}>
                 Trả lời
               </button>
               <button className="hover:text-red-600 flex items-center gap-1 transition-colors" onClick={() => handleReportComment(comment.id)}>
@@ -519,7 +519,7 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
               {currentUser?.id === comment.authorId && (
                 <>
                   <button
-                    className="hover:text-[#F26B38] flex items-center gap-1 transition-colors opacity-0 group-hover:opacity-100 ml-auto"
+                    className="hover:text-sky-600 flex items-center gap-1 transition-colors opacity-0 group-hover:opacity-100 ml-auto"
                     onClick={() => {
                       setEditingCommentId(comment.id);
                       setEditingCommentContent(comment.content || "");
@@ -561,7 +561,7 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
         {/* ── Header ── */}
         <div className="sticky top-0 bg-white/95 backdrop-blur-md border-b border-slate-100 px-6 py-4 flex items-center justify-between z-20">
           <div className="flex items-center gap-2 text-slate-800">
-            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-[#F26B38] to-[#D9541E] flex items-center justify-center shadow-sm">
+            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-sky-600 to-cyan-500 flex items-center justify-center shadow-sm">
               <FileText className="h-4 w-4 text-white" />
             </div>
             <h2 className="text-lg font-bold">Chi tiết bài viết</h2>
@@ -612,7 +612,7 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
                 className={`h-9 px-4 rounded-xl text-sm font-semibold transition-all ${
                   isFollowing 
                     ? "bg-slate-100 text-slate-700 hover:bg-slate-200" 
-                    : "btn-gradient-orange"
+                    : "btn-gradient-ocean"
                 }`}
               >
                 {isFollowing ? 'Đang theo dõi' : 'Theo dõi'}
@@ -632,7 +632,7 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-tight mb-4">{post.title}</h1>
 
           <div className="flex flex-wrap gap-2 mb-8">
-            <Badge className="bg-[#FEF0E8] text-[#D9541E] hover:bg-[#FEF0E8] border-none px-2.5 py-0.5 text-xs font-semibold">
+            <Badge className="bg-sky-50 text-sky-700 hover:bg-sky-50 border-none px-2.5 py-0.5 text-xs font-semibold">
               {post.topic || 'Chủ đề chung'}
             </Badge>
             <Badge className="bg-blue-50 text-blue-600 hover:bg-blue-50 border-none px-2.5 py-0.5 text-xs font-semibold">
@@ -646,7 +646,7 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
           </div>
 
           {/* ── Post Content ── */}
-          <div className="prose prose-slate max-w-none mb-10 prose-p:leading-relaxed prose-p:text-slate-700 prose-a:text-[#F26B38]">
+          <div className="prose prose-slate max-w-none mb-10 prose-p:leading-relaxed prose-p:text-slate-700 prose-a:text-sky-600">
             <p className="whitespace-pre-wrap">{post.content}</p>
           </div>
 
@@ -659,9 +659,9 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {post.attachments.map((file) => (
-                  <div key={file.id} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-xl hover:border-[#F26B38] transition-colors group">
+                  <div key={file.id} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-xl hover:border-sky-300 transition-colors group">
                     <div className="flex items-center gap-3 overflow-hidden">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#FEF0E8] text-[#F26B38] group-hover:scale-105 transition-transform">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-sky-50 text-sky-600 group-hover:scale-105 transition-transform">
                         <FileText className="h-5 w-5" />
                       </div>
                       <div className="min-w-0">
@@ -669,7 +669,7 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
                         <p className="text-[10px] text-slate-400 font-medium">{file.size}</p>
                       </div>
                     </div>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 group-hover:text-[#F26B38] rounded-lg shrink-0">
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 group-hover:text-sky-600 rounded-lg shrink-0">
                       <Download className="h-4 w-4" />
                     </Button>
                   </div>
@@ -732,11 +732,11 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
             <h3 className="text-lg font-bold text-slate-800 mb-5">Bình luận ({commentsCount})</h3>
 
             {/* Comment Input Box */}
-            <div className="mb-8 p-4 rounded-2xl border border-slate-200 bg-slate-50 focus-within:border-[#F26B38] focus-within:ring-2 focus-within:ring-[#F26B38]/20 transition-all">
+            <div className="mb-8 p-4 rounded-2xl border border-slate-200 bg-slate-50 focus-within:border-sky-300 focus-within:ring-2 focus-within:ring-sky-200 transition-all">
               {replyTo && (
-                <div className="flex items-center justify-between mb-3 px-3 py-1.5 bg-[#FEF0E8] border border-orange-100 rounded-lg">
-                  <span className="text-xs font-semibold text-[#D9541E]">Đang trả lời bình luận...</span>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-orange-200 text-[#D9541E]" onClick={() => setReplyTo(null)}>
+                <div className="flex items-center justify-between mb-3 px-3 py-1.5 bg-sky-50 border border-sky-100 rounded-lg">
+                  <span className="text-xs font-semibold text-sky-700">Đang trả lời bình luận...</span>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-sky-200 text-sky-700" onClick={() => setReplyTo(null)}>
                     <X className="h-3 w-3" />
                   </Button>
                 </div>
@@ -768,7 +768,7 @@ export function PostDetail({ post, isOpen, onClose, onLike, onUserUpdate }: Post
                     <Button
                       size="sm"
                       onClick={handleAddComment}
-                      className="h-8 px-4 rounded-lg text-xs font-semibold btn-gradient-orange"
+                      className="h-8 px-4 rounded-lg text-xs font-semibold btn-gradient-ocean"
                       disabled={!currentUser || !newComment.trim()}
                     >
                       Gửi bình luận

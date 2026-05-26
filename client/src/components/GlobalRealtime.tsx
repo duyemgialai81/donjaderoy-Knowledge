@@ -307,13 +307,13 @@ export function GlobalRealtime() {
   return (
     <div role="dialog" aria-modal="true" aria-label="Cuộc gọi đến" style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(15,23,42,0.52)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <div style={{ width: "min(420px, 100%)", borderRadius: 24, background: "linear-gradient(180deg,#111827 0%,#0f172a 100%)", color: "#fff", boxShadow: "0 30px 90px rgba(15,23,42,0.45)", padding: 24, textAlign: "center" }}>
-        <img src={callerAvatar} alt="" style={{ width: 76, height: 76, margin: "0 auto 14px", borderRadius: 24, objectFit: "cover", background: "#f97316", display: "block" }} />
-        <div style={{ fontSize: 13, color: "#fb923c", fontWeight: 700, marginBottom: 6 }}>{isVideo ? "Cuộc gọi video đến" : "Cuộc gọi đến"}</div>
+        <img src={callerAvatar} alt="" style={{ width: 76, height: 76, margin: "0 auto 14px", borderRadius: 24, objectFit: "cover", background: "#0284c7", display: "block" }} />
+        <div style={{ fontSize: 13, color: "#38bdf8", fontWeight: 700, marginBottom: 6 }}>{isVideo ? "Cuộc gọi video đến" : "Cuộc gọi đến"}</div>
         <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>{callerName}</div>
         <div style={{ fontSize: 13, color: "#cbd5e1", marginBottom: 22 }}>Đang gọi cho bạn</div>
         <div style={{ display: "flex", gap: 12 }}>
           <button type="button" onClick={rejectIncomingCall} style={{ flex: 1, height: 46, borderRadius: 14, border: "none", background: "#ef4444", color: "#fff", fontWeight: 800, cursor: "pointer" }}>Từ chối</button>
-          <button type="button" onClick={answerIncomingCall} style={{ flex: 1, height: 46, borderRadius: 14, border: "none", background: "#f97316", color: "#fff", fontWeight: 800, cursor: "pointer" }}>Trả lời</button>
+          <button type="button" onClick={answerIncomingCall} style={{ flex: 1, height: 46, borderRadius: 14, border: "none", background: "#0284c7", color: "#fff", fontWeight: 800, cursor: "pointer" }}>Trả lời</button>
         </div>
       </div>
     </div>

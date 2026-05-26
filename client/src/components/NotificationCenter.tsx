@@ -182,7 +182,7 @@ export function NotificationCenter() {
       case "follow": return "bg-emerald-100 text-emerald-500";
       case "badge": return "bg-amber-100 text-amber-500";
       case "message": return "bg-sky-100 text-sky-500";
-      case "call": return "bg-orange-100 text-orange-500";
+      case "call": return "bg-sky-100 text-sky-500";
       case "report": return "bg-red-100 text-red-500";
       case "mention": return "bg-purple-100 text-purple-500";
       default: return "bg-slate-100 text-slate-500";
@@ -192,7 +192,7 @@ export function NotificationCenter() {
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative h-11 w-11 rounded-full border border-transparent hover:border-orange-100 hover:bg-orange-50 text-slate-500 hover:text-orange-600 transition-all">
+        <Button variant="ghost" size="icon" className="relative h-11 w-11 rounded-full border border-transparent hover:border-sky-100 hover:bg-sky-50 text-slate-500 hover:text-sky-600 transition-all">
           <Bell className="h-[22px] w-[22px]" />
           {unreadCount > 0 && (
             <span className="notif-dot absolute right-1.5 top-1.5 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-gradient-to-r from-red-500 to-rose-500 border-2 border-white text-[9px] font-bold text-white shadow-sm">
@@ -207,7 +207,7 @@ export function NotificationCenter() {
             <SheetTitle className="flex min-w-0 items-start justify-between gap-3 text-xl [&>span:first-child]:min-w-0 [&>span:first-child]:truncate">
               <span className="font-extrabold text-slate-900 tracking-tight">Thông báo</span>
               {unreadCount > 0 && (
-                <Badge className="shrink-0 rounded-full border-none bg-orange-100 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-orange-700 shadow-sm hover:bg-orange-100">
+                <Badge className="shrink-0 rounded-full border-none bg-sky-100 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-sky-700 shadow-sm hover:bg-sky-100">
                   {unreadCount} mới
                 </Badge>
               )}
@@ -216,7 +216,7 @@ export function NotificationCenter() {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="ml-1 h-9 w-9 shrink-0 rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-orange-50 hover:text-orange-600 sm:h-8 sm:w-8"
+                  className="ml-1 h-9 w-9 shrink-0 rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-sky-50 hover:text-sky-600 sm:h-8 sm:w-8"
                   aria-label="Đóng thông báo"
                 >
                   <X className="h-4 w-4" />
@@ -260,7 +260,7 @@ export function NotificationCenter() {
                   className={`group relative rounded-[20px] p-4 transition-all duration-300 ${
                     notification.read
                       ? "bg-white border border-slate-100 hover:border-slate-200 hover:shadow-md"
-                      : "bg-gradient-to-br from-orange-50/80 to-white border border-orange-200 shadow-sm hover:shadow-md"
+                      : "bg-gradient-to-br from-sky-50/80 to-white border border-sky-200 shadow-sm hover:shadow-md"
                   }`}
                 >
                   <div className="flex items-start gap-3.5">
@@ -305,7 +305,7 @@ export function NotificationCenter() {
                   </div>
 
                   {!notification.read && (
-                    <div className="notif-dot absolute top-5 right-5 h-2.5 w-2.5 rounded-full bg-orange-500 border border-white shadow-sm" />
+                    <div className="notif-dot absolute top-5 right-5 h-2.5 w-2.5 rounded-full bg-sky-500 border border-white shadow-sm" />
                   )}
                 </div>
               ))

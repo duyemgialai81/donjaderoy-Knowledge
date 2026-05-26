@@ -110,7 +110,7 @@ export function FilterPanel({ filters, onFilterChange, isOpen, onToggle }: Filte
           {/* Step 1: Ngành học */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 mb-1.5">
-              <GraduationCap className="h-4 w-4 text-orange-600 shrink-0" />
+              <GraduationCap className="h-4 w-4 text-sky-600 shrink-0" />
               <span className="text-xs sm:text-sm text-gray-600 truncate">
                 Bước 1: Chọn ngành học
               </span>
@@ -124,7 +124,7 @@ export function FilterPanel({ filters, onFilterChange, isOpen, onToggle }: Filte
                 {majors.map((major) => (
                   <SelectItem key={major.id} value={major.id}>
                     <div className="flex items-center gap-2">
-                      <span className="text-orange-600 font-medium">{major.code}</span>
+                      <span className="text-sky-600 font-medium">{major.code}</span>
                       <span>{major.name}</span>
                     </div>
                   </SelectItem>
@@ -219,7 +219,7 @@ export function FilterPanel({ filters, onFilterChange, isOpen, onToggle }: Filte
               onClick={onToggle}
               className={`
                 h-9 sm:h-10 flex-1 sm:flex-none
-                ${isOpen ? 'bg-orange-600 hover:bg-orange-700 text-white' : ''}
+                ${isOpen ? 'bg-sky-600 hover:bg-sky-700 text-white' : ''}
               `}
             >
               <Filter className="h-4 w-4 sm:mr-2" />
@@ -227,7 +227,7 @@ export function FilterPanel({ filters, onFilterChange, isOpen, onToggle }: Filte
               {activeFiltersCount > 0 && (
                 <Badge
                   variant="destructive"
-                  className="ml-1.5 bg-white text-orange-600 text-xs px-1.5 py-0"
+                  className="ml-1.5 bg-white text-sky-600 text-xs px-1.5 py-0"
                 >
                   {activeFiltersCount}
                 </Badge>
@@ -245,7 +245,7 @@ export function FilterPanel({ filters, onFilterChange, isOpen, onToggle }: Filte
                 <>
                   <Badge
                     variant="outline"
-                    className="bg-orange-50 text-orange-700 border-orange-200 text-xs"
+                    className="bg-sky-50 text-sky-700 border-sky-200 text-xs"
                   >
                     {selectedMajor?.code} - {selectedMajor?.name}
                   </Badge>
@@ -287,8 +287,8 @@ export function FilterPanel({ filters, onFilterChange, isOpen, onToggle }: Filte
                       variant={filters.tags.includes(tag) ? 'default' : 'outline'}
                       className={`cursor-pointer transition-all text-xs sm:text-sm ${
                         filters.tags.includes(tag)
-                          ? 'bg-orange-600 hover:bg-orange-700'
-                          : 'hover:bg-orange-100'
+                          ? 'bg-sky-600 hover:bg-sky-700'
+                          : 'hover:bg-sky-100'
                       }`}
                       onClick={() => handleTagToggle(tag)}
                     >

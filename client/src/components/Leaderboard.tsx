@@ -47,7 +47,7 @@ export function Leaderboard() {
       <div
         className={`flex items-center gap-3 p-2.5 rounded-xl transition-all ${
           isTop3
-            ? "bg-gradient-to-r from-[#FEF0E8] to-[#FFF7F3] border border-orange-100"
+            ? "bg-gradient-to-r from-sky-50 to-cyan-50 border border-sky-100"
             : "hover:bg-slate-50"
         }`}
       >
@@ -66,7 +66,7 @@ export function Leaderboard() {
             }}
           />
           {entry.badgeIcon && (
-            <span className="absolute -bottom-1 -right-1 text-xs bg-white rounded-full p-px border border-orange-100">
+            <span className="absolute -bottom-1 -right-1 text-xs bg-white rounded-full p-px border border-sky-100">
               {entry.badgeIcon}
             </span>
           )}
@@ -80,7 +80,7 @@ export function Leaderboard() {
         </div>
 
         <div className="text-right shrink-0">
-          <p className="text-sm font-bold text-[#F26B38]">{(entry[scoreKey] ?? 0).toLocaleString()}</p>
+          <p className="text-sm font-bold text-sky-600">{(entry[scoreKey] ?? 0).toLocaleString()}</p>
           <p className="text-[10px] text-slate-400">{scoreLabel}</p>
         </div>
       </div>
@@ -90,7 +90,7 @@ export function Leaderboard() {
   return (
     <div className="card-premium p-5">
       <div className="flex items-center gap-2 mb-4">
-        <Trophy className="h-4 w-4 text-[#F26B38]" />
+        <Trophy className="h-4 w-4 text-sky-600" />
         <h3 className="font-semibold text-slate-800 text-sm">Bảng xếp hạng</h3>
       </div>
 

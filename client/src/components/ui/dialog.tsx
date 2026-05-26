@@ -63,7 +63,7 @@ const DialogContent = React.forwardRef<
       >
         <DialogPrimitive.Title className="sr-only">Nội dung</DialogPrimitive.Title>
         {children}
-        <DialogPrimitive.Close className="ring-offset-background focus:ring-orange-200 data-[state=open]:bg-slate-100 data-[state=open]:text-slate-500 absolute top-4 right-4 rounded-full p-1.5 opacity-70 transition-all hover:bg-slate-100 hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none bg-white">
+        <DialogPrimitive.Close className="ring-offset-background focus:ring-sky-200 data-[state=open]:bg-slate-100 data-[state=open]:text-slate-500 absolute top-4 right-4 rounded-full p-1.5 opacity-70 transition-all hover:bg-slate-100 hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none bg-white">
           <XIcon className="h-4 w-4 text-slate-500" />
           <span className="sr-only">Close</span>
         </DialogPrimitive.Close>

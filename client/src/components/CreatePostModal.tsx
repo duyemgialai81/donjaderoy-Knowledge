@@ -135,7 +135,7 @@ export function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePostModalPr
         <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-6 py-4 rounded-t-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2.5 text-base font-bold text-slate-800">
-              <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-[#F26B38] to-[#D9541E] flex items-center justify-center shadow-sm">
+              <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-[#0284c7] to-[#06b6d4] flex items-center justify-center shadow-sm">
                 <FileText className="h-4 w-4 text-white" />
               </div>
               Tạo bài viết mới
@@ -146,7 +146,7 @@ export function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePostModalPr
         <div className="px-6 py-5 space-y-4">
 
           {/* ── Section 1: Basic Info ── */}
-          <SectionCard icon={BookOpen} title="Thông tin cơ bản" iconColor="bg-[#F26B38]">
+          <SectionCard icon={BookOpen} title="Thông tin cơ bản" iconColor="bg-[#0284c7]">
             {/* Title */}
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
@@ -156,7 +156,7 @@ export function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePostModalPr
                 placeholder="Nhập tiêu đề bài viết..."
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="h-10 rounded-xl border-slate-200 focus:border-[#F26B38] focus:ring-[#F26B38]/20 bg-white text-sm"
+                className="h-10 rounded-xl border-slate-200 focus:border-[#0284c7] focus:ring-[#0284c7]/20 bg-white text-sm"
               />
             </div>
 
@@ -167,8 +167,8 @@ export function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePostModalPr
               </Label>
               <div className="relative">
                 <Textarea
-                  placeholder="Chia sẻ kiến thức, kinh nghiệm của bạn với cộng đồng FPT Polytechnic..."
-                  className="min-h-[160px] rounded-xl border-slate-200 focus:border-[#F26B38] focus:ring-[#F26B38]/20 bg-white text-sm resize-none"
+                  placeholder="Chia sẻ kiến thức, kinh nghiệm của bạn với cộng đồng Don Jade Roy..."
+                  className="min-h-[160px] rounded-xl border-slate-200 focus:border-[#0284c7] focus:ring-[#0284c7]/20 bg-white text-sm resize-none"
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                 />
@@ -191,7 +191,7 @@ export function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePostModalPr
                   <SelectContent className="rounded-xl">
                     {majors.map((m) => (
                       <SelectItem key={m.id} value={m.id} className="text-sm">
-                        <span className="font-medium text-[#F26B38]">{m.code}</span> – {m.name}
+                        <span className="font-medium text-[#0284c7]">{m.code}</span> – {m.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -237,7 +237,7 @@ export function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePostModalPr
                   {tags.map((tag) => (
                     <Badge
                       key={tag}
-                      className="gap-1 bg-[#FEF0E8] text-[#D9541E] border-orange-200 text-xs font-medium hover:bg-orange-100"
+                      className="gap-1 bg-[#e0f2fe] text-[#0369a1] border-sky-200 text-xs font-medium hover:bg-sky-100"
                     >
                       #{tag}
                       <X className="h-3 w-3 cursor-pointer" onClick={() => setTags(tags.filter((t) => t !== tag))} />
@@ -257,8 +257,8 @@ export function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePostModalPr
               onDrop={(e) => { e.preventDefault(); setIsDragOver(false); void uploadPostFiles(e.dataTransfer.files); }}
               className={`block w-full border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer ${
                 isDragOver
-                  ? "border-[#F26B38] bg-[#FEF0E8]"
-                  : "border-slate-200 hover:border-[#F26B38] hover:bg-slate-50"
+                  ? "border-[#0284c7] bg-[#e0f2fe]"
+                  : "border-slate-200 hover:border-[#0284c7] hover:bg-slate-50"
               }`}
             >
               <input
@@ -271,9 +271,9 @@ export function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePostModalPr
                 }}
               />
               <div className={`h-12 w-12 rounded-xl mx-auto mb-3 flex items-center justify-center transition-colors ${
-                isDragOver ? "bg-[#F26B38]" : "bg-slate-100"
+                isDragOver ? "bg-[#0284c7]" : "bg-slate-100"
               }`}>
-                {isUploading ? <Loader2 className="h-6 w-6 animate-spin text-[#F26B38]" /> : <Upload className={`h-6 w-6 ${isDragOver ? "text-white" : "text-slate-400"}`} />}
+                {isUploading ? <Loader2 className="h-6 w-6 animate-spin text-[#0284c7]" /> : <Upload className={`h-6 w-6 ${isDragOver ? "text-white" : "text-slate-400"}`} />}
               </div>
               <p className="text-sm font-medium text-slate-600">
                 {isUploading ? "Đang tải file..." : isDragOver ? "Thả file vào đây!" : "Kéo thả hoặc click để tải file"}
@@ -285,7 +285,7 @@ export function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePostModalPr
               <div className="space-y-2">
                 {attachments.map((file, index) => (
                   <div key={`${file.url}-${index}`} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white px-3 py-2">
-                    <FileText className="h-4 w-4 text-[#F26B38]" />
+                    <FileText className="h-4 w-4 text-[#0284c7]" />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-semibold text-slate-700">{file.name}</div>
                       <div className="truncate text-xs text-slate-400">{file.type}</div>
@@ -323,7 +323,7 @@ export function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePostModalPr
                   className={`flex-1 flex items-center gap-2 rounded-xl border-2 p-3 text-sm font-medium transition-all ${
                     status === s
                       ? s === "published"
-                        ? "border-[#F26B38] bg-[#FEF0E8] text-[#D9541E]"
+                        ? "border-[#0284c7] bg-[#e0f2fe] text-[#0369a1]"
                         : "border-slate-400 bg-slate-100 text-slate-700"
                       : "border-slate-200 text-slate-500 hover:border-slate-300"
                   }`}
@@ -344,7 +344,7 @@ export function CreatePostModal({ isOpen, onClose, onSubmit }: CreatePostModalPr
           </Button>
           <Button
             onClick={handleSubmit}
-            className="h-10 px-6 rounded-xl text-sm font-semibold btn-gradient-orange"
+            className="h-10 px-6 rounded-xl text-sm font-semibold btn-gradient-ocean"
           >
             {status === "draft" ? "💾 Lưu nháp" : "🚀 Đăng bài viết"}
           </Button>

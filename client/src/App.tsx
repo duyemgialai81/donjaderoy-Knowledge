@@ -318,7 +318,7 @@ function MainApp() {
   // 1. Admin view
   if (currentView === "admin" && isAdmin) {
     return (
-      <div>
+      <div className="app-page-shell min-h-screen">
         <Header {...headerProps} />
         <AdminDashboard />
       </div>
@@ -328,9 +328,9 @@ function MainApp() {
   // 2. Settings View
   if (currentView === "settings") {
     return (
-      <div>
+      <div className="app-page-shell min-h-screen">
         <Header {...headerProps} />
-        <div className="bg-[#eef3f8]">
+        <div className="bg-transparent">
           <SettingsPage />
         </div>
       </div>
@@ -361,7 +361,7 @@ function MainApp() {
       );
     }
     return (
-      <div>
+      <div className="app-page-shell min-h-screen">
         <Header {...headerProps} />
         <div className="mt-16">
           <ProfilePage
@@ -393,7 +393,7 @@ function MainApp() {
 
   // 5. Default Main Feed View
   return (
-    <div className="app-page-shell min-h-screen" style={{ background: "#F7F9FC" }}>
+    <div className="app-page-shell min-h-screen">
       <Header {...headerProps} />
 
       <FilterPanel
@@ -437,7 +437,7 @@ function MainApp() {
               {/* Create post CTA */}
               <button
                 onClick={() => setIsCreateModalOpen(true)}
-                className="w-full flex items-center gap-2.5 p-3.5 rounded-xl bg-gradient-to-r from-[#F26B38] to-[#D9541E] text-white text-sm font-semibold shadow-[0_4px_14px_rgba(242,107,56,0.35)] hover:shadow-[0_6px_20px_rgba(242,107,56,0.45)] transition-shadow"
+                className="w-full flex items-center gap-2.5 p-3.5 rounded-xl btn-gradient-ocean text-white text-sm font-semibold"
               >
                 <Plus className="h-4 w-4" />
                 Tạo bài viết mới
@@ -464,7 +464,7 @@ function MainApp() {
                       key={value}
                       value={value}
                         className="feed-tab-trigger flex-1 h-11 gap-1.5 text-xs font-medium rounded-none border-0 border-b-2 border-transparent
-                        data-[state=active]:border-[#F26B38] data-[state=active]:text-[#F26B38]
+                        data-[state=active]:border-[#0284c7] data-[state=active]:text-[#0284c7]
                         data-[state=active]:bg-transparent text-slate-500 hover:text-slate-700"
                     >
                       <Icon className="h-3.5 w-3.5" />
@@ -504,7 +504,7 @@ function MainApp() {
                   <p className="text-sm text-slate-400 mb-5">Thử điều chỉnh bộ lọc hoặc tìm kiếm với từ khóa khác</p>
                   <button
                     onClick={() => setIsCreateModalOpen(true)}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold btn-gradient-orange"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold btn-gradient-ocean"
                   >
                     <Plus className="h-4 w-4" /> Tạo bài viết đầu tiên
                   </button>
