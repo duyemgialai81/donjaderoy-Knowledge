@@ -209,7 +209,8 @@ public class PostLikeServiceImpl implements PostLikeService {
                     .build();
             leaderboardRepository.save(lb);
         }
-        recalculateLeaderboardRanks();
+        // Rank recalculation is intentionally not done on every like; it is O(n)
+        // and blocks badly when users/leaderboard rows reach millions.
     }
 
     private Optional<Leaderboard> findPrimaryLeaderboard(String userId) {
@@ -224,12 +225,8 @@ public class PostLikeServiceImpl implements PostLikeService {
     }
 
     private void recalculateLeaderboardRanks() {
-        List<Leaderboard> all = leaderboardRepository.findAllByOrderByPointsDesc();
-        int rank = 1;
-        for (Leaderboard lb : all) {
-            lb.setRankNo(rank++);
-            leaderboardRepository.save(lb);
-        }
+        // Disabled for request path safety. Re-ranking every row is O(n) and
+        // must run only from a controlled background/admin job.
     }
 
     private void checkAndAwardBadges(String userId) {

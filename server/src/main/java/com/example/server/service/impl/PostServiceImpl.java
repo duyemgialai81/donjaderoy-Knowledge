@@ -366,12 +366,8 @@ public class PostServiceImpl implements PostService {
 
     // Recalculate all ranks
     private void recalculateLeaderboardRanks() {
-        List<Leaderboard> all = leaderboardRepository.findAllByOrderByPointsDesc();
-        int rank = 1;
-        for (Leaderboard lb : all) {
-            lb.setRankNo(rank++);
-            leaderboardRepository.save(lb);
-        }
+        // Disabled for request path safety. Re-ranking every row is O(n) and
+        // must run only from a controlled background/admin job.
     }
 
     // Check and award badges based on points

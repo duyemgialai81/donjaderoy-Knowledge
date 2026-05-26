@@ -20,6 +20,8 @@ public interface UserRepository extends JpaRepository<User, String> {
     long countByPointsGreaterThan(Integer points);
 
     List<User> findByMajorId(String majorId);
+    Page<User> findAllByOrderByPointsDesc(Pageable pageable);
+    Page<User> findByMajorIdOrderByPointsDesc(String majorId, Pageable pageable);
     Page<User> findByIdIn(List<String> ids, Pageable pageable);
 
     @Query("""

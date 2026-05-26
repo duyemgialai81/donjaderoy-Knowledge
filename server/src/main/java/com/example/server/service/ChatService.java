@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +44,7 @@ public class ChatService {
 
     private static final int DEFAULT_MESSAGE_LIMIT = 100;
     private static final int MAX_MESSAGE_LIMIT = 200;
+    private static final int UNREAD_DISPLAY_CAP = 100;
 
     private final ConversationRepository conversationRepository;
     private final ConversationParticipantRepository participantRepository;
@@ -105,7 +107,7 @@ public class ChatService {
                 .build();
 
         Message savedMessage = cacheService.saveMessageWithCache(message);
-        touchConversation(conversationId, now);
+        touchConversationWithLastMessage(conversationId, savedMessage, now);
         markConversationAsRead(conversationId, senderId, now);
         invalidateConversationListCaches(conversationId);
         return mapToMessageResponse(savedMessage, senderId);
@@ -127,15 +129,7 @@ public class ChatService {
                 PageRequest.of(safePage, safeSize)
         );
 
-        List<ChatDTO.ConversationItem> items = myParticipants.getContent().stream()
-                .map(myPart -> buildConversationItem(userId, myPart))
-                .filter(item -> item.getStatus() == null || !"blocked".equalsIgnoreCase(item.getStatus()))
-                .sorted((a, b) -> {
-                    if (a.getLastMessageTime() == null) return 1;
-                    if (b.getLastMessageTime() == null) return -1;
-                    return b.getLastMessageTime().compareTo(a.getLastMessageTime());
-                })
-                .collect(Collectors.toList());
+        List<ChatDTO.ConversationItem> items = buildConversationItems(userId, myParticipants.getContent());
 
         return new PageableObject<>(
                 items,
@@ -289,7 +283,7 @@ public class ChatService {
         message.setEditedAt(LocalDateTime.now());
         Message saved = messageRepository.save(message);
         cacheService.cacheUpdatedMessage(saved);
-        touchConversation(saved.getConversationId(), saved.getEditedAt());
+        updateLastMessageSummaryIfCurrent(saved);
         invalidateConversationListCaches(saved.getConversationId());
         return mapToMessageResponse(saved, userId);
     }
@@ -305,7 +299,7 @@ public class ChatService {
         message.setDeletedAt(now);
         Message saved = messageRepository.save(message);
         cacheService.cacheUpdatedMessage(saved);
-        touchConversation(saved.getConversationId(), now);
+        refreshLastMessageAfterDelete(saved, now);
         invalidateConversationListCaches(saved.getConversationId());
         return mapToMessageResponse(saved, userId);
     }
@@ -441,10 +435,114 @@ public class ChatService {
     }
 
     private ChatDTO.ConversationItem buildConversationItem(String userId, ConversationParticipant myPart) {
-        String conversationId = myPart.getConversationId();
-        Conversation conversation = conversationRepository.findById(conversationId).orElse(null);
-        List<ConversationParticipant> participants = participantRepository.findByConversationId(conversationId);
+        return buildConversationItems(userId, List.of(myPart)).stream()
+                .findFirst()
+                .orElseGet(() -> ChatDTO.ConversationItem.builder()
+                        .id(myPart.getConversationId())
+                        .status(myPart.getStatus() != null ? myPart.getStatus().name() : "accepted")
+                        .build());
+    }
 
+    private List<ChatDTO.ConversationItem> buildConversationItems(String userId, List<ConversationParticipant> myParticipants) {
+        if (myParticipants == null || myParticipants.isEmpty()) {
+            return List.of();
+        }
+
+        List<String> conversationIds = myParticipants.stream()
+                .map(ConversationParticipant::getConversationId)
+                .filter(this::hasText)
+                .distinct()
+                .toList();
+        if (conversationIds.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, Conversation> conversationsById = new HashMap<>();
+        conversationRepository.findAllById(conversationIds)
+                .forEach(conversation -> conversationsById.put(conversation.getId(), conversation));
+
+        Map<String, List<ConversationParticipant>> participantsByConversation = participantRepository
+                .findByConversationIdIn(conversationIds)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        ConversationParticipant::getConversationId,
+                        LinkedHashMap::new,
+                        Collectors.toList()
+                ));
+
+        Map<String, Message> latestMessageByConversation = new HashMap<>();
+        for (String conversationId : conversationIds) {
+            Conversation conversation = conversationsById.get(conversationId);
+            if (hasConversationSummary(conversation)) {
+                continue;
+            }
+            messageRepository.findLatestVisibleMessages(conversationId, PageRequest.of(0, 1))
+                    .stream()
+                    .findFirst()
+                    .ifPresent(message -> latestMessageByConversation.put(conversationId, message));
+        }
+
+        Map<String, Integer> unreadByConversation = new HashMap<>();
+        for (ConversationParticipant myPart : myParticipants) {
+            int unread = messageRepository.findUnreadMessageIdsCapped(
+                    myPart.getConversationId(),
+                    userId,
+                    myPart.getLastReadAt(),
+                    PageRequest.of(0, UNREAD_DISPLAY_CAP)
+            ).size();
+            unreadByConversation.put(myPart.getConversationId(), unread);
+        }
+
+        Set<String> userIdsToLoad = new LinkedHashSet<>();
+        participantsByConversation.forEach((conversationId, participants) -> {
+            Conversation conversation = conversationsById.get(conversationId);
+            if (conversation != null && conversation.getType() == Conversation.ConversationType.direct) {
+                participants.stream()
+                        .map(ConversationParticipant::getUserId)
+                        .filter(participantId -> !userId.equals(participantId))
+                        .forEach(userIdsToLoad::add);
+            }
+        });
+        conversationsById.values().stream()
+                .map(Conversation::getLastMessageSenderId)
+                .filter(this::hasText)
+                .forEach(userIdsToLoad::add);
+        latestMessageByConversation.values().stream()
+                .map(Message::getSenderId)
+                .filter(this::hasText)
+                .forEach(userIdsToLoad::add);
+
+        Map<String, User> usersById = new HashMap<>();
+        if (!userIdsToLoad.isEmpty()) {
+            userRepository.findAllById(userIdsToLoad)
+                    .forEach(user -> usersById.put(user.getId(), user));
+        }
+
+        return myParticipants.stream()
+                .filter(myPart -> myPart.getStatus() == null
+                        || myPart.getStatus() != ConversationParticipant.ParticipantStatus.blocked)
+                .map(myPart -> buildConversationItemFromBatch(
+                        userId,
+                        myPart,
+                        conversationsById.get(myPart.getConversationId()),
+                        participantsByConversation.getOrDefault(myPart.getConversationId(), List.of()),
+                        latestMessageByConversation.get(myPart.getConversationId()),
+                        usersById,
+                        unreadByConversation.getOrDefault(myPart.getConversationId(), 0)
+                ))
+                .collect(Collectors.toList());
+    }
+
+    private ChatDTO.ConversationItem buildConversationItemFromBatch(
+            String userId,
+            ConversationParticipant myPart,
+            Conversation conversation,
+            List<ConversationParticipant> participants,
+            Message lastMessage,
+            Map<String, User> usersById,
+            int unreadCount
+    ) {
+        String conversationId = myPart.getConversationId();
         ChatDTO.ConversationItem item = ChatDTO.ConversationItem.builder()
                 .id(conversationId)
                 .status(myPart.getStatus() != null ? myPart.getStatus().name() : "accepted")
@@ -456,30 +554,52 @@ public class ChatService {
             item.setBackgroundId(conversation.getBackgroundId());
             item.setBackgroundUrl(conversation.getBackgroundUrl());
             if (conversation.getType() == Conversation.ConversationType.direct) {
-                fillDirectConversationTarget(item, userId, participants);
+                fillDirectConversationTargetFromBatch(item, userId, participants, usersById);
             } else {
                 item.setGroupName(conversation.getName());
                 item.setMemberCount(participants.size());
             }
         }
 
-        List<Message> latestMessages = cacheService.getMessagesByConversation(conversationId, 1);
-        if (latestMessages.isEmpty()) {
+        if (hasConversationSummary(conversation)) {
+            User sender = usersById.get(conversation.getLastMessageSenderId());
+            item.setLastMessage(conversation.getLastMessageText());
+            item.setLastMessageTime(conversation.getLastMessageAt());
+            item.setLastMessageType(hasText(conversation.getLastMessageType()) ? conversation.getLastMessageType() : "text");
+            item.setLastMessageSenderName(sender != null ? sender.getName() : conversation.getLastMessageSenderId());
+        } else if (lastMessage == null) {
             item.setLastMessage("Bat dau cuoc tro chuyen...");
             if (conversation != null) {
                 item.setLastMessageTime(conversation.getUpdatedAt());
             }
         } else {
-            Message lastMessage = latestMessages.get(0);
+            User sender = usersById.get(lastMessage.getSenderId());
             item.setLastMessage(lastMessage.getContent());
             item.setLastMessageTime(lastMessage.getCreatedAt());
             item.setLastMessageType(lastMessage.getMessageType() != null ? lastMessage.getMessageType().name() : "text");
-            item.setLastMessageSenderName(lastMessage.getSenderId());
+            item.setLastMessageSenderName(sender != null ? sender.getName() : lastMessage.getSenderId());
         }
 
-        long unread = messageRepository.countUnreadMessages(conversationId, userId, myPart.getLastReadAt());
-        item.setUnreadCount((int) Math.min(unread, Integer.MAX_VALUE));
+        item.setUnreadCount(unreadCount);
         return item;
+    }
+
+    private void fillDirectConversationTargetFromBatch(
+            ChatDTO.ConversationItem item,
+            String userId,
+            List<ConversationParticipant> participants,
+            Map<String, User> usersById
+    ) {
+        participants.stream()
+                .filter(participant -> !participant.getUserId().equals(userId))
+                .findFirst()
+                .map(participant -> usersById.get(participant.getUserId()))
+                .ifPresent(otherUser -> {
+                    item.setTargetUserId(otherUser.getId());
+                    item.setTargetUserName(otherUser.getName());
+                    item.setTargetUserAvatar(otherUser.getAvatar());
+                    item.setTargetIsOnline(cacheService.isUserOnline(otherUser.getId()));
+                });
     }
 
     private void fillDirectConversationTarget(
@@ -503,6 +623,64 @@ public class ChatService {
         Conversation conversation = conversationRepository.findById(conversationId).orElseThrow();
         conversation.setUpdatedAt(time);
         conversationRepository.save(conversation);
+    }
+
+    private void touchConversationWithLastMessage(String conversationId, Message message, LocalDateTime time) {
+        Conversation conversation = conversationRepository.findById(conversationId).orElseThrow();
+        applyLastMessageSummary(conversation, message);
+        conversation.setUpdatedAt(time);
+        conversationRepository.save(conversation);
+    }
+
+    private void updateLastMessageSummaryIfCurrent(Message message) {
+        Conversation conversation = conversationRepository.findById(message.getConversationId()).orElseThrow();
+        if (message.getId().equals(conversation.getLastMessageId())) {
+            applyLastMessageSummary(conversation, message);
+            conversation.setUpdatedAt(message.getEditedAt() != null ? message.getEditedAt() : LocalDateTime.now());
+            conversationRepository.save(conversation);
+        }
+    }
+
+    private void refreshLastMessageAfterDelete(Message deletedMessage, LocalDateTime time) {
+        Conversation conversation = conversationRepository.findById(deletedMessage.getConversationId()).orElseThrow();
+        if (deletedMessage.getId().equals(conversation.getLastMessageId())) {
+            messageRepository.findLatestVisibleMessages(deletedMessage.getConversationId(), PageRequest.of(0, 1))
+                    .stream()
+                    .findFirst()
+                    .ifPresentOrElse(
+                            latest -> applyLastMessageSummary(conversation, latest),
+                            () -> clearLastMessageSummary(conversation)
+                    );
+        }
+        conversation.setUpdatedAt(time);
+        conversationRepository.save(conversation);
+    }
+
+    private void applyLastMessageSummary(Conversation conversation, Message message) {
+        conversation.setLastMessageId(message.getId());
+        conversation.setLastMessageSenderId(message.getSenderId());
+        conversation.setLastMessageType(message.getMessageType() != null ? message.getMessageType().name() : "text");
+        conversation.setLastMessageText(truncate(message.getContent(), 1024));
+        conversation.setLastMessageAt(message.getCreatedAt());
+    }
+
+    private void clearLastMessageSummary(Conversation conversation) {
+        conversation.setLastMessageId(null);
+        conversation.setLastMessageSenderId(null);
+        conversation.setLastMessageType(null);
+        conversation.setLastMessageText(null);
+        conversation.setLastMessageAt(null);
+    }
+
+    private boolean hasConversationSummary(Conversation conversation) {
+        return conversation != null && hasText(conversation.getLastMessageId());
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength);
     }
 
     private void markConversationAsRead(String conversationId, String userId, LocalDateTime readAt) {

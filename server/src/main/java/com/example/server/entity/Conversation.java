@@ -27,6 +27,15 @@ public class Conversation {
     @Column(length = 1024)
     private String backgroundUrl;
 
+    private String lastMessageId;
+    private String lastMessageSenderId;
+    private String lastMessageType;
+
+    @Column(length = 1024)
+    private String lastMessageText;
+
+    private LocalDateTime lastMessageAt;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

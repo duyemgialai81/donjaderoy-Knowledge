@@ -14,7 +14,6 @@ import java.util.List;
 public interface MessageRepository extends JpaRepository<Message, String> {
     List<Message> findByConversationIdOrderByCreatedAtAsc(String conversationId);
     List<Message> findByConversationIdOrderByCreatedAtDesc(String conversationId, Pageable pageable);
-    long countByConversationId(String conversationId);
 
     @Query("SELECT m FROM Message m WHERE m.conversationId = :convId AND m.createdAt > :since ORDER BY m.createdAt ASC")
     List<Message> findNewMessagesSince(@Param("convId") String convId, @Param("since") LocalDateTime since);
@@ -22,6 +21,7 @@ public interface MessageRepository extends JpaRepository<Message, String> {
     @Query("""
             SELECT m FROM Message m
             WHERE m.conversationId = :conversationId
+              AND (m.isDeleted = false OR m.isDeleted IS NULL)
             ORDER BY m.createdAt DESC, m.id DESC
             """)
     List<Message> findLatestVisibleMessages(@Param("conversationId") String conversationId, Pageable pageable);
@@ -50,4 +50,17 @@ public interface MessageRepository extends JpaRepository<Message, String> {
     long countUnreadMessages(@Param("conversationId") String conversationId,
                              @Param("userId") String userId,
                              @Param("lastReadAt") LocalDateTime lastReadAt);
+
+    @Query("""
+            SELECT m.id FROM Message m
+            WHERE m.conversationId = :conversationId
+              AND m.senderId <> :userId
+              AND (m.isDeleted = false OR m.isDeleted IS NULL)
+              AND (:lastReadAt IS NULL OR m.createdAt > :lastReadAt)
+            ORDER BY m.createdAt DESC, m.id DESC
+            """)
+    List<String> findUnreadMessageIdsCapped(@Param("conversationId") String conversationId,
+                                            @Param("userId") String userId,
+                                            @Param("lastReadAt") LocalDateTime lastReadAt,
+                                            Pageable pageable);
 }

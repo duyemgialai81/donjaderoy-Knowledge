@@ -1,9 +1,26 @@
 USE duyem;
 
+-- Schema columns used by the optimized chat read path.
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS last_message_id VARCHAR(255);
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS last_message_sender_id VARCHAR(255);
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS last_message_type VARCHAR(255);
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS last_message_text VARCHAR(1024);
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS last_message_at DATETIME;
+
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_message_id VARCHAR(255);
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS attachment_url VARCHAR(255);
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS attachment_name VARCHAR(255);
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS attachment_size BIGINT;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS edited_at DATETIME;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS deleted_at DATETIME;
+
 -- Chat hot path: conversation list, latest messages, cursor pagination, unread count.
 CREATE INDEX IF NOT EXISTS idx_cp_user_status_conversation ON conversation_participants(user_id, status, conversation_id);
 CREATE INDEX IF NOT EXISTS idx_cp_conversation_status_user ON conversation_participants(conversation_id, status, user_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_updated_id ON conversations(updated_at DESC, id);
+CREATE INDEX IF NOT EXISTS idx_conversations_last_message_at ON conversations(last_message_at DESC, id);
 CREATE INDEX IF NOT EXISTS idx_messages_conv_created_id ON messages(conversation_id, created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_conv_deleted_created_id ON messages(conversation_id, is_deleted, created_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_conv_sender_created ON messages(conversation_id, sender_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_reply_to ON messages(reply_to_message_id);
 CREATE INDEX IF NOT EXISTS idx_message_reactions_message_user ON message_reactions(message_id, user_id);
@@ -14,6 +31,7 @@ CREATE INDEX IF NOT EXISTS idx_posts_status_created_id ON posts(status, created_
 CREATE INDEX IF NOT EXISTS idx_posts_status_major_created ON posts(status, major_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_posts_status_topic_created ON posts(status, topic, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_posts_author_created ON posts(author_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_posts_author_status_created ON posts(author_id, status, created_at DESC);
 
 -- Comments/replies: all comment endpoints are paged.
 CREATE INDEX IF NOT EXISTS idx_comments_post_parent_created ON comments(post_id, parent_id, created_at DESC);
@@ -32,8 +50,13 @@ CREATE INDEX IF NOT EXISTS idx_blocks_blocker_created_blocked ON blocks(blocker_
 
 -- Admin/auth lookup and permission checks.
 CREATE INDEX IF NOT EXISTS idx_users_active_role_created ON users(is_active, role, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_users_points_id ON users(points DESC, id);
+CREATE INDEX IF NOT EXISTS idx_users_major_points_id ON users(major_id, points DESC, id);
 CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);
 CREATE INDEX IF NOT EXISTS idx_users_provider_verified ON users(auth_provider, email_verified);
+CREATE INDEX IF NOT EXISTS idx_leaderboard_user_id ON leaderboard(user_id);
+CREATE INDEX IF NOT EXISTS idx_leaderboard_points_id ON leaderboard(points DESC, id);
+CREATE INDEX IF NOT EXISTS idx_leaderboard_posts_week_user ON leaderboard(posts_this_week DESC, user_id);
 CREATE INDEX IF NOT EXISTS idx_bans_active_end_user ON bans(is_active, end_at, user_id);
 CREATE INDEX IF NOT EXISTS idx_reports_status_created_id ON reports(status, created_at DESC, id);
 CREATE INDEX IF NOT EXISTS idx_admin_actions_created_id ON admin_actions(created_at DESC, id);

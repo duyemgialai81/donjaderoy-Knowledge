@@ -132,10 +132,6 @@ public class MessageCacheService {
                 boolean scopedToConversation = cachedMessages.stream()
                         .allMatch(message -> conversationId.equals(message.getConversationId()));
                 boolean cacheHasFullRequestedWindow = cachedWindowSize >= safeLimit;
-                if (cachedWindowSize < Math.max(safeLimit, DEFAULT_CONVERSATION_CACHE_WINDOW)) {
-                    long dbMessageCount = messageRepository.countByConversationId(conversationId);
-                    cacheHasFullRequestedWindow = dbMessageCount <= cachedWindowSize;
-                }
 
                 if (cacheComplete && scopedToConversation && cacheHasFullRequestedWindow) {
                     redisTemplate.expire(convKey, ttl(messagesTtlMinutes));
